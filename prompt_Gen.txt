@@ -9,7 +9,7 @@
 5. Đoạn thông tin phải là nội dung văn liên mạch, không tách thành nhiều tình huống
 6. Đáp án sai phải hợp lý, không quá dễ loại bỏ
 7. Lời giải phải nhận đúng những nội dung đã thuyết phục
-8. Trả về duy nhất nội dung viết câu, không những nội dung khác như: "Tất nhiên rồi...", "Dưới đây là...", "Tôi đã hiểu...rồi"
+8. Trả về duy nhất nội dung viết câu, không những nội dung khác như: "Tất nhiên rồi...", "Dưới đây là...", "Tôi đã hiểu...rồi", "Chắc chắn rồi..."
 
 ---
 
