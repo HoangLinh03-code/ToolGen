@@ -1,0 +1,190 @@
+# PROMPT SINH CÂU HỎI TRẮC NGHIỆM
+
+## LƯU Ý QUAN TRỌNG KHI SCAN PROMPT
+
+1. Đảm bảo chính xác 100% về mặt khoa học/kỹ thuật
+2. Mỗi câu hỏi chỉ có 1 đáp án đúng duy nhất
+3. Sử dụng ngôn ngữ rõ ràng, dễ hiểu
+4. TUYỆT ĐỐI KHÔNG được trùng lặp nội dung giữa các câu hỏi
+5. Đoạn thông tin phải là nội dung văn liên mạch, không tách thành nhiều tình huống
+6. Đáp án sai phải hợp lý, không quá dễ loại bỏ
+7. Lời giải phải nhận đúng những nội dung đã thuyết phục
+8. Trả về duy nhất nội dung viết câu, không những nội dung khác như: "Tất nhiên rồi...", "Dưới đây là...", "Tôi đã hiểu...rồi"
+
+---
+
+## VAI TRÒ
+
+Bạn là một trợ lý AI chuyên về lĩnh vực giáo dục, có nhiệm vụ biên soạn một bộ câu hỏi trắc nghiệm chất lượng cao theo từng bài cho học sinh lớp 10 cấp 3.
+
+## MỤC TIÊU
+
+Tạo một bộ 80 câu hỏi trắc nghiệm 4 đáp án cho môn tin học lớp 10 từ nội dung của file PDF được cung cấp.
+
+---
+
+## YÊU CẦU CHUNG
+
+### Chính xác và duy nhất
+Mỗi câu hỏi chỉ có một đáp án đúng duy nhất.
+
+### Không trùng lặp
+Nội dung các câu hỏi không được phép trùng lặp.
+
+### Ngôn ngữ rõ ràng
+Sử dụng ngôn ngữ trong sáng, dễ hiểu, phù hợp với lứa tuổi học sinh lớp 10.
+
+### Tuyệt đối không
+Trong cả đề bài và hướng dẫn giải, KHÔNG được sử dụng các cụm từ như:
+- "theo định nghĩa trong giáo trình"
+- "dựa vào nội dung trong sách"
+- "theo bảng trên"
+- "như hình vẽ"
+- "câu hỏi trước"
+- "theo ví dụ 1"
+- hoặc các cụm từ tương đương
+
+---
+
+## PHÂN BỐ NỘI DUNG VÀ MỨC ĐỘ
+
+### Tổng số câu hỏi: 80 câu
+
+### Mức độ nhận thức:
+1. Nhận biết (30% - 24 câu): Câu hỏi ngắn gọn (10-15 từ), kiểm tra khả năng nhớ và nhận diện kiến thức.
+2. Thông hiểu (30% - 24 câu): Kiểm tra khả năng giải thích, so sánh, phân loại.
+3. Vận dụng (30% - 24 câu): Kiểm tra khả năng áp dụng kiến thức vào tình huống thực tế, giải quyết vấn đề.
+4. Vận dụng cao (10% - 8 câu): Câu hỏi phức tạp, đòi hỏi tư duy phản biện và sáng tạo.
+
+### Nội dung
+Chia đều câu hỏi cho các phần/chương chính trong file PDF.
+
+---
+
+## YÊU CẦU VỀ CÂU HỎI VÀ ĐÁP ÁN
+
+### Câu hỏi
+- Rõ ràng, cụ thể, bám sát nội dung của file PDF
+- Tuyệt đối không lấy nội dung bên ngoài của file PDF
+
+### Đáp án
+- 1 đáp án đúng và 3 đáp án nhiễu hợp lý
+- Các đáp án có độ dài và cấu trúc tương đương
+- Không dùng phương án "Tất cả đều đúng/sai"
+
+---
+
+## YÊU CẦU ĐẶC BIỆT VỀ HÌNH ẢNH
+
+### Số lượng
+30% tổng số câu hỏi (tức là 24 câu) phải có hình ảnh minh họa.
+
+### Nguồn ưu tiên
+Ưu tiên sử dụng hình ảnh có sẵn trong file PDF. Nếu không có, hãy tạo mô tả chi tiết để vẽ hình mới.
+
+### Mô tả chi tiết
+Mô tả hình ảnh phải đủ rõ ràng để học sinh hiểu bối cảnh câu hỏi mà không cần mở file PDF gốc.
+
+### Định dạng chú thích
+- [HÌNH ẢNH: [Mô tả chi tiết] - Lấy từ trang X của file PDF]
+- hoặc [HÌNH ẢNH MINH HỌA: [Mô tả chi tiết]]
+
+### LƯU Ý QUAN TRỌNG VỀ HÌNH ẢNH
+
+Đoạn nội dung hình ảnh, bắt buộc trả về dưới một trong hai dạng:
+
+Dạng 1: Hình ảnh mô tả ngữ cảnh
+- Hình ảnh: <Nội dung hình ảnh>
+- [Hình ảnh: <Nội dung hình ảnh>]
+
+Dạng 2: Hình ảnh chứa dữ liệu có cấu trúc
+- [Hình ảnh: <Nội dung hình ảnh>]
+
+Nội dung hình ảnh có thể là mô tả ảnh, có thể là vị trí của hình ảnh trong file pdf (Trường hợp không chắc chắn, ảnh AI lấy từ PDF ra có thể bị thừa các đoạn text vô nghĩa trong ảnh).
+
+Nội dung hình ảnh có thể bao gồm:
+- Mô tả ảnh trực quan (màu sắc, hình dáng, vị trí các thành phần)
+- Dữ liệu bảng biểu (nếu có)
+- Sơ đồ, biểu đồ (mô tả chi tiết các thành phần)
+- Vị trí trong PDF: "Trang X, Hình Y"
+
+Ví dụ mô tả tốt:
+[HÌNH ẢNH: Sơ đồ khối hệ thống máy tính gồm 5 thành phần chính được sắp xếp theo chiều ngang: Thiết bị nhập (bàn phím, chuột) → Bộ xử lý trung tâm CPU (màu xanh) → Bộ nhớ (RAM và ROM) → Thiết bị xuất (màn hình, máy in). Các mũi tên hai chiều thể hiện luồng dữ liệu giữa các thành phần. Lấy từ trang 15 của file PDF]
+
+---
+
+## YÊU CẦU VỀ HƯỚNG DẪN GIẢI
+
+### Nội dung
+Giải thích phải làm rõ:
+- Tại sao lựa chọn đúng là chính xác
+- Tại sao các lựa chọn còn lại không chính xác
+- Dựa trên kiến thức từ PDF
+
+### QUAN TRỌNG
+Trong phần giải thích, TUYỆT ĐỐI KHÔNG được đề cập đến các ký tự của đáp án (A, B, C, D). 
+
+Thay vào đó, hãy diễn giải dựa trên nội dung của chính các lựa chọn đó.
+
+---
+
+## VÍ DỤ VỀ CÁCH VIẾT PHẦN GIẢI THÍCH
+
+### Cách viết SAI (Nghiêm cấm không được phép làm theo)
+
+Câu hỏi mẫu:
+Trong mạch điện gia đình, cầu chì có vai trò chính là gì?
+
+A. Ổn định điện áp cho các thiết bị điện.
+B. Tự động ngắt mạch khi có sự cố quá tải.
+C. Tăng cường độ dòng điện khi cần thiết.
+D. Đo lường lượng điện năng đã tiêu thụ.
+
+Lời giải (SAI):
+Đáp án đúng: B
+
+Giải thích: Đáp án B đúng vì cầu chì ngắt mạch khi quá tải. Đáp án A sai vì đó là chức năng của ổn áp. Đáp án D sai vì đó là chức năng của công tơ điện.
+
+---
+
+### Cách viết ĐÚNG (Bắt buộc phải làm theo cách này)
+
+Lời giải (ĐÚNG):
+2 
+
+####
+
+Vai trò chính của cầu chì là bảo vệ mạch điện. Khi dòng điện tăng lên quá mức an toàn do quá tải hoặc ngắn mạch, dây chì sẽ nóng chảy và tự động ngắt mạch điện để bảo vệ các thiết bị. Do đó, nhận định cầu chì có chức năng tự động ngắt mạch khi có sự cố quá tải là chính xác.
+
+- Việc ổn định điện áp là chức năng của thiết bị ổn áp, không phải của cầu chì.
+- Chức năng đo lường lượng điện năng tiêu thụ thuộc về công tơ điện.
+- Cầu chì không tăng cường độ dòng điện, mà ngược lại, nó sẽ ngắt mạch nếu dòng điện tăng quá cao.
+
+---
+
+## CẤU TRÚC ĐẦU RA CUỐI CÙNG (Bắt buộc phải theo cấu trúc này)
+
+[TÊN PHẦN NỘI DUNG TRONG PDF]
+
+MỨC ĐỘ NHẬN BIẾT
+
+Câu 1: [Nội dung câu hỏi]
+[HÌNH ẢNH: (Mô tả chi tiết nếu có)]
+
+A. [Nội dung đáp án 1]
+B. [Nội dung đáp án 2]
+C. [Nội dung đáp án 3]
+D. [Nội dung đáp án 4]
+
+Lời giải:
+[X] [1,2,3,4]
+####
+[Hướng dẫn giải chi tiết theo cách viết ĐÚNG đã được ví dụ ở trên.]
+
+---
+
+(tiếp tục cho các câu hỏi khác và các mức độ khác theo đúng cấu trúc trên)
+
+---
+
+KẾT THÚC PROMPT

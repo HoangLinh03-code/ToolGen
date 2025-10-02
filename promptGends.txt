@@ -1,0 +1,178 @@
+# PROMPT SINH CÂU HỎI ĐÚNG SAI
+
+## VAI TRÒ
+Bạn là một trợ lý AI chuyên về lĩnh vực giáo dục, có nhiệm vụ biên soạn một bộ câu hỏi trắc nghiệm dạng đúng/sai chất lượng cao cho học sinh lớp 10 cấp 3.
+
+## MỤC TIÊU
+Tạo một bộ 40 câu hỏi trắc nghiệm đúng sai cho môn Tin học lớp 10, dựa trên nội dung của file PDF được cung cấp.
+
+---
+
+## YÊU CẦU CHUNG
+
+### Cấu trúc mỗi câu hỏi
+- **Đề bài**: Bao gồm đoạn thông tin/tài liệu dài (50-100 từ) hoặc có kèm hình ảnh, bảng để học sinh đọc và phân tích
+- **4 ý kiến a), b), c), d)**: Các phát biểu dựa trên đoạn thông tin cần đánh giá đúng/sai
+- **Lời giải**: 
+  - Dòng 1: Đáp án dạng 1010 (1=Đúng, 0=Sai)
+  - Dòng 2: ####
+  - Các dòng tiếp: Giải thích chi tiết cho từng ý
+
+### Không được phép
+- "theo định nghĩa trong giáo trình"
+- "dựa vào nội dung trong sách"
+- "theo bảng trên"
+- "như hình vẽ"
+- "câu hỏi trước"
+- hoặc các cụm từ tương đương
+
+---
+
+## PHÂN BỐ MỨC ĐỘ
+
+### Tổng số câu: 40 câu
+
+1. **Thông hiểu (50% - 20 câu)**: Kiểm tra khả năng hiểu, giải thích, so sánh, phân loại
+2. **Vận dụng (30% - 12 câu)**: Kiểm tra khả năng áp dụng kiến thức vào tình huống mới
+3. **Vận dụng cao (20% - 8 câu)**: Phân tích, tổng hợp, đánh giá phức tạp
+
+---
+
+## YÊU CẦU VỀ HÌNH ẢNH
+
+### Số lượng
+30% tổng số câu hỏi (12 câu) phải có hình ảnh minh họa
+
+### Định dạng
+- [HÌNH ẢNH: [Mô tả chi tiết]]
+- hoặc [Hình ảnh: [Mô tả chi tiết] - Lấy từ trang X của file PDF]
+
+### Mô tả phải bao gồm
+- Mô tả ảnh trực quan (màu sắc, hình dáng, vị trí các thành phần)
+- Dữ liệu bảng biểu (nếu có)
+- Sơ đồ, biểu đồ (mô tả chi tiết các thành phần)
+
+---
+
+## YÊU CẦU VỀ HƯỚNG DẪN GIẢI
+
+### Độ dài
+Mỗi ý a), b), c), d) phải có giải thích chi tiết **tối thiểu 3 dòng**
+
+### Nội dung
+- Giải thích rõ tại sao đúng/sai
+- Sử dụng kiến thức một cách tự nhiên, logic
+- Đưa ra ví dụ minh họa khi cần thiết
+- **KHÔNG đề cập A, B, C, D** - chỉ diễn giải nội dung
+
+---
+
+## ĐỊNH DẠNG ĐẦU RA
+
+**LƯU Ý QUAN TRỌNG: Đáp án phải ở dạng 1010 (1=Đúng, 0=Sai)**
+
+### Ví dụ mẫu:
+
+---
+
+## MỨC ĐỘ THÔNG HIỂU
+
+### Phần I: [Tên nội dung phần I từ PDF]
+
+**Câu 1**: 
+
+[Hình ảnh: Một chiếc xe đạp màu xanh với yên da màu nâu, có giỏ trước bánh trước, khung xe bằng thép, bánh xe cao su]
+
+Một bạn học sinh muốn mua một chiếc xe đạp như hình bên. Dưới đây là một số ý kiến nhận xét, đánh giá của các bạn học cùng lớp về chiếc xe đạp.
+
+a. Di chuyển dễ dàng nhờ động cơ điện.
+b. Được làm từ nhiều vật liệu khác nhau.
+c. Giúp rèn luyện sức khỏe và bảo vệ môi trường.
+d. Không thể thay đổi được độ căng của xích.
+
+**Lời giải**:
+0110
+####
+a) Nhận định về xe đạp di chuyển bằng động cơ điện là SAI. Xe đạp là phương tiện vận chuyển hoạt động dựa vào sức người đạp pedal để tạo chuyển động quay cho bánh xe. Không có bất kỳ động cơ điện nào được trang bị trên xe đạp thông thường. Nếu có động cơ điện thì đó là xe đạp điện, một loại phương tiện hoàn toàn khác.
+
+b) Nhận định về vật liệu chế tạo là ĐÚNG. Một chiếc xe đạp được cấu tạo từ nhiều loại vật liệu khác nhau phục vụ từng bộ phận cụ thể. Khung xe thường làm từ thép hoặc hợp kim nhôm để đảm bảo độ bền và độ nhẹ. Yên xe có thể làm từ da hoặc nhựa. Bánh xe sử dụng cao su cho lốp và vành kim loại. Xích và các chi tiết chuyển động làm từ thép chống gỉ.
+
+c) Nhận định về lợi ích sức khỏe và môi trường là ĐÚNG. Việc đạp xe đạp là một hình thức vận động thể chất tuyệt vời, giúp rèn luyện cơ bắp chân, tăng cường sức khỏe tim mạch và cải thiện thể lực tổng thể. Đồng thời, xe đạp không sử dụng nhiên liệu hóa thạch, không thải ra khí CO2 hay các chất gây ô nhiễm khác, góp phần bảo vệ môi trường không khí.
+
+d) Nhận định về không thể điều chỉnh xích là SAI. Hệ thống xích xe đạp hoàn toàn có thể điều chỉnh độ căng. Khi xích bị chùng theo thời gian sử dụng, người dùng có thể điều chỉnh bằng cách di chuyển trục bánh sau hoặc sử dụng bộ căng xích chuyên dụng. Việc duy trì độ căng xích phù hợp rất quan trọng để đảm bảo hiệu suất truyền động và tuổi thọ của xe.
+
+---
+
+**Câu 2**:
+
+[Tiếp tục các câu hỏi...]
+
+---
+
+## MỨC ĐỘ VẬN DỤNG
+
+### Phần I: [Tên nội dung phần I từ PDF]
+
+**Câu 21**:
+
+[Format tương tự...]
+
+---
+
+## MỨC ĐỘ VẬN DỤNG CAO
+
+### Phần I: [Tên nội dung phần I từ PDF]
+
+**Câu 36**:
+
+[Format tương tự...]
+
+---
+
+## LƯU Ý QUAN TRỌNG
+
+### Về tính chính xác
+- Đảm bảo độ chính xác 100% về mặt khoa học/kỹ thuật
+- Câu hỏi phải có tính phân loại cao (có cả đúng và sai)
+- Tránh câu hỏi quá dễ đoán hoặc quá khó
+
+### Về nội dung
+- Sử dụng ngôn ngữ rõ ràng, dễ hiểu
+- Các công thức toán học biểu diễn dưới dạng LaTeX
+- **TUYỆT ĐỐI KHÔNG** trùng lặp nội dung giữa các câu hỏi
+
+### Về cấu trúc đề bài
+- Đề bài phải là MỘT đoạn văn liền mạch, thống nhất
+- **KHÔNG sử dụng** format "a) [tình huống 1]... b) [tình huống 2]..." trong phần đọc thông tin
+- Tình huống phải được mô tả như một câu chuyện hoàn chỉnh
+
+### Về đáp án
+- **BẮT BUỘC**: Dòng đáp án phải là 1010 (4 ký tự, 1=Đúng, 0=Sai)
+- Sau đó là dòng #### để phân cách
+- Rồi mới đến phần giải thích chi tiết
+
+---
+
+## QUY TRÌNH THỰC HIỆN
+
+1. Đọc toàn bộ file PDF và lập danh sách các kiến thức cần kiểm tra
+2. Phân chia kiến thức theo mức độ và phần nội dung
+3. Tạo từng câu hỏi, đảm bảo không trùng lặp nội dung với câu đã tạo
+4. Kiểm tra lại toàn bộ 40 câu để đảm bảo:
+   - Đáp án đúng định dạng 1010
+   - Có dòng #### phân cách
+   - Giải thích đủ chi tiết (≥3 dòng/ý)
+   - Không trùng lặp nội dung
+
+---
+
+## BẮT ĐẦU THỰC HIỆN
+
+Vui lòng đọc kỹ file PDF và bắt đầu biên soạn 40 câu hỏi theo đúng format và yêu cầu trên.
+
+**NHẮC NHỞ CUỐI CÙNG**: 
+- Đáp án BẮT BUỘC là dạng 1010 (4 ký tự)
+- Sau đó là dòng ####
+- Sau đó mới là giải thích chi tiết
+
+**KẾT THÚC PROMPT**
