@@ -130,8 +130,18 @@ class ProcessingThread(QThread):
         except Exception as e:
             self.error.emit(f"Lỗi trong quá trình xử lý: {str(e)}")
             return
+        finally:
+            # Đảm bảo executor được shutdown
+            if self._executor:
+                self._executor.shutdown(wait=False, cancel_futures=True)
         
         self.finished.emit(generated_files)
+        
+    def stop(self):
+        """Dừng thread một cách an toàn"""
+        self.requestInterruption()
+        if self._executor:
+            self._executor.shutdown(wait=False, cancel_futures=True)
 
 
 class MainWindow(QWidget):
@@ -379,22 +389,51 @@ class MainWindow(QWidget):
         self.prompt_ds_button.setEnabled(True)
         self.progress_bar.setVisible(False)
 
+    # def request_exit(self):
+    #     if hasattr(self, 'thread') and self.thread and self.thread.isRunning():
+    #         reply = QMessageBox.question(
+    #             self, "Thoát",
+    #             "Đang xử lý. Bạn có muốn dừng và thoát ứng dụng không?",
+    #             QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+    #         )
+    #         if reply == QMessageBox.Yes:
+    #             try:
+    #                 self.thread.requestInterruption()
+    #                 self.thread.wait(3000)
+    #             except Exception:
+    #                 pass
+    #             QApplication.quit()
+    #         return
+    #     QApplication.quit()
+
     def request_exit(self):
-        if hasattr(self, 'thread') and self.thread and self.thread.isRunning():
+        """Xử lý yêu cầu thoát ứng dụng"""
+        if self.thread and self.thread.isRunning():
             reply = QMessageBox.question(
-                self, "Thoát",
-                "Đang xử lý. Bạn có muốn dừng và thoát ứng dụng không?",
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+                self, "Xác nhận thoát",
+                "Đang có tiến trình xử lý. Bạn có chắc muốn dừng và thoát?",
+                QMessageBox.Yes | QMessageBox.No, 
+                QMessageBox.No
             )
             if reply == QMessageBox.Yes:
-                try:
-                    self.thread.requestInterruption()
-                    self.thread.wait(3000)
-                except Exception:
-                    pass
+                self.log_text.append("\n⏹ Đang dừng tiến trình...")
+                QApplication.processEvents()  # Cập nhật UI
+                
+                # Gọi stop() để dừng executor
+                self.thread.stop()
+                
+                # Đợi thread kết thúc (tăng timeout lên 5s)
+                if not self.thread.wait(5000):
+                    self.log_text.append("⚠️ Thread không dừng sau 5s, buộc thoát...")
+                    self.thread.terminate()  # Force terminate nếu cần
+                    self.thread.wait(1000)
+                
+                self.log_text.append("✓ Đã dừng tiến trình")
+                QApplication.processEvents()
+                
                 QApplication.quit()
-            return
-        QApplication.quit()
+        else:
+            QApplication.quit()
 
     def show_help(self):
         QMessageBox.information(
@@ -409,19 +448,41 @@ class MainWindow(QWidget):
             )
         )
 
+    # def closeEvent(self, event):
+    #     if hasattr(self, 'thread') and self.thread and self.thread.isRunning():
+    #         reply = QMessageBox.question(
+    #             self, "Thoát",
+    #             "Đang xử lý. Bạn có muốn dừng và thoát ứng dụng không?",
+    #             QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+    #         )
+    #         if reply == QMessageBox.Yes:
+    #             try:
+    #                 self.thread.requestInterruption()
+    #                 self.thread.wait(3000)
+    #             except Exception:
+    #                 pass
+    #             event.accept()
+    #         else:
+    #             event.ignore()
+    #     else:
+    #         event.accept()
     def closeEvent(self, event):
-        if hasattr(self, 'thread') and self.thread and self.thread.isRunning():
+        """Xử lý sự kiện đóng cửa sổ"""
+        if self.thread and self.thread.isRunning():
             reply = QMessageBox.question(
-                self, "Thoát",
-                "Đang xử lý. Bạn có muốn dừng và thoát ứng dụng không?",
-                QMessageBox.Yes | QMessageBox.No, QMessageBox.No
+                self, "Xác nhận thoát",
+                "Đang có tiến trình xử lý. Bạn có chắc muốn dừng và thoát?",
+                QMessageBox.Yes | QMessageBox.No, 
+                QMessageBox.No
             )
             if reply == QMessageBox.Yes:
-                try:
-                    self.thread.requestInterruption()
-                    self.thread.wait(3000)
-                except Exception:
-                    pass
+                # Dừng thread
+                self.thread.stop()
+                
+                if not self.thread.wait(5000):
+                    self.thread.terminate()
+                    self.thread.wait(1000)
+                
                 event.accept()
             else:
                 event.ignore()
