@@ -177,7 +177,7 @@ C. [Nội dung đáp án 3]
 D. [Nội dung đáp án 4]
 
 Lời giải:
-[X] [1,2,3,4]
+[X] 
 ####
 [Hướng dẫn giải chi tiết theo cách viết ĐÚNG đã được ví dụ ở trên.]
 
