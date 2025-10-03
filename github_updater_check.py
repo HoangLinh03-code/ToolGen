@@ -29,7 +29,7 @@ class GitHubUpdateChecker:
         try:
             headers = {
                 'Accept': 'application/vnd.github.v3+json',
-                'Authorization': f'Bearer {os.getenv("GITHUB_TOKEN")}',
+                # 'Authorization': f'Bearer {os.getenv("GITHUB_TOKEN")}',
                 'User-Agent': 'Python-Update-Checker'
             }
             print(f"[DEBUG] Kiểm tra cập nhật từ {headers}")
