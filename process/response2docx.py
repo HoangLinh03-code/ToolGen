@@ -178,7 +178,7 @@ def response2docx_improved(file_paths, prompt, output_filename, project_id,
     question_type: "tracnghiem" (80 câu) hoặc "dungsai" (40 câu)
     """
     try:
-        print(f"\n=== Bắt đầu sinh {question_type} ===")
+        print(f"\n=== Bắt đầu sinh {question_type} ===\n")
         
         # 1. Gọi API
         client = VertexClient(project_id, creds, model_name)
@@ -201,9 +201,9 @@ Bạn hãy kiểm tra đề đó theo các yêu cầu sau:
 - Lược bỏ tất cả những phần không liên quan đến các câu hỏi: "Tất nhiên rồi,...", "Tôi sẽ...", "Tôi hiểu...",...
 '''
         
-        print("  → Đang kiểm tra và tối ưu nội dung...")
+        print("\n  → Đang kiểm tra và tối ưu nội dung...\n")
         AIresponse_final = client.send_data_to_check(prompt=prompt_check)
-        print("  ✓ Đã nhận phản hồi từ AI")
+        print("\n  ✓ Đã nhận phản hồi từ AI\n")
         
         # 3. Tạo document
         doc = Document()

@@ -71,6 +71,9 @@ Chia đều câu hỏi cho các phần/chương chính trong file PDF.
 - 1 đáp án đúng và 3 đáp án nhiễu hợp lý
 - Các đáp án có độ dài và cấu trúc tương đương
 - Không dùng phương án "Tất cả đều đúng/sai"
+- Các đáp án phải đánh dấu bằng A, B, C, D như bình thường.
+- Trong phần "Lời giải", thay [X] bằng **số thứ tự đáp án đúng** (A=1, B=2, C=3, D=4).
+
 
 ---
 
