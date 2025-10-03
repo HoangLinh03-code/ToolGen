@@ -49,6 +49,8 @@ class GitHubUpdateChecker:
             
             # Lấy thông tin version
             remote_version = release_data['tag_name'].lstrip('v')
+
+            print(f"[DEBUG] Phiên bản mới nhất: {remote_version}")
             
             # So sánh version
             if version.parse(remote_version) > version.parse(self.current_version):
