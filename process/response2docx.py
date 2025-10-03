@@ -130,18 +130,14 @@ def handle_image_generation(description, doc):
         print(f" \n → Đang sinh ảnh: {description[:50]}... \n")
         image_bytes = generate_image_from_text(description)
         
-        # Tạo paragraph mới cho ảnh
+        # Tạo paragraph mới cho ảnh và căn giữa
         img_paragraph = doc.add_paragraph()
-        
-        # Thêm ảnh với kích thước nhỏ hơn (2.5 inches ~ 6.35cm)
-        run = img_paragraph.add_run()
-        picture = run.add_picture(BytesIO(image_bytes), width=Inches(3))
-        
-        # Căn giữa ảnh bằng cách set alignment cho paragraph
         img_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
         
-        # Thêm spacing sau ảnh
-        img_paragraph.paragraph_format.space_after = Pt(6)
+        # Thêm ảnh với kích thước nhỏ hơn (2.5 inches ~ 6.35cm)
+        # Kích thước này vừa đủ để xem rõ mà không chiếm quá nhiều không gian
+        run = img_paragraph.add_run()
+        run.add_picture(BytesIO(image_bytes), width=Inches(2.5))
         
         print("\n  ✓ Đã sinh ảnh thành công\n")
         return True, img_paragraph

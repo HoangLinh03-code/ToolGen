@@ -70,7 +70,6 @@ a) Phát biểu kiểm tra ý thứ nhất.
 b) Phát biểu kiểm tra ý thứ hai.  
 c) Phát biểu kiểm tra ý thứ ba.  
 d) Phát biểu kiểm tra ý thứ tư.
-
 **Lời giải**:  
 1010  
 ####  

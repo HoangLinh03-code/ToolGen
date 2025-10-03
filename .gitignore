@@ -6,5 +6,6 @@ __pycache__/
 *.dll
 *.exe
 *.spec
+*.json
 venv/
 output/
