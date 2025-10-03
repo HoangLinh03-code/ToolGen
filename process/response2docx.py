@@ -2,6 +2,7 @@ from docx import Document
 from api.callAPI import VertexClient
 from process.text2Image import generate_image_from_text
 from docx.shared import Inches, Pt, RGBColor
+from docx.enum.text import WD_ALIGN_PARAGRAPH
 from io import BytesIO
 import zipfile, subprocess, re
 from tempfile import NamedTemporaryFile
@@ -40,7 +41,6 @@ def insert_equation_into_paragraph(latex_math_dollar, paragraph):
     omml_str = latex_to_omml_via_pandoc(latex_math_dollar)
     
     if not omml_str:
-        # Fallback: Thêm text thuần nếu không convert được
         paragraph.add_run(f" [{latex_math_dollar}] ")
         return
     
@@ -78,7 +78,7 @@ def clean_latex_math(latex_raw):
     latex_raw = re.sub(r'\\nonumber', '', latex_raw)
     latex_raw = latex_raw.replace(r'\?', '?')
     latex_raw = re.sub(r'\\cdot\s*(?=\w)', r'\\cdot ', latex_raw)
-    latex_raw = latex_raw.replace(r'\dotstan', r'\cdot \tan')
+    latex_raw = latex_raw.replace(r'\dotstan', r'\\cdot \\tan')
     latex_raw = re.sub(r'(?<!\\)(\bln\b|\blog\b|\bsin\b|\bcos\b|\btan\b|\blog_{?\d*}?)', 
                        r'\\\1', latex_raw)
     latex_raw = re.sub(r'(\\Leftrightarrow|\\Rightarrow|\\rightarrow)(?=\w)', r'\1 ', latex_raw)
@@ -124,173 +124,38 @@ def process_text(text, paragraph, bold=False):
                 run.bold = True
 
 
-def handle_image_generation(description, doc, paragraph):
-    """Xử lý sinh ảnh với fallback"""
+def handle_image_generation(description, doc):
+    """Xử lý sinh ảnh với kích thước vừa phải và căn giữa"""
     try:
-        print(f"  → Đang sinh ảnh: {description[:50]}...")
+        print(f" \n → Đang sinh ảnh: {description[:50]}... \n")
         image_bytes = generate_image_from_text(description)
         
-        section = doc.sections[0]
-        usable_width = section.page_width - section.left_margin - section.right_margin
-        doc.add_picture(BytesIO(image_bytes), width=usable_width)
+        # Tạo paragraph mới cho ảnh
+        img_paragraph = doc.add_paragraph()
         
-        print("  ✓ Đã sinh ảnh thành công")
-        return True
+        # Thêm ảnh với kích thước nhỏ hơn (2.5 inches ~ 6.35cm)
+        run = img_paragraph.add_run()
+        picture = run.add_picture(BytesIO(image_bytes), width=Inches(3))
+        
+        # Căn giữa ảnh bằng cách set alignment cho paragraph
+        img_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        # Thêm spacing sau ảnh
+        img_paragraph.paragraph_format.space_after = Pt(6)
+        
+        print("\n  ✓ Đã sinh ảnh thành công\n")
+        return True, img_paragraph
     
     except Exception as e:
-        print(f"  ✗ Không thể sinh ảnh: {e}")
-        # Thêm placeholder thay vì crash
-        run = paragraph.add_run(f"\n[HÌNH ẢNH MINH HỌA: {description}]\n")
-        run.font.color.rgb = RGBColor(255, 0, 0)  # Màu đỏ
+        print(f"\n  ✗ Không thể sinh ảnh: {e}\n")
+        # Tạo placeholder với căn giữa
+        img_paragraph = doc.add_paragraph()
+        img_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = img_paragraph.add_run(f"[HÌNH ẢNH MINH HỌA: {description}]")
+        run.font.color.rgb = RGBColor(128, 128, 128)
         run.italic = True
-        return False
-
-
-def parse_dungsai_answer(answer_line):
-    """
-    Parse dòng đáp án đúng/sai
-    Input: "1010" hoặc "ĐSĐS" hoặc "a) Đ, b) S, c) Đ, d) S"
-    Output: ['Đ', 'S', 'Đ', 'S']
-    """
-    answer_line = answer_line.strip().upper()
-    
-    # Kiểu 1: 1010
-    if re.match(r'^[01]+$', answer_line):
-        return ['Đ' if c == '1' else 'S' for c in answer_line]
-    
-    # Kiểu 2: ĐSĐS
-    if re.match(r'^[ĐDS]+$', answer_line):
-        return list(answer_line)
-    
-    # Kiểu 3: a) Đ, b) S...
-    matches = re.findall(r'[ĐDS]', answer_line)
-    if matches:
-        return matches
-    
-    return []
-
-
-def response2docx_improved(file_paths, prompt, output_filename, project_id, 
-                          creds, model_name, question_type="tracnghiem"):
-    """
-    Hàm cải tiến sinh DOCX với xử lý lỗi tốt hơn
-    
-    question_type: "tracnghiem" (80 câu) hoặc "dungsai" (40 câu)
-    """
-    try:
-        print(f"\n=== Bắt đầu sinh {question_type} ===\n")
-        
-        # 1. Gọi API
-        client = VertexClient(project_id, creds, model_name)
-        AIresponse = client.send_data_to_AI(prompt, file_paths)
-        
-        # 2. Kiểm tra lại (check prompt)
-        prompt_check = f'''Tôi có một đề bao gồm các câu hỏi sau:
-```
-{AIresponse}
-```
-Bạn hãy kiểm tra đề đó theo các yêu cầu sau:
-* Yêu cầu về tính đúng sai:
-- Nếu đề bài sai, sinh lại toàn bộ đề bài và lời giải của câu hỏi đó.
-- Nếu lời giải (hoặc giải thích) sai, sinh lại lời giải (giải thích) chính xác. Độ dài ít nhất 4 dòng (60 từ).
-* Yêu cầu về nội dung:
-- Nếu lời giải ngắn, sinh lại lời giải dài ít nhất 4 dòng (60 từ).
-- Nếu các công thức toán học chưa được biểu diễn dưới dạng LaTeX, chuyển toàn bộ công thức toán học sang dạng LaTeX (Kể cả số mũ hay chỉ số).
-* Yêu cầu trả về:
-- Trả về duy nhất đề bài bao gồm toàn bộ câu hỏi.
-- Lược bỏ tất cả những phần không liên quan đến các câu hỏi: "Tất nhiên rồi,...", "Tôi sẽ...", "Tôi hiểu...",...
-'''
-        
-        print("\n  → Đang kiểm tra và tối ưu nội dung...\n")
-        AIresponse_final = client.send_data_to_check(prompt=prompt_check)
-        print("\n  ✓ Đã nhận phản hồi từ AI\n")
-        
-        # 3. Tạo document
-        doc = Document()
-        parts = AIresponse_final.split("\n")
-        
-        image_failed_count = 0
-        
-        for idx, part in enumerate(parts):
-            part = part.strip()
-            if not part:
-                continue
-            
-            # Xử lý hình ảnh
-            if ("Hình ảnh:" in part) or ("HÌNH ẢNH:" in part) or ("hình ảnh:" in part):
-                paragraph = doc.add_paragraph()
-                
-                # Xử lý bold text nếu có
-                if "**" in part:
-                    process_bold_text(part, paragraph)
-                
-                # Extract mô tả ảnh
-                cleaned_part = part.replace("[", "").replace("]", "") \
-                                  .replace("Hình ảnh:", "").replace("HÌNH ẢNH:", "") \
-                                  .replace("hình ảnh:", "").replace("**", "").strip()
-                
-                if cleaned_part:
-                    success = handle_image_generation(cleaned_part, doc, paragraph)
-                    if not success:
-                        image_failed_count += 1
-                    
-                    # Thêm mô tả text
-                    run = paragraph.add_run(f"\n[Mô tả ảnh: {cleaned_part}]\n")
-                    run.font.size = Pt(9)
-                    run.italic = True
-                
-                continue
-            
-            # Xử lý heading
-            if part.startswith("### "):
-                heading_text = part.replace("### ", "").strip()
-                doc.add_heading(heading_text, level=3)
-                continue
-            
-            if part.startswith("## "):
-                heading_text = part.replace("## ", "").strip()
-                doc.add_heading(heading_text, level=2)
-                continue
-            
-            if part.startswith("# "):
-                heading_text = part.replace("# ", "").strip()
-                doc.add_heading(heading_text, level=1)
-                continue
-            
-            # Xử lý đáp án đúng/sai (dạng đặc biệt)
-            if question_type == "dungsai":
-                # Phát hiện dòng đáp án: 1010 hoặc ĐSĐS
-                if re.match(r'^[01ĐSDS]{4}, part.strip().upper()$', part):
-                    answers = parse_dungsai_answer(part)
-                    if answers:
-                        paragraph = doc.add_paragraph()
-                        labels = ['a)', 'b)', 'c)', 'd)']
-                        answer_text = ', '.join([f"{labels[i]} {answers[i]}" for i in range(len(answers))])
-                        run = paragraph.add_run(answer_text)
-                        run.bold = True
-                        continue
-            
-            # Xử lý text thông thường với bold
-            paragraph = doc.add_paragraph()
-            if "**" in part:
-                process_bold_text(part, paragraph)
-            else:
-                process_text(part, paragraph)
-        
-        # 4. Lưu file
-        output_path = f"{output_filename}.docx"
-        doc.save(output_path)
-        
-        print(f"  ✓ Đã lưu file: {output_path}")
-        if image_failed_count > 0:
-            print(f"  ⚠️ {image_failed_count} hình ảnh không sinh được (đã thêm placeholder)")
-        
-        return output_path
-    
-    except Exception as e:
-        print(f"✗ LỖI NGHIÊM TRỌNG: {e}")
-        traceback.print_exc()
-        return None
+        run.font.size = Pt(9)
+        return False, img_paragraph
 
 
 def process_bold_text(text, paragraph):
@@ -319,3 +184,223 @@ def process_bold_text(text, paragraph):
     # Text cuối cùng
     if current_text:
         process_text(current_text, paragraph)
+
+
+def response2docx_improved(file_paths, prompt, output_filename, project_id, 
+                          creds, model_name, question_type="tracnghiem"):
+    """
+    Hàm cải tiến sinh DOCX với format chuẩn
+    
+    question_type: "tracnghiem" (80 câu) hoặc "dungsai" (40 câu)
+    Format theo prompt:
+    
+    TRẮC NGHIỆM:
+    **Câu X:**
+    [Đề bài - nội dung văn bản]
+    [HÌNH ẢNH nếu có]
+    
+    A. [Đáp án 1]
+    B. [Đáp án 2]
+    C. [Đáp án 3]
+    D. [Đáp án 4]
+    
+    Lời giải:
+    [X] (số thứ tự 1-4)
+    ####
+    [Giải thích chi tiết]
+    
+    ĐÚNG/SAI:
+    **Câu X:**
+    [Đoạn văn liền mạch 50-100 từ]
+    [HÌNH ẢNH nếu có]
+    
+    a) [Phát biểu 1]
+    b) [Phát biểu 2]
+    c) [Phát biểu 3]
+    d) [Phát biểu 4]
+    
+    Lời giải:
+    1010 (1=Đúng, 0=Sai)
+    ####
+    - [Nội dung phát biểu] là ĐÚNG/SAI.
+    Giải thích chi tiết (ít nhất 3 dòng)...
+    """
+    try:
+        print(f"\n=== Bắt đầu sinh {question_type} ===\n")
+        
+        # 1. Gọi API
+        client = VertexClient(project_id, creds, model_name)
+        AIresponse = client.send_data_to_AI(prompt, file_paths)
+        
+        # 2. Kiểm tra lại
+        prompt_check = f'''Tôi có một đề bao gồm các câu hỏi sau:
+```
+{AIresponse}
+```
+Bạn hãy kiểm tra đề đó theo các yêu cầu sau:
+* Yêu cầu về tính đúng sai:
+- Nếu đề bài sai, sinh lại toàn bộ đề bài và lời giải của câu hỏi đó.
+- Nếu lời giải (hoặc giải thích) sai, sinh lại lời giải (giải thích) chính xác. Độ dài ít nhất 4 dòng (60 từ).
+* Yêu cầu về nội dung:
+- Nếu lời giải ngắn, sinh lại lời giải dài ít nhất 4 dòng (60 từ).
+- Nếu các công thức toán học chưa được biểu diễn dưới dạng LaTeX, chuyển toàn bộ công thức toán học sang dạng LaTeX (Kể cả số mũ hay chỉ số).
+* Yêu cầu trả về:
+- Trả về duy nhất đề bài bao gồm toàn bộ câu hỏi.
+- Lược bỏ tất cả những phần không liên quan đến các câu hỏi: "Tất nhiên rồi,...", "Tôi sẽ...", "Tôi hiểu...",...
+'''
+        
+        print("\n  → Đang kiểm tra và tối ưu nội dung...\n")
+        AIresponse_final = client.send_data_to_check(prompt=prompt_check)
+        print("\n  ✓ Đã nhận phản hồi từ AI\n")
+        
+        # 3. Tạo document
+        doc = Document()
+        lines = AIresponse_final.split("\n")
+        
+        image_failed_count = 0
+        in_question = False
+        in_loi_giai = False
+        waiting_for_separator = False
+        question_content_lines = []
+        
+        i = 0
+        while i < len(lines):
+            line = lines[i].strip()
+            
+            if not line:
+                i += 1
+                continue
+            
+            # 1. Phát hiện tiêu đề câu hỏi: **Câu X:** hoặc Câu X:
+            if re.match(r'^\*?\*?Câu\s+\d+[:\.]?\*?\*?', line, re.IGNORECASE):
+                # Thêm khoảng cách trước câu mới (trừ câu đầu)
+                if in_question:
+                    doc.add_paragraph()
+                
+                in_question = True
+                in_loi_giai = False
+                waiting_for_separator = False
+                question_content_lines = []
+                
+                # Xử lý tiêu đề câu
+                question_para = doc.add_paragraph()
+                question_text = line.replace("**", "").strip()
+                run = question_para.add_run(question_text)
+                run.bold = True
+                run.font.size = Pt(12)
+                
+                i += 1
+                continue
+            
+            # 2. Xử lý hình ảnh
+            if re.search(r'\[?\s*(HÌNH ẢNH|Hình ảnh|hình ảnh)', line, re.IGNORECASE):
+                # Extract mô tả
+                cleaned = re.sub(r'\[?\s*(HÌNH ẢNH|Hình ảnh|hình ảnh)\s*[:\]]?', '', line, flags=re.IGNORECASE)
+                cleaned = cleaned.replace("[", "").replace("]", "").strip()
+                
+                if cleaned:
+                    success, img_para = handle_image_generation(cleaned, doc)
+                    if not success:
+                        image_failed_count += 1
+                
+                i += 1
+                continue
+            
+            # 3. Xử lý đáp án A, B, C, D (trắc nghiệm) hoặc a), b), c), d) (đúng/sai)
+            if re.match(r'^[A-Da-d][\.\)]', line):
+                answer_para = doc.add_paragraph()
+                process_text(line, answer_para)
+                
+                i += 1
+                continue
+            
+            # 4. Phát hiện "Lời giải:" hoặc "**Lời giải:**"
+            if re.match(r'^\*?\*?Lời giải[:\.]?\*?\*?', line, re.IGNORECASE):
+                in_loi_giai = True
+                waiting_for_separator = False
+                
+                # Thêm dòng trống trước "Lời giải:"
+                doc.add_paragraph()
+                
+                solution_para = doc.add_paragraph()
+                solution_text = line.replace("**", "").strip()
+                run = solution_para.add_run(solution_text)
+                run.bold = True
+                
+                i += 1
+                continue
+            
+            # 5. Xử lý đáp án đúng sau "Lời giải:"
+            # - Trắc nghiệm: 1, 2, 3, 4 (số đơn)
+            # - Đúng/sai: 1010, 0101, ... (chuỗi 4 ký tự 0/1)
+            if in_loi_giai and not waiting_for_separator:
+                # Kiểm tra đúng/sai: 1010, 0110, ...
+                if re.match(r'^[01]{4}$', line.strip()):
+                    answer_para = doc.add_paragraph()
+                    run = answer_para.add_run(line.strip())
+                    run.bold = True
+                    waiting_for_separator = True
+                    i += 1
+                    continue
+                
+                # Kiểm tra trắc nghiệm: 1, 2, 3, 4
+                if re.match(r'^[1-4]$', line.strip()):
+                    answer_para = doc.add_paragraph()
+                    run = answer_para.add_run(line.strip())
+                    run.bold = True
+                    waiting_for_separator = True
+                    i += 1
+                    continue
+            
+            # 6. Xử lý dấu phân cách ####
+            if line.strip() == "####":
+                separator_para = doc.add_paragraph()
+                run = separator_para.add_run("####")
+                run.bold = True
+                waiting_for_separator = False
+                
+                i += 1
+                continue
+            
+            # 7. Xử lý heading (##, ###)
+            if line.startswith("### "):
+                heading_text = line.replace("### ", "").strip()
+                doc.add_heading(heading_text, level=3)
+                i += 1
+                continue
+            
+            if line.startswith("## "):
+                heading_text = line.replace("## ", "").strip()
+                doc.add_heading(heading_text, level=2)
+                i += 1
+                continue
+            
+            if line.startswith("# "):
+                heading_text = line.replace("# ", "").strip()
+                doc.add_heading(heading_text, level=1)
+                i += 1
+                continue
+            
+            # 8. Xử lý text thông thường (đề bài, giải thích)
+            paragraph = doc.add_paragraph()
+            if "**" in line:
+                process_bold_text(line, paragraph)
+            else:
+                process_text(line, paragraph)
+            
+            i += 1
+        
+        # 4. Lưu file
+        output_path = f"{output_filename}.docx"
+        doc.save(output_path)
+        
+        print(f"\n  ✓ Đã lưu file: {output_path}")
+        if image_failed_count > 0:
+            print(f"  ⚠️ {image_failed_count} hình ảnh không sinh được (đã thêm placeholder)")
+        
+        return output_path
+    
+    except Exception as e:
+        print(f"✗ LỖI NGHIÊM TRỌNG: {e}")
+        traceback.print_exc()
+        return None

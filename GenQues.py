@@ -1174,24 +1174,118 @@ class MainWindow(QWidget):
         self.start_button.setEnabled(True)
         self.stop_button.setEnabled(False)
     
-    # ==================== DOCUMENT VIEWER ====================
+    def refresh_docx_list(self):
+        """Làm mới danh sách file docx từ output folder"""
+        self.docx_list.clear()
+        self.generated_files = []
+        
+        if not os.path.exists("output"):
+            self.log_text.append("⚠️ Thư mục output chưa tồn tại")
+            self.docx_viewer.setHtml(
+                "<h3>📁 Thư mục output trống</h3>"
+                "<p>Chưa có file nào được tạo. Hãy bắt đầu xử lý để tạo file.</p>"
+            )
+            return
+        
+        # Scan tất cả file .docx trong output
+        docx_files = []
+        for root, dirs, files in os.walk("output"):
+            for file in files:
+                if file.endswith(".docx") and not file.startswith("~$"):  # Bỏ qua file temp
+                    full_path = os.path.join(root, file)
+                    docx_files.append(full_path)
+        
+        if not docx_files:
+            self.log_text.append("⚠️ Không tìm thấy file .docx nào trong output")
+            self.docx_viewer.setHtml(
+                "<h3>📄 Chưa có file</h3>"
+                "<p>Thư mục output chưa có file .docx nào.</p>"
+            )
+            return
+        
+        # Sắp xếp theo tên
+        docx_files.sort()
+        
+        # Thêm vào list
+        for file_path in docx_files:
+            self.docx_list.addItem(os.path.basename(file_path))
+            self.generated_files.append(file_path)
+        
+        self.log_text.append(f"✅ Đã tải {len(docx_files)} file docx")
+        
+        # Auto select first file
+        if self.docx_list.count() > 0:
+            self.docx_list.setCurrentRow(0)
+            self.show_selected_docx(self.docx_list.item(0))
+    
+    def open_output_folder(self):
+        """Mở thư mục output trong file explorer"""
+        output_path = os.path.abspath("output")
+        
+        if not os.path.exists(output_path):
+            QMessageBox.warning(self, "Lỗi", "Thư mục output chưa tồn tại!")
+            return
+        
+        # Mở folder tùy theo hệ điều hành
+        import platform
+        system = platform.system()
+        
+        try:
+            if system == "Windows":
+                os.startfile(output_path)
+            elif system == "Darwin":  # macOS
+                os.system(f'open "{output_path}"')
+            else:  # Linux
+                os.system(f'xdg-open "{output_path}"')
+            
+            self.log_text.append(f"📁 Đã mở thư mục: {output_path}")
+        except Exception as e:
+            QMessageBox.warning(self, "Lỗi", f"Không thể mở thư mục: {str(e)}")
+    
+    def on_tab_changed(self, index, tabs):
+        """Xử lý khi chuyển tab"""
+        tab_name = tabs.tabText(index)
+        
+        # Nếu chuyển sang tab "Xem File", tự động load danh sách
+        if "Xem File" in tab_name:
+            if self.docx_list.count() == 0:  # Chỉ load nếu list trống
+                self.refresh_docx_list()    
     def show_selected_docx(self, item):
         """Hiển thị file docx được chọn"""
         if not item:
             return
         
         file_name = item.text()
-        full_path = next(
-            (f for f in self.generated_files if os.path.basename(f) == file_name), 
-            None
-        )
+        
+        # Tìm file trong generated_files hoặc scan từ output folder
+        full_path = None
+        
+        # Tìm trong generated_files trước
+        for f in self.generated_files:
+            if os.path.basename(f) == file_name:
+                full_path = f
+                break
+        
+        # Nếu không tìm thấy, scan toàn bộ output folder
+        if not full_path and os.path.exists("output"):
+            for root, dirs, files in os.walk("output"):
+                if file_name in files:
+                    full_path = os.path.join(root, file_name)
+                    break
         
         if not full_path or not os.path.isfile(full_path):
             self.docx_viewer.setHtml(
                 f"<h3 style='color: #e74c3c;'>❌ Lỗi</h3>"
                 f"<p>File không tồn tại: {file_name}</p>"
+                f"<p>Đường dẫn tìm kiếm: {full_path or 'Không tìm thấy'}</p>"
             )
             return
+        
+        # Hiển thị loading
+        self.docx_viewer.setHtml(
+            "<h3>⏳ Đang tải nội dung...</h3>"
+            f"<p>File: {file_name}</p>"
+        )
         
         try:
             with open(full_path, "rb") as docx_file:
@@ -1202,36 +1296,89 @@ class MainWindow(QWidget):
                     styled_html = f"""
                     <html>
                     <head>
+                        <meta charset="UTF-8">
                         <style>
                             body {{
                                 font-family: 'Segoe UI', Arial, sans-serif;
                                 padding: 20px;
-                                line-height: 1.6;
+                                line-height: 1.8;
+                                background-color: #f8f9fa;
                             }}
-                            h1, h2, h3 {{ color: #2c3e50; }}
-                            table {{ border-collapse: collapse; width: 100%; }}
-                            td, th {{ border: 1px solid #ddd; padding: 8px; }}
-                            th {{ background-color: #3498db; color: white; }}
+                            h1, h2, h3 {{ 
+                                color: #2c3e50; 
+                                margin-top: 20px;
+                            }}
+                            p {{ 
+                                margin: 10px 0;
+                                text-align: justify;
+                            }}
+                            table {{ 
+                                border-collapse: collapse; 
+                                width: 100%; 
+                                margin: 15px 0;
+                                background: white;
+                            }}
+                            td, th {{ 
+                                border: 1px solid #ddd; 
+                                padding: 10px;
+                                text-align: left;
+                            }}
+                            th {{ 
+                                background-color: #3498db; 
+                                color: white;
+                                font-weight: bold;
+                            }}
+                            img {{
+                                max-width: 100%;
+                                height: auto;
+                                margin: 15px 0;
+                                border: 1px solid #ddd;
+                                border-radius: 5px;
+                            }}
+                            .file-info {{
+                                background: #e3f2fd;
+                                padding: 15px;
+                                border-radius: 5px;
+                                margin-bottom: 20px;
+                                border-left: 4px solid #2196f3;
+                            }}
                         </style>
                     </head>
                     <body>
-                        <h2>📄 {file_name}</h2>
+                        <div class="file-info">
+                            <h2>📄 {file_name}</h2>
+                            <p><strong>Đường dẫn:</strong> {full_path}</p>
+                            <p><strong>Kích thước:</strong> {os.path.getsize(full_path) / 1024:.2f} KB</p>
+                        </div>
                         <hr>
-                        {html}
+                        <div class="content">
+                            {html}
+                        </div>
                     </body>
                     </html>
                     """
                     self.docx_viewer.setHtml(styled_html)
+                    self.log_text.append(f"✅ Đã tải file: {file_name}")
                 else:
                     self.docx_viewer.setHtml(
                         f"<h3>⚠️ Cảnh báo</h3>"
                         f"<p>Không có nội dung trong {file_name}</p>"
+                        f"<p>File có thể bị lỗi hoặc trống.</p>"
                     )
         except Exception as e:
-            self.docx_viewer.setHtml(
-                f"<h3 style='color: #e74c3c;'>❌ Lỗi khi mở {file_name}</h3>"
-                f"<p>{str(e)}</p>"
-            )
+            error_html = f"""
+            <html>
+            <body style='font-family: Arial; padding: 20px;'>
+                <h3 style='color: #e74c3c;'>❌ Lỗi khi mở {file_name}</h3>
+                <p><strong>Chi tiết lỗi:</strong></p>
+                <pre style='background: #f8f9fa; padding: 15px; border-radius: 5px;'>{str(e)}</pre>
+                <p><strong>Đường dẫn:</strong> {full_path}</p>
+                <p><strong>Gợi ý:</strong> File có thể bị hỏng hoặc không đúng định dạng DOCX.</p>
+            </body>
+            </html>
+            """
+            self.docx_viewer.setHtml(error_html)
+            self.log_text.append(f"❌ Lỗi khi tải {file_name}: {str(e)}")
 
 
 # ==================== MAIN ====================
