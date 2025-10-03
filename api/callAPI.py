@@ -24,7 +24,7 @@ class VertexClient:
                 parts.append(
                     Part.from_data(data=pdf_bytes, mime_type="application/pdf")
                 )
-            print("Load xong pdf")
+            print("Load xong pdf\n")
 
         # ThÃªm prompt dáº¡ng text
         parts.append(Part.from_text(prompt))
