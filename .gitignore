@@ -6,11 +6,5 @@ __pycache__/
 *.dll
 *.exe
 *.spec
-<<<<<<< HEAD
 venv/
 output/
-=======
-"env/" 
-"output/" 
-".env" 
->>>>>>> 51832a8 (feat: auto-check-update-version (without secrets))
