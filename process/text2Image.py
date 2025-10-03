@@ -31,8 +31,8 @@ import os
 import vertexai
 from vertexai.preview.vision_models import ImageGenerationModel
 from api.callAPI import get_vertex_ai_credentials
-from google import genai
-from google.genai import types
+from google import generativeai as genai
+from google.generativeai import types
 from PIL import Image
 from io import BytesIO
 import config  # chứa GEMINI_API_KEYS
