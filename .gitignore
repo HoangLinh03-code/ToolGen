@@ -1,10 +1,10 @@
-".env"
-"build/"
+.env
+build/
 dist/
 __pycache__/
 *.pkg
 *.dll
 *.exe
 *.spec
-"env/" 
-"output/" 
+env/
+output/
