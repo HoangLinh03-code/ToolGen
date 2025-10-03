@@ -12,7 +12,7 @@ import threading
 from dotenv import load_dotenv
 load_dotenv()
 
-class pGitHubUpdateChecker:
+class GitHubUpdateChecker:
     def __init__(self, current_version, github_repo):
         """
         current_version: 1.0.0
