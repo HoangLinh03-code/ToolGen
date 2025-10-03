@@ -53,7 +53,7 @@ jobs:
           ${{ github.event.head_commit.message }}
           
           ### Installation
-          Download `GenQues.exe` and run it.
+          Download `ToolGen.exe` and run it.
           
           ### Full Changelog
           https://github.com/${{ github.repository }}/compare/v1.0.0...${{ github.ref_name }}
