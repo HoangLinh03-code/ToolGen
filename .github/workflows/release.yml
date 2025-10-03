@@ -46,14 +46,14 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          dist/MyApp.exe
+          dist/GenQues.exe
           version.json
         body: |
           ## What's Changed
           ${{ github.event.head_commit.message }}
           
           ### Installation
-          Download `MyApp.exe` and run it.
+          Download `GenQues.exe` and run it.
           
           ### Full Changelog
           https://github.com/${{ github.repository }}/compare/v1.0.0...${{ github.ref_name }}

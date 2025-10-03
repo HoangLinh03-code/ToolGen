@@ -18,13 +18,10 @@ from google.oauth2 import service_account
 import glob
 import time
 import gc
-<<<<<<< HEAD
 import io
 
-=======
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from github_updater_check import GitHubUpdateChecker
->>>>>>> c1c41fb (feat: check update new version when dev push new tag)
 from process.response2docx import response2docx_improved
 
 load_dotenv()
