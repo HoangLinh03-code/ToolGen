@@ -18,8 +18,13 @@ from google.oauth2 import service_account
 import glob
 import time
 import gc
+<<<<<<< HEAD
 import io
 
+=======
+from concurrent.futures import ThreadPoolExecutor, as_completed
+from github_updater_check import GitHubUpdateChecker
+>>>>>>> c1c41fb (feat: check update new version when dev push new tag)
 from process.response2docx import response2docx_improved
 
 load_dotenv()
@@ -356,6 +361,24 @@ class PromptEditorDialog(QDialog):
 
 # ==================== MAIN WINDOW ====================
 class MainWindow(QWidget):
+    CURRENT_VERSION = "1.0.0"  # Thay đổi mỗi khi release
+    GITHUB_REPO = "HoangLinh03-code/ToolGen"  # Thay bằng repo của bạn
+    
+    # Kiểm tra cập nhật
+    print("Đang kiểm tra cập nhật phiên bản")
+    checker = GitHubUpdateChecker(CURRENT_VERSION, GITHUB_REPO)
+    
+    has_update, update_info = checker.check_for_updates()
+    
+    if has_update:
+        print(f"✓ Tìm thấy phiên bản mới: {update_info['version']}")
+        checker.show_update_dialog(update_info)
+    else:
+        print("✓ Bạn đang sử dụng phiên bản mới nhất")
+    
+    # Tiếp tục chạy app
+    print("\n=== APP ĐANG CHẠY ===")
+
     def __init__(self):
         super().__init__()
         self.setWindowTitle("Supreme Gen Ques Pro - Advanced Edition")
