@@ -35,6 +35,8 @@ class GitHubUpdateChecker:
             print(f"[DEBUG] Kiểm tra cập nhật từ {headers}")
 
             print(f"[DEBUG] Gửi yêu cầu tới {self.api_url}")
+
+            print(f"[DEBUG] Phiên bản hiện tại: {self.current_version}")
             
             response = requests.get(self.api_url, headers=headers, timeout=10)
 
