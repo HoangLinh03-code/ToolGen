@@ -40,7 +40,7 @@ def insert_equation_into_paragraph(latex_math_dollar, paragraph):
     omml_str = latex_to_omml_via_pandoc(latex_math_dollar)
     
     if not omml_str:
-        # Fallback: Thêm text thuần nếu không conrt được
+        # Fallback: Thêm text thuần nếu không convert được
         paragraph.add_run(f" [{latex_math_dollar}] ")
         return
     
@@ -260,7 +260,7 @@ Bạn hãy kiểm tra đề đó theo các yêu cầu sau:
             # Xử lý đáp án đúng/sai (dạng đặc biệt)
             if question_type == "dungsai":
                 # Phát hiện dòng đáp án: 1010 hoặc ĐSĐS
-                if re.match(r'^[01ĐSDS]{4}, part.strip().upper()', part):
+                if re.match(r'^[01ĐSDS]{4}, part.strip().upper()$', part):
                     answers = parse_dungsai_answer(part)
                     if answers:
                         paragraph = doc.add_paragraph()
