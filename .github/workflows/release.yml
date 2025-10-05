@@ -27,7 +27,7 @@ jobs:
     
     - name: Build executable
       run: |
-        pyinstaller --onefile --noconsole --name ToolGen GenQues.py
+        pyinstaller --onefile --name ToolGen GenQues.py
     
     - name: Create version.json
       run: |
