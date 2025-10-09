@@ -17,7 +17,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: '3.13'
     
     - name: Install dependencies
       run: |
@@ -27,7 +27,7 @@ jobs:
     
     - name: Build executable
       run: |
-        pyinstaller --onefile --noconsole --name ToolGen GenQues.py
+        pyinstaller --onefile --name ToolGen GenQues.py
     
     - name: Create version.json
       run: |
