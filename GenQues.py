@@ -21,7 +21,7 @@ import gc
 import io
 
 from concurrent.futures import ThreadPoolExecutor, as_completed
-from github_updater_check import GitHubUpdateChecker
+from github_updater_check import GitHubUpdateChecker, load_current_version
 from process.response2docx import response2docx_improved
 
 load_dotenv()
@@ -363,7 +363,9 @@ class MainWindow(QWidget):
     
     # Kiểm tra cập nhật
     print("Đang kiểm tra cập nhật phiên bản")
-    checker = GitHubUpdateChecker(CURRENT_VERSION, GITHUB_REPO)
+    # checker = GitHubUpdateChecker(CURRENT_VERSION, GITHUB_REPO)
+    # checker = GitHubUpdateChecker("1.0.0", "HoangLinh03-code/ToolGen")
+    checker = GitHubUpdateChecker(load_current_version(), GITHUB_REPO)
     
     has_update, update_info = checker.check_for_updates()
     
@@ -701,7 +703,7 @@ class MainWindow(QWidget):
                     └── file.pdf
             </div>
             
-            <h2>🚀 Các bước thực hiện</h2>
+            <h2>🚀 Các bước thực hiện:</h2>
             
             <div class="step">
                 <strong>Bước 1: Kiểm tra API</strong><br>

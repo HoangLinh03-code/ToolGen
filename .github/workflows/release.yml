@@ -17,7 +17,7 @@ jobs:
     - name: Set up Python
       uses: actions/setup-python@v4
       with:
-        python-version: '3.11'
+        python-version: '3.13'
     
     - name: Install dependencies
       run: |
@@ -26,15 +26,14 @@ jobs:
         pip install pyinstaller
     
     - name: Build executable
-      run: |
-        pyinstaller --onefile --name ToolGen GenQues.py
+      run: pyinstaller ToolGen.spec
     
     - name: Create version.json
       run: |
         $version = "${{ github.ref_name }}".TrimStart('v')
         $json = @{
           version = $version
-          download_url = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/GenQues.exe"
+          download_url = "https://github.com/${{ github.repository }}/releases/download/${{ github.ref_name }}/ToolGen.exe"
           changelog = "${{ github.event.head_commit.message }}"
           release_date = (Get-Date -Format "yyyy-MM-dd")
           required = $false
@@ -46,14 +45,14 @@ jobs:
       uses: softprops/action-gh-release@v1
       with:
         files: |
-          dist/GenQues.exe
+          dist/ToolGen.exe
           version.json
         body: |
           ## What's Changed
           ${{ github.event.head_commit.message }}
           
           ### Installation
-          Download `GenQues.exe` and run it.
+          Download `ToolGen.exe` and run it.
           
           ### Full Changelog
           https://github.com/${{ github.repository }}/compare/v1.0.0...${{ github.ref_name }}
