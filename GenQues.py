@@ -703,7 +703,7 @@ class MainWindow(QWidget):
                     └── file.pdf
             </div>
             
-            <h2>🚀 Các bước thực hiện</h2>
+            <h2>🚀 Các bước thực hiện:</h2>
             
             <div class="step">
                 <strong>Bước 1: Kiểm tra API</strong><br>
