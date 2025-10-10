@@ -28,8 +28,25 @@ load_dotenv()
 
 
 # ==================== CONSOLE REDIRECT ====================
+# class ConsoleRedirect(QObject):
+#     """Redirect stdout/stderr to QTextEdit"""
+#     output_written = pyqtSignal(str)
+    
+#     def __init__(self):
+#         super().__init__()
+#         self.buffer = io.StringIO()
+    
+#     def write(self, text):
+#         if text.strip():  # Bỏ qua dòng trống
+#             self.output_written.emit(text)
+#         # Vẫn ghi vào terminal gốc
+#         sys.__stdout__.write(text)
+    
+#     def flush(self):
+#         pass
+
 class ConsoleRedirect(QObject):
-    """Redirect stdout/stderr to QTextEdit"""
+    """Redirect stdout/stderr to QTextEdit - Robust version"""
     output_written = pyqtSignal(str)
     
     def __init__(self):
@@ -37,13 +54,35 @@ class ConsoleRedirect(QObject):
         self.buffer = io.StringIO()
     
     def write(self, text):
-        if text.strip():  # Bỏ qua dòng trống
-            self.output_written.emit(text)
-        # Vẫn ghi vào terminal gốc
-        sys.__stdout__.write(text)
+        # Safety check
+        if not text:
+            return
+            
+        text_str = str(text)  # Ensure it's a string
+        
+        if text_str.strip():  # Only process non-empty text
+            try:
+                self.output_written.emit(text_str)
+            except:
+                pass  # Ignore signal errors in threads
+        
+        # Always write to original stdout for debugging
+        try:
+            sys.__stdout__.write(text_str)
+        except:
+            pass
     
     def flush(self):
-        pass
+        try:
+            sys.__stdout__.flush()
+        except:
+            pass
+    
+    def isatty(self):
+        return False
+    
+    def fileno(self):
+        return sys.__stdout__.fileno() if hasattr(sys.__stdout__, 'fileno') else -1
 
 # ==================== PROGRESS MANAGER ====================
 class ProgressManager:
