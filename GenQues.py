@@ -19,6 +19,7 @@ import glob
 import time
 import gc
 import io
+import re
 
 from process.response2docx import response2docx_improved
 
@@ -35,9 +36,8 @@ class ConsoleRedirect(QObject):
         self.buffer = io.StringIO()
     
     def write(self, text):
-        if text.strip():  # Bỏ qua dòng trống
+        if text.strip():
             self.output_written.emit(text)
-        # Vẫn ghi vào terminal gốc
         sys.__stdout__.write(text)
     
     def flush(self):
@@ -107,17 +107,14 @@ class APIChecker(QThread):
     
     def run(self):
         try:
-            # Import vertexai thay vì google.generativeai
             import vertexai
             from vertexai.generative_models import GenerativeModel
             
-            # Khởi tạo với credentials
             vertexai.init(
                 project=self.project_id, 
                 credentials=self.creds
             )
             
-            # Test model
             model = GenerativeModel("gemini-2.0-flash-exp")
             
             result = {
@@ -141,16 +138,16 @@ class ProcessingThread(QThread):
     progress = pyqtSignal(str)
     error = pyqtSignal(str)
     finished = pyqtSignal(list)
-    batch_complete = pyqtSignal(int, int)  # (completed, total)
-    image_progress = pyqtSignal(str)  # Log xử lý ảnh
-    console_output = pyqtSignal(str)  # Output từ console
+    batch_complete = pyqtSignal(int, int)
+    image_progress = pyqtSignal(str)
+    console_output = pyqtSignal(str)
     
-    def __init__(self, root_folder, prompt_tracnghiem_path, prompt_dungsai_path, 
+    def __init__(self, root_folder, prompt_tracnghiem_content, prompt_dungsai_content, 
                  project_id, creds, batch_size=2, max_lessons=None, resume=False):
         super().__init__()
         self.root_folder = root_folder
-        self.prompt_tracnghiem_path = prompt_tracnghiem_path
-        self.prompt_dungsai_path = prompt_dungsai_path
+        self.prompt_tracnghiem_content = prompt_tracnghiem_content
+        self.prompt_dungsai_content = prompt_dungsai_content
         self.project_id = project_id
         self.creds = creds
         self.batch_size = batch_size
@@ -167,13 +164,6 @@ class ProcessingThread(QThread):
         generated_files = []
         
         try:
-            # Đọc prompts
-            with open(self.prompt_tracnghiem_path, "r", encoding="utf-8") as f:
-                prompt_tracnghiem = f.read()
-            
-            with open(self.prompt_dungsai_path, "r", encoding="utf-8") as f:
-                prompt_dungsai = f.read()
-            
             # Lấy danh sách bài
             bai_folders = [
                 os.path.join(self.root_folder, name)
@@ -250,7 +240,7 @@ class ProcessingThread(QThread):
                     try:
                         docx_tracnghiem = response2docx_improved(
                             pdf_files,
-                            prompt_tracnghiem,
+                            self.prompt_tracnghiem_content,
                             os.path.join(output_folder, f"{bai_name}_TracNghiem"),
                             self.project_id,
                             self.creds,
@@ -272,7 +262,7 @@ class ProcessingThread(QThread):
                     try:
                         docx_dungsai = response2docx_improved(
                             pdf_files,
-                            prompt_dungsai,
+                            self.prompt_dungsai_content,
                             os.path.join(output_folder, f"{bai_name}_DungSai"),
                             self.project_id,
                             self.creds,
@@ -474,6 +464,90 @@ class MainWindow(QWidget):
         except Exception as e:
             QMessageBox.critical(self, "Lỗi", f"Không thể tải credentials: {str(e)}")
     
+    def replace_subject_grade_in_prompt(self, prompt_content):
+        """Thay thế môn học và lớp trong prompt"""
+        subject = self.subject_input.text().strip()
+        grade = self.grade_input.text().strip()
+        
+        if not subject or not grade:
+            return prompt_content
+        
+        modified_content = prompt_content
+        
+        # Thứ tự quan trọng: Thay thế từ cụ thể đến tổng quát
+        # 1. **lớp 10 môn Tin học** (có bold)
+        modified_content = re.sub(
+            r'\*\*lớp\s+10\s+môn\s+Tin\s+học\*\*',
+            f'**lớp {grade} môn {subject}**',
+            modified_content,
+            flags=re.IGNORECASE
+        )
+        
+        # 2. lớp 10 môn Tin học (không bold)
+        modified_content = re.sub(
+            r'lớp\s+10\s+môn\s+Tin\s+học',
+            f'lớp {grade} môn {subject}',
+            modified_content,
+            flags=re.IGNORECASE
+        )
+        
+        # 3. **Tin học lớp 10** (có bold)
+        modified_content = re.sub(
+            r'\*\*Tin\s+học\s+lớp\s+10\*\*',
+            f'**{subject} lớp {grade}**',
+            modified_content,
+            flags=re.IGNORECASE
+        )
+        
+        # 4. Tin học lớp 10 (không bold)
+        modified_content = re.sub(
+            r'Tin\s+học\s+lớp\s+10',
+            f'{subject} lớp {grade}',
+            modified_content,
+            flags=re.IGNORECASE
+        )
+        
+        # 5. **môn Tin học lớp 10** (có bold)
+        modified_content = re.sub(
+            r'\*\*môn\s+Tin\s+học\s+lớp\s+10\*\*',
+            f'**môn {subject} lớp {grade}**',
+            modified_content,
+            flags=re.IGNORECASE
+        )
+        
+        # 6. môn Tin học lớp 10 (không bold)
+        modified_content = re.sub(
+            r'môn\s+Tin\s+học\s+lớp\s+10',
+            f'môn {subject} lớp {grade}',
+            modified_content,
+            flags=re.IGNORECASE
+        )
+        
+        return modified_content
+    
+    def get_modified_prompt(self, prompt_path):
+        """Đọc và thay thế môn học/lớp trong prompt"""
+        try:
+            with open(prompt_path, 'r', encoding='utf-8') as f:
+                original_content = f.read()
+            
+            # Thay thế môn học và lớp
+            modified_content = self.replace_subject_grade_in_prompt(original_content)
+            
+            # Lưu log nếu có thay đổi
+            if modified_content != original_content:
+                subject = self.subject_input.text().strip()
+                grade = self.grade_input.text().strip()
+                self.log_text.append(
+                    f"🔄 Đã tự động thay thế trong {os.path.basename(prompt_path)}: "
+                    f"Tin học lớp 10 → {subject} lớp {grade}"
+                )
+            
+            return modified_content
+        except Exception as e:
+            self.log_text.append(f"⚠️ Lỗi khi đọc prompt: {str(e)}")
+            return None
+    
     def init_ui(self):
         main_layout = QHBoxLayout()
         
@@ -514,6 +588,23 @@ class MainWindow(QWidget):
         # 3. Prompt Settings
         prompt_group = QGroupBox("📝 Cấu hình Prompt")
         prompt_layout = QVBoxLayout()
+        
+        # Tùy chỉnh môn học và lớp
+        subject_layout = QHBoxLayout()
+        subject_layout.addWidget(QLabel("Môn học:"))
+        self.subject_input = QLineEdit("Tin học")
+        self.subject_input.setPlaceholderText("VD: Vật lí, Hóa học, Toán...")
+        subject_layout.addWidget(self.subject_input)
+        
+        subject_layout.addWidget(QLabel("Lớp:"))
+        self.grade_input = QLineEdit("10")
+        self.grade_input.setPlaceholderText("VD: 10, 11, 12...")
+        self.grade_input.setMaximumWidth(60)
+        subject_layout.addWidget(self.grade_input)
+        subject_layout.addStretch()
+        
+        prompt_layout.addLayout(subject_layout)
+        prompt_layout.addWidget(QLabel("<i>💡 Chương trình sẽ tự động thay thế môn học và lớp trong prompt</i>"))
         
         # Prompt trắc nghiệm
         tn_layout = QHBoxLayout()
@@ -594,7 +685,7 @@ class MainWindow(QWidget):
         control_layout.addWidget(self.stop_button)
         control_layout.addWidget(self.reset_button)
         
-        # Progress bar - TO HƠN VÀ RÕ RÀNG HƠN
+        # Progress bar
         progress_group = QGroupBox("📊 Tiến trình xử lý")
         progress_layout = QVBoxLayout()
         
@@ -642,7 +733,7 @@ class MainWindow(QWidget):
         # Tabs
         tabs = QTabWidget()
         
-        # Tab 0: Hướng dẫn sử dụng
+        # Tab 0: Hướng dẫn
         guide_widget = QWidget()
         guide_layout = QVBoxLayout()
         
@@ -668,6 +759,20 @@ class MainWindow(QWidget):
             
             <h2>🎯 Mục đích</h2>
             <p>Công cụ tự động sinh câu hỏi trắc nghiệm và đúng/sai từ tài liệu PDF sử dụng AI Gemini.</p>
+            
+            <h2>✨ Tính năng MỚI: Tự động thay thế môn học</h2>
+            <div class="note">
+                <strong>💡 Không cần sửa prompt thủ công nữa!</strong><br>
+                • Nhập môn học và lớp vào ô tương ứng<br>
+                • Chương trình tự động tìm và thay thế:<br>
+                &nbsp;&nbsp;- "Tin học lớp 10" → "Vật lí lớp 12"<br>
+                &nbsp;&nbsp;- "lớp 10 môn Tin học" → "lớp 12 môn Vật lí"<br>
+                &nbsp;&nbsp;- "**Tin học lớp 10**" → "**Vật lí lớp 12**"<br>
+                &nbsp;&nbsp;- "**lớp 10 môn Tin học**" → "**lớp 12 môn Vật lí**"<br>
+                • Áp dụng cho cả 2 file prompt (Trắc nghiệm & Đúng/Sai)<br>
+                • File .txt gốc không bị thay đổi
+                • Nếu muốn có thể sửa đổi prompt thủ công bằng nút <code>Sửa</code>
+            </div>
             
             <h2>📋 Cấu trúc thư mục yêu cầu</h2>
             <div class="step">
@@ -696,29 +801,38 @@ class MainWindow(QWidget):
             </div>
             
             <div class="step">
-                <strong>Bước 3: Cấu hình Prompt</strong><br>
+                <strong>Bước 3: Nhập môn học và lớp</strong><br>
+                • <strong>Môn học:</strong> VD: Vật lí, Hóa học, Toán, Sinh học...<br>
+                • <strong>Lớp:</strong> VD: 10, 11, 12<br>
+                • Chương trình sẽ <strong>tự động thay thế</strong> "Tin học lớp 10" trong prompt thành môn và lớp bạn nhập<br>
+                • Bạn <strong>không cần</strong> sửa file .txt thủ công nữa!
+            </div>
+            
+            <div class="step">
+                <strong>Bước 4: Cấu hình Prompt</strong><br>
                 • <strong>Prompt 80 câu TN:</strong> File prompt sinh câu trắc nghiệm<br>
                 • <strong>Prompt 40 câu Đ/S:</strong> File prompt sinh câu đúng/sai<br>
                 • Nhấn <code>Chọn</code> để đổi file hoặc <code>Sửa</code> để chỉnh sửa
             </div>
             
             <div class="step">
-                <strong>Bước 4: Cài đặt xử lý</strong><br>
+                <strong>Bước 5: Cài đặt xử lý</strong><br>
                 • <strong>Batch size:</strong> Số bài xử lý cùng lúc (1-5, khuyến nghị: 2)<br>
                 • <strong>Giới hạn số bài:</strong> Tick để chỉ xử lý N bài đầu tiên<br>
                 • <strong>Resume:</strong> Tick để bỏ qua bài đã hoàn thành
             </div>
             
             <div class="step">
-                <strong>Bước 5: Bắt đầu xử lý</strong><br>
-                • Nhấn <code>▶️ Bắt đầu</code> → Theo dõi tiến trình trong các tab<br>
-                • Nhấn <code>⏸️ Dừng</code> nếu muốn tạm dừng (tiến trình được lưu)
+                <strong>Bước 6: Bắt đầu xử lý</strong><br>
+                • Nhấn <code>▶️ Bắt đầu</code> → Theo dõi tiến độ trong các tab<br>
+                • Nhấn <code>⏸️ Dừng</code> nếu muốn tạm dừng (tiến độ được lưu)
             </div>
             
             <h2>📊 Các Tab theo dõi</h2>
             <ul>
                 <li><strong>📋 Log Chính:</strong> Theo dõi tiến trình xử lý tổng thể</li>
                 <li><strong>🖼️ Log Ảnh:</strong> Chi tiết xử lý ảnh từng câu hỏi</li>
+                <li><strong>💻 Console:</strong> Output từ terminal/console</li>
                 <li><strong>📊 Tiến độ:</strong> Bảng trạng thái tất cả bài học</li>
                 <li><strong>📄 Xem File:</strong> Preview file docx đã tạo</li>
             </ul>
@@ -785,7 +899,7 @@ class MainWindow(QWidget):
         img_log_layout.addWidget(self.img_log_text)
         img_log_widget.setLayout(img_log_layout)
         
-        # Tab 3: Console Output (Terminal)
+        # Tab 3: Console Output
         console_widget = QWidget()
         console_layout = QVBoxLayout()
         
@@ -819,14 +933,14 @@ class MainWindow(QWidget):
         
         # Tab 4: Progress Table
         progress_widget = QWidget()
-        progress_layout = QVBoxLayout()
+        progress_layout_tab = QVBoxLayout()
         self.progress_table = QTableWidget()
         self.progress_table.setColumnCount(3)
         self.progress_table.setHorizontalHeaderLabels(["Bài", "Trạng thái", "Thời gian"])
         self.progress_table.horizontalHeader().setStretchLastSection(True)
-        progress_layout.addWidget(QLabel("📊 Bảng tiến độ:"))
-        progress_layout.addWidget(self.progress_table)
-        progress_widget.setLayout(progress_layout)
+        progress_layout_tab.addWidget(QLabel("📊 Bảng tiến độ:"))
+        progress_layout_tab.addWidget(self.progress_table)
+        progress_widget.setLayout(progress_layout_tab)
         
         # Tab 5: Document Viewer
         viewer_widget = QWidget()
@@ -839,7 +953,7 @@ class MainWindow(QWidget):
         viewer_layout.addWidget(self.docx_list)
         viewer_widget.setLayout(viewer_layout)
         
-        # Add tabs - HƯỚNG DẪN LÀ TAB ĐẦU TIÊN
+        # Add tabs
         tabs.addTab(guide_widget, "📖 Hướng dẫn")
         tabs.addTab(log_widget, "📋 Log Chính")
         tabs.addTab(img_log_widget, "🖼️ Log Ảnh")
@@ -974,6 +1088,23 @@ class MainWindow(QWidget):
             QMessageBox.warning(self, "Lỗi", "Vui lòng chọn cả 2 file prompt!")
             return
         
+        # Kiểm tra môn học và lớp
+        subject = self.subject_input.text().strip()
+        grade = self.grade_input.text().strip()
+        
+        if not subject or not grade:
+            QMessageBox.warning(self, "Lỗi", "Vui lòng nhập môn học và lớp!")
+            return
+        
+        # Đọc và thay thế prompt
+        self.log_text.append("\n🔄 Đang áp dụng cấu hình môn học và lớp...")
+        prompt_tracnghiem_content = self.get_modified_prompt(prompt_tn)
+        prompt_dungsai_content = self.get_modified_prompt(prompt_ds)
+        
+        if not prompt_tracnghiem_content or not prompt_dungsai_content:
+            QMessageBox.warning(self, "Lỗi", "Không thể đọc file prompt!")
+            return
+        
         # Disable UI
         self.start_button.setEnabled(False)
         self.stop_button.setEnabled(True)
@@ -990,17 +1121,18 @@ class MainWindow(QWidget):
         self.log_text.append("="*60)
         self.log_text.append("🚀 BẮT ĐẦU XỬ LÝ")
         self.log_text.append("="*60)
+        self.log_text.append(f"📚 Môn học: {subject} - Lớp {grade}")
         self.log_text.append(f"📁 Folder: {self.root_folder}")
         self.log_text.append(f"📦 Batch size: {self.batch_spinbox.value()}")
         self.log_text.append(f"📊 Giới hạn: {max_lessons if max_lessons else 'Không'}")
         self.log_text.append(f"🔄 Resume: {'Có' if resume else 'Không'}")
         self.log_text.append("="*60 + "\n")
         
-        # Create thread
+        # Create thread với prompt đã được thay thế
         self.processing_thread = ProcessingThread(
             self.root_folder,
-            prompt_tn,
-            prompt_ds,
+            prompt_tracnghiem_content,
+            prompt_dungsai_content,
             self.project_id,
             self.credentials,
             self.batch_spinbox.value(),
@@ -1154,82 +1286,6 @@ class MainWindow(QWidget):
         self.start_button.setEnabled(True)
         self.stop_button.setEnabled(False)
     
-    def refresh_docx_list(self):
-        """Làm mới danh sách file docx từ output folder"""
-        self.docx_list.clear()
-        self.generated_files = []
-        
-        if not os.path.exists("output"):
-            self.log_text.append("⚠️ Thư mục output chưa tồn tại")
-            self.docx_viewer.setHtml(
-                "<h3>📁 Thư mục output trống</h3>"
-                "<p>Chưa có file nào được tạo. Hãy bắt đầu xử lý để tạo file.</p>"
-            )
-            return
-        
-        # Scan tất cả file .docx trong output
-        docx_files = []
-        for root, dirs, files in os.walk("output"):
-            for file in files:
-                if file.endswith(".docx") and not file.startswith("~$"):  # Bỏ qua file temp
-                    full_path = os.path.join(root, file)
-                    docx_files.append(full_path)
-        
-        if not docx_files:
-            self.log_text.append("⚠️ Không tìm thấy file .docx nào trong output")
-            self.docx_viewer.setHtml(
-                "<h3>📄 Chưa có file</h3>"
-                "<p>Thư mục output chưa có file .docx nào.</p>"
-            )
-            return
-        
-        # Sắp xếp theo tên
-        docx_files.sort()
-        
-        # Thêm vào list
-        for file_path in docx_files:
-            self.docx_list.addItem(os.path.basename(file_path))
-            self.generated_files.append(file_path)
-        
-        self.log_text.append(f"✅ Đã tải {len(docx_files)} file docx")
-        
-        # Auto select first file
-        if self.docx_list.count() > 0:
-            self.docx_list.setCurrentRow(0)
-            self.show_selected_docx(self.docx_list.item(0))
-    
-    def open_output_folder(self):
-        """Mở thư mục output trong file explorer"""
-        output_path = os.path.abspath("output")
-        
-        if not os.path.exists(output_path):
-            QMessageBox.warning(self, "Lỗi", "Thư mục output chưa tồn tại!")
-            return
-        
-        # Mở folder tùy theo hệ điều hành
-        import platform
-        system = platform.system()
-        
-        try:
-            if system == "Windows":
-                os.startfile(output_path)
-            elif system == "Darwin":  # macOS
-                os.system(f'open "{output_path}"')
-            else:  # Linux
-                os.system(f'xdg-open "{output_path}"')
-            
-            self.log_text.append(f"📁 Đã mở thư mục: {output_path}")
-        except Exception as e:
-            QMessageBox.warning(self, "Lỗi", f"Không thể mở thư mục: {str(e)}")
-    
-    def on_tab_changed(self, index, tabs):
-        """Xử lý khi chuyển tab"""
-        tab_name = tabs.tabText(index)
-        
-        # Nếu chuyển sang tab "Xem File", tự động load danh sách
-        if "Xem File" in tab_name:
-            if self.docx_list.count() == 0:  # Chỉ load nếu list trống
-                self.refresh_docx_list()    
     def show_selected_docx(self, item):
         """Hiển thị file docx được chọn"""
         if not item:

@@ -8,6 +8,12 @@ import zipfile, subprocess, re
 from tempfile import NamedTemporaryFile
 from docx.oxml import parse_xml
 import traceback
+from process.ques_valid import validate_and_fix_response
+from process.PDF_Scan import enhance_prompt_with_pdf_scan, regenerate_missing_questions
+from enum import Enum
+
+# ============ LATEX & EQUATION FUNCTIONS ============
+# (Giữ nguyên các hàm latex như cũ - không thay đổi)
 
 def latex_to_omml_via_pandoc(latex_math_dollar):
     """Chuyển đổi LaTeX sang OMML qua Pandoc"""
@@ -22,7 +28,6 @@ def latex_to_omml_via_pandoc(latex_math_dollar):
             )
 
             if result.returncode != 0:
-                print(f"⚠️ Pandoc error: {result.stderr}")
                 return None
             
             with zipfile.ZipFile(temp_docx.name, 'r') as z:
@@ -32,7 +37,6 @@ def latex_to_omml_via_pandoc(latex_math_dollar):
         return match.group(1) if match else None
     
     except Exception as e:
-        print(f"Lỗi latex_to_omml: {e}")
         return None
 
 
@@ -57,7 +61,6 @@ def insert_equation_into_paragraph(latex_math_dollar, paragraph):
         run = paragraph.add_run()
         run._r.append(omml_element)
     except Exception as e:
-        print(f"Lỗi chèn equation: {e}")
         paragraph.add_run(f" [{latex_math_dollar}] ")
 
 
@@ -97,7 +100,7 @@ def process_text(text, paragraph, bold=False):
         return
     
     text = text.replace("<br>", "\n").replace("<br/>", "\n") \
-               .replace("<Br>", "\n").replace("<Br/>", "\n")
+        .replace("<Br>", "\n").replace("<Br/>", "\n")
     text = re.sub(r'</?(div|p|u|span|font|i|b)\b[^>]*>', '', text)
     text = text.replace("&nbsp;", "").replace("&lt;", "").replace("&gt;", "")
     
@@ -113,7 +116,6 @@ def process_text(text, paragraph, bold=False):
                 latex_expr = clean_latex_math(part)
                 insert_equation_into_paragraph(latex_expr, paragraph)
             except Exception as e:
-                print(f"Lỗi xử lý LaTeX: {e}")
                 run = paragraph.add_run(part)
                 if bold:
                     run.bold = True
@@ -123,39 +125,7 @@ def process_text(text, paragraph, bold=False):
             if bold:
                 run.bold = True
 
-
-def handle_image_generation(description, doc):
-    """Xử lý sinh ảnh với kích thước vừa phải và căn giữa"""
-    try:
-        print(f" \n → Đang sinh ảnh: {description[:50]}... \n")
-        image_bytes = generate_image_from_text(description)
-        
-        # Tạo paragraph mới cho ảnh và căn giữa
-        img_paragraph = doc.add_paragraph()
-        img_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        
-        # Thêm ảnh với kích thước nhỏ hơn (2.5 inches ~ 6.35cm)
-        # Kích thước này vừa đủ để xem rõ mà không chiếm quá nhiều không gian
-        run = img_paragraph.add_run()
-        run.add_picture(BytesIO(image_bytes), width=Inches(2.5))
-        
-        print("\n  ✓ Đã sinh ảnh thành công\n")
-        return True, img_paragraph
-    
-    except Exception as e:
-        print(f"\n  ✗ Không thể sinh ảnh: {e}\n")
-        # Tạo placeholder với căn giữa
-        img_paragraph = doc.add_paragraph()
-        img_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
-        run = img_paragraph.add_run(f"[HÌNH ẢNH MINH HỌA: {description}]")
-        run.font.color.rgb = RGBColor(128, 128, 128)
-        run.italic = True
-        run.font.size = Pt(9)
-        return False, img_paragraph
-
-
 def process_bold_text(text, paragraph):
-    """Xử lý text có **bold**"""
     current_text = text
     
     while "**" in current_text:
@@ -165,99 +135,351 @@ def process_bold_text(text, paragraph):
         if start_bold == -1 or end_bold == -1:
             process_text(current_text, paragraph)
             break
-        
-        # Text trước **
         if start_bold > 0:
             process_text(current_text[:start_bold], paragraph)
-        
-        # Text in đậm
         bold_text = current_text[start_bold + 2:end_bold]
         process_text(bold_text, paragraph, bold=True)
-        
-        # Phần còn lại
         current_text = current_text[end_bold + 2:]
-    
-    # Text cuối cùng
     if current_text:
         process_text(current_text, paragraph)
 
 
+def handle_image_generation(description, doc):
+    """Xử lý sinh ảnh với kích thước và căn giữa"""
+    try:
+        print(f"   → Đang sinh ảnh: {description[:50]}...")
+        image_bytes = generate_image_from_text(description)
+        
+        img_paragraph = doc.add_paragraph()
+        img_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        
+        run = img_paragraph.add_run()
+        run.add_picture(BytesIO(image_bytes), width=Inches(3.5))
+        
+        print("     ✓ Đã sinh ảnh thành công")
+        return True, img_paragraph
+    
+    except Exception as e:
+        print(f"     ✗ Không thể sinh ảnh: {e}")
+        img_paragraph = doc.add_paragraph()
+        img_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        run = img_paragraph.add_run(f"[HÌNH ẢNH MINH HỌA: {description}]")
+        run.font.color.rgb = RGBColor(128, 128, 128)
+        run.italic = True
+        return False, img_paragraph
+
+
+# ============ DETECTION FUNCTIONS ============
+# (Giữ nguyên các hàm detection như cũ)
+
+def is_image_line(line):
+    return bool(re.search(r'\[?\s*(HÌNH ẢNH|Hình ảnh|hình ảnh)', line, re.IGNORECASE))
+
+def extract_image_description(line):
+    cleaned = re.sub(r'\[?\s*(HÌNH ẢNH|Hình ảnh|hình ảnh)\s*[:\]]?', '', line, flags=re.IGNORECASE)
+    cleaned = cleaned.replace("[", "").replace("]", "").strip()
+    return cleaned
+
+def is_question_title(line):
+    return bool(re.match(r'^\*?\*?Câu\s+\d+[:\.]?\*?\*?', line, re.IGNORECASE))
+
+def is_answer_option(line):
+    return bool(re.match(r'^[A-Da-d][\.\)]', line.strip()))
+
+def is_solution_header(line):
+    return bool(re.match(r'^\*?\*?Lời giải[:\.]?\*?\*?', line, re.IGNORECASE))
+
+def is_correct_answer(line):
+    stripped = line.strip()
+    return bool(re.match(r'^[1-4]$', stripped) or re.match(r'^[01]{4}$', stripped))
+
+def is_separator(line):
+    return line.strip() == "####"
+
+def is_heading(line):
+    return bool(re.match(r'^#{1,3}\s+', line))
+
+
+# ============ QUESTION STATE MACHINE ============
+# (Giữ nguyên QuestionState và QuestionBuffer như cũ)
+
+class QuestionState(Enum):
+    IDLE = "idle"
+    IN_TITLE = "in_title"
+    IN_CONTENT = "in_content"
+    WAITING_IMAGE = "waiting_image"
+    IN_ANSWERS = "in_answers"
+    IN_SOLUTION_HEADER = "in_solution_header"
+    IN_CORRECT_ANSWER = "in_correct_answer"
+    AFTER_SEPARATOR = "after_separator"
+    IN_EXPLANATION = "in_explanation"
+
+
+class QuestionBuffer:
+    def __init__(self):
+        self.question_num = 0
+        self.title = ""
+        self.content_lines = []
+        self.image_description = None
+        self.answers = []
+        self.solution_header = ""
+        self.correct_answer = ""
+        self.explanation_lines = []
+        self.state = QuestionState.IDLE
+    
+    def reset(self):
+        self.__init__()
+    
+    def has_content(self):
+        return len(self.content_lines) > 0
+    
+    def has_answers(self):
+        return len(self.answers) >= 4
+    
+    def has_explanation(self):
+        return len(self.explanation_lines) > 0
+    
+    def is_complete(self):
+        return (
+            self.title and
+            self.has_content() and
+            self.has_answers() and
+            self.solution_header and
+            self.correct_answer and
+            self.has_explanation()
+        )
+    
+    def flush_to_doc(self, doc):
+        if not self.is_complete():
+            missing = []
+            if not self.title:
+                missing.append("tiêu đề")
+            if not self.has_content():
+                missing.append("nội dung")
+            if not self.has_answers():
+                missing.append(f"đáp án ({len(self.answers)}/4)")
+            if not self.solution_header:
+                missing.append("lời giải header")
+            if not self.correct_answer:
+                missing.append("đáp án đúng")
+            if not self.has_explanation():
+                missing.append("giải thích")
+            
+            print(f"   ⚠️ Câu {self.question_num} THIẾU: {', '.join(missing)}")
+            return False
+        
+        # 1. Thêm tiêu đề
+        title_para = doc.add_paragraph()
+        run = title_para.add_run(self.title)
+        run.bold = True
+        run.font.size = Pt(12)
+        
+        # 2. Thêm nội dung
+        for line in self.content_lines:
+            if line.strip():
+                para = doc.add_paragraph()
+                if "**" in line:
+                    process_bold_text(line, para)
+                else:
+                    process_text(line, para)
+        
+        # 3. Thêm hình ảnh (nếu có)
+        if self.image_description:
+            handle_image_generation(self.image_description, doc)
+        
+        # 4. Thêm đáp án
+        for answer in self.answers:
+            answer_para = doc.add_paragraph()
+            process_text(answer, answer_para)
+        
+        # 5. Thêm khoảng cách trước lời giải
+        doc.add_paragraph()
+        
+        # 6. Thêm lời giải header
+        solution_para = doc.add_paragraph()
+        run = solution_para.add_run(self.solution_header)
+        run.bold = True
+        
+        # 7. Thêm đáp án đúng
+        answer_para = doc.add_paragraph()
+        run = answer_para.add_run(self.correct_answer)
+        run.bold = True
+        
+        # 8. Thêm separator
+        separator_para = doc.add_paragraph()
+        run = separator_para.add_run("####")
+        run.bold = True
+        
+        # 9. Thêm giải thích
+        for line in self.explanation_lines:
+            if line.strip():
+                para = doc.add_paragraph()
+                if "**" in line:
+                    process_bold_text(line, para)
+                else:
+                    process_text(line, para)
+        
+        print(f"   ✅ Câu {self.question_num}: Đã ghi vào document")
+        return True
+
+
+# ============ MAIN FUNCTION V3 WITH PDF SCANNER ============
+
 def response2docx_improved(file_paths, prompt, output_filename, project_id, 
-                          creds, model_name, question_type="tracnghiem"):
+                     creds, model_name, question_type="tracnghiem"):
     """
-    Hàm cải tiến sinh DOCX với format chuẩn
+    VERSION 3: Tích hợp PDF Scanner và Missing Question Fixer
     
-    question_type: "tracnghiem" (80 câu) hoặc "dungsai" (40 câu)
-    Format theo prompt:
-    
-    TRẮC NGHIỆM:
-    **Câu X:**
-    [Đề bài - nội dung văn bản]
-    [HÌNH ẢNH nếu có]
-    
-    A. [Đáp án 1]
-    B. [Đáp án 2]
-    C. [Đáp án 3]
-    D. [Đáp án 4]
-    
-    Lời giải:
-    [X] (số thứ tự 1-4)
-    ####
-    [Giải thích chi tiết]
-    
-    ĐÚNG/SAI:
-    **Câu X:**
-    [Đoạn văn liền mạch 50-100 từ]
-    [HÌNH ẢNH nếu có]
-    
-    a) [Phát biểu 1]
-    b) [Phát biểu 2]
-    c) [Phát biểu 3]
-    d) [Phát biểu 4]
-    
-    Lời giải:
-    1010 (1=Đúng, 0=Sai)
-    ####
-    - [Nội dung phát biểu] là ĐÚNG/SAI.
-    Giải thích chi tiết (ít nhất 3 dòng)...
+    Cải tiến mới:
+    1. Quét 3 file PDF (SGK, SBT, SGV) để hiểu chủ đề
+    2. Tạo topic guide để sinh câu hỏi không lạc đề
+    3. Tự động sinh lại câu thiếu với nội dung hoàn toàn khác
+    4. Kiểm tra trùng lặp giữa các lần sinh
     """
     try:
-        print(f"\n=== Bắt đầu sinh {question_type} ===\n")
+        print(f"\n{'='*70}")
+        print(f"SINH {question_type.upper()} - VERSION 3 (PDF SCANNER)")
+        print(f"{'='*70}\n")
         
-        # 1. Gọi API
+        required_count = 80 if question_type == "tracnghiem" else 40
+        print(f"Yêu cầu: {required_count} câu\n")
+        
+        # ============ BƯỚC 0: QUÉT PDF VÀ CẢI THIỆN PROMPT ============
+        print(f"{'='*70}")
+        print("BƯỚC 0: QUÉT PDF VÀ TẠO TOPIC GUIDE")
+        print(f"{'='*70}\n")
+        
+        enhanced_prompt = enhance_prompt_with_pdf_scan(
+            prompt, file_paths, project_id, creds
+        )
+        
+        # ============ BƯỚC 1: BATCH PROCESSING ============
+        print(f"{'='*70}")
+        print("BƯỚC 1: GEN THEO BATCH")
+        print(f"{'='*70}\n")
+        
         client = VertexClient(project_id, creds, model_name)
-        AIresponse = client.send_data_to_AI(prompt, file_paths)
         
-        # 2. Kiểm tra lại
-        prompt_check = f'''Tôi có một đề bao gồm các câu hỏi sau:
-```
-{AIresponse}
-```
-Bạn hãy kiểm tra đề đó theo các yêu cầu sau:
-* Yêu cầu về tính đúng sai:
-- Nếu đề bài sai, sinh lại toàn bộ đề bài và lời giải của câu hỏi đó.
-- Nếu lời giải (hoặc giải thích) sai, sinh lại lời giải (giải thích) chính xác. Độ dài ít nhất 4 dòng (60 từ).
-* Yêu cầu về nội dung:
-- Nếu lời giải ngắn, sinh lại lời giải dài ít nhất 4 dòng (60 từ).
-- Nếu các công thức toán học chưa được biểu diễn dưới dạng LaTeX, chuyển toàn bộ công thức toán học sang dạng LaTeX (Kể cả số mũ hay chỉ số).
-* Yêu cầu trả về:
-- Trả về duy nhất đề bài bao gồm toàn bộ câu hỏi.
-- Lược bỏ tất cả những phần không liên quan đến các câu hỏi: "Tất nhiên rồi,...", "Tôi sẽ...", "Tôi hiểu...",...
-'''
+        all_responses = []
+        generated_count = 0
+        MAX_QUESTIONS_PER_REQUEST = 20
+        max_attempts = 5
+        attempt = 0
         
-        print("\n  → Đang kiểm tra và tối ưu nội dung...\n")
-        AIresponse_final = client.send_data_to_check(prompt=prompt_check)
-        print("\n  ✓ Đã nhận phản hồi từ AI\n")
+        while generated_count < required_count and attempt < max_attempts:
+            attempt += 1
+            remaining = required_count - generated_count
+            batch_count = min(MAX_QUESTIONS_PER_REQUEST, remaining)
+            
+            print(f"\n{'─'*70}")
+            print(f"Lần {attempt}: Sinh câu {generated_count+1} đến {generated_count+batch_count}")
+            print(f"{'─'*70}")
+            
+            if generated_count == 0:
+                batch_prompt = enhanced_prompt
+                print(f"(Lần đầu - gồm cả file PDF và topic guide)")
+                batch_response = client.send_data_to_AI(
+                    batch_prompt, 
+                    file_paths,
+                    temperature=0.7
+                )
+            else:
+                batch_prompt = f"""{enhanced_prompt}
+
+YÊU CẦU THÊM CÂU HỎI:
+- Sinh {batch_count} câu hỏi THÊM (từ câu {generated_count+1} đến {generated_count+batch_count})
+- TUYỆT ĐỐI KHÔNG sinh lại các câu đã sinh
+- Mỗi câu PHẢI ĐẦY ĐỦ: tiêu đề, nội dung, 4 đáp án, lời giải, giải thích
+- BÁM SÁT chủ đề đã được định nghĩa trong PHẠM VI CHỦ ĐỀ VÀ KIẾN THỨC
+- KHÔNG LẠC ĐỀ sang chủ đề khác
+- KHÔNG THÊM LỜI MỞ ĐẦU HOẶC KẾT LUẬN
+"""
+                print(f"(Lần {attempt} - không có file PDF)")
+                batch_response = client.send_data_to_check(
+                    prompt=batch_prompt,
+                    temperature=0.7
+                )
+            
+            all_responses.append(batch_response)
+            
+            # Đếm câu trong batch
+            batch_questions = len(re.findall(r'\*?\*?Câu\s+\d+', batch_response, re.IGNORECASE))
+            print(f"Kết quả batch: {batch_questions} câu (yêu cầu {batch_count})")
+            
+            # Cập nhật count
+            combined_text = "\n\n".join(all_responses)
+            current_count = len(re.findall(r'\*?\*?Câu\s+\d+', combined_text, re.IGNORECASE))
+            print(f"Tổng cộng: {current_count}/{required_count} câu")
+            
+            generated_count = current_count
         
-        # 3. Tạo document
+        final_response = "\n\n".join(all_responses)
+        
+        # ============ BƯỚC 2: VALIDATE & FIX ============
+        print(f"\n{'='*70}")
+        print("BƯỚC 2: VALIDATE & AUTO-FIX")
+        print(f"{'='*70}\n")
+        
+        AIresponse_final = validate_and_fix_response(
+            final_response,
+            enhanced_prompt,
+            client,
+            question_type
+        )
+        
+        # ============ BƯỚC 2.5: SINH LẠI CÂU THIẾU (NẾU CÓ) ============
+        print(f"\n{'='*70}")
+        print("BƯỚC 2.5: KIỂM TRA VÀ SINH LẠI CÂU THIẾU")
+        print(f"{'='*70}\n")
+        
+        # Import validator để kiểm tra
+        from process.ques_valid import QuestionValidator
+        validator = QuestionValidator(question_type=question_type)
+        validations, missing_nums = validator.validate_all_questions(AIresponse_final)
+        
+        # Nếu vẫn còn câu thiếu, sinh lại
+        regeneration_attempts = 0
+        max_regeneration_attempts = 3
+        
+        while missing_nums and regeneration_attempts < max_regeneration_attempts:
+            regeneration_attempts += 1
+            print(f"\n🔄 Lần sinh lại thứ {regeneration_attempts}/{max_regeneration_attempts}")
+            print(f"   Cần sinh lại: {len(missing_nums)} câu\n")
+            
+            new_questions = regenerate_missing_questions(
+                missing_nums,
+                enhanced_prompt,
+                AIresponse_final,
+                project_id,
+                creds,
+                question_type
+            )
+            
+            if new_questions:
+                # Thêm câu mới vào text hiện tại
+                AIresponse_final = AIresponse_final + "\n\n" + new_questions
+                
+                # Validate lại
+                validations, missing_nums = validator.validate_all_questions(AIresponse_final)
+                
+                if not missing_nums:
+                    print("✅ Đã sinh đủ tất cả các câu!\n")
+                    break
+            else:
+                print("⚠️ Không thể sinh thêm câu. Dừng lại.\n")
+                break
+        
+        # ============ BƯỚC 3: TẠO DOCUMENT VỚI BUFFER ============
+        print(f"\n{'='*70}")
+        print("BƯỚC 3: TẠO DOCUMENT VỚI BUFFER")
+        print(f"{'='*70}\n")
+        
         doc = Document()
         lines = AIresponse_final.split("\n")
         
+        buffer = QuestionBuffer()
         image_failed_count = 0
-        in_question = False
-        in_loi_giai = False
-        waiting_for_separator = False
-        question_content_lines = []
+        question_count_in_doc = 0
         
         i = 0
         while i < len(lines):
@@ -267,136 +489,134 @@ Bạn hãy kiểm tra đề đó theo các yêu cầu sau:
                 i += 1
                 continue
             
-            # 1. Phát hiện tiêu đề câu hỏi: **Câu X:** hoặc Câu X:
-            if re.match(r'^\*?\*?Câu\s+\d+[:\.]?\*?\*?', line, re.IGNORECASE):
-                # Thêm khoảng cách trước câu mới (trừ câu đầu)
-                if in_question:
-                    doc.add_paragraph()
+            # ========== HEADING ==========
+            if is_heading(line):
+                if buffer.question_num > 0:
+                    if buffer.flush_to_doc(doc):
+                        question_count_in_doc += 1
+                    buffer.reset()
                 
-                in_question = True
-                in_loi_giai = False
-                waiting_for_separator = False
-                question_content_lines = []
-                
-                # Xử lý tiêu đề câu
-                question_para = doc.add_paragraph()
-                question_text = line.replace("**", "").strip()
-                run = question_para.add_run(question_text)
-                run.bold = True
-                run.font.size = Pt(12)
-                
-                i += 1
-                continue
-            
-            # 2. Xử lý hình ảnh
-            if re.search(r'\[?\s*(HÌNH ẢNH|Hình ảnh|hình ảnh)', line, re.IGNORECASE):
-                # Extract mô tả
-                cleaned = re.sub(r'\[?\s*(HÌNH ẢNH|Hình ảnh|hình ảnh)\s*[:\]]?', '', line, flags=re.IGNORECASE)
-                cleaned = cleaned.replace("[", "").replace("]", "").strip()
-                
-                if cleaned:
-                    success, img_para = handle_image_generation(cleaned, doc)
-                    if not success:
-                        image_failed_count += 1
+                if line.startswith("### "):
+                    heading_text = line.replace("### ", "").strip()
+                    doc.add_heading(heading_text, level=3)
+                elif line.startswith("## "):
+                    heading_text = line.replace("## ", "").strip()
+                    doc.add_heading(heading_text, level=2)
+                elif line.startswith("# "):
+                    heading_text = line.replace("# ", "").strip()
+                    doc.add_heading(heading_text, level=1)
                 
                 i += 1
                 continue
             
-            # 3. Xử lý đáp án A, B, C, D (trắc nghiệm) hoặc a), b), c), d) (đúng/sai)
-            if re.match(r'^[A-Da-d][\.\)]', line):
-                answer_para = doc.add_paragraph()
-                process_text(line, answer_para)
+            # ========== QUESTION TITLE ==========
+            if is_question_title(line):
+                if buffer.question_num > 0:
+                    if buffer.flush_to_doc(doc):
+                        question_count_in_doc += 1
+                        doc.add_paragraph()
+                    buffer.reset()
+                
+                buffer.title = line.replace("**", "").strip()
+                buffer.state = QuestionState.IN_TITLE
+                
+                match = re.match(r'^\*?\*?Câu\s+(\d+)', line)
+                if match:
+                    buffer.question_num = int(match.group(1))
+                    print(f"Câu {buffer.question_num}: {line[:50]}...")
                 
                 i += 1
                 continue
             
-            # 4. Phát hiện "Lời giải:" hoặc "**Lời giải:**"
-            if re.match(r'^\*?\*?Lời giải[:\.]?\*?\*?', line, re.IGNORECASE):
-                in_loi_giai = True
-                waiting_for_separator = False
-                
-                # Thêm dòng trống trước "Lời giải:"
-                doc.add_paragraph()
-                
-                solution_para = doc.add_paragraph()
-                solution_text = line.replace("**", "").strip()
-                run = solution_para.add_run(solution_text)
-                run.bold = True
+            # ========== IMAGE ==========
+            if is_image_line(line):
+                img_desc = extract_image_description(line)
+                if img_desc:
+                    buffer.image_description = img_desc
+                    print(f"   → Lưu ảnh: {img_desc[:40]}...")
                 
                 i += 1
                 continue
             
-            # 5. Xử lý đáp án đúng sau "Lời giải:"
-            # - Trắc nghiệm: 1, 2, 3, 4 (số đơn)
-            # - Đúng/sai: 1010, 0101, ... (chuỗi 4 ký tự 0/1)
-            if in_loi_giai and not waiting_for_separator:
-                # Kiểm tra đúng/sai: 1010, 0110, ...
-                if re.match(r'^[01]{4}$', line.strip()):
-                    answer_para = doc.add_paragraph()
-                    run = answer_para.add_run(line.strip())
-                    run.bold = True
-                    waiting_for_separator = True
-                    i += 1
-                    continue
-                
-                # Kiểm tra trắc nghiệm: 1, 2, 3, 4
-                if re.match(r'^[1-4]$', line.strip()):
-                    answer_para = doc.add_paragraph()
-                    run = answer_para.add_run(line.strip())
-                    run.bold = True
-                    waiting_for_separator = True
-                    i += 1
-                    continue
-            
-            # 6. Xử lý dấu phân cách ####
-            if line.strip() == "####":
-                separator_para = doc.add_paragraph()
-                run = separator_para.add_run("####")
-                run.bold = True
-                waiting_for_separator = False
+            # ========== ANSWER OPTIONS ==========
+            if is_answer_option(line):
+                buffer.answers.append(line)
+                buffer.state = QuestionState.IN_ANSWERS
+                print(f"   → Đáp án {len(buffer.answers)}: {line[:35]}...")
                 
                 i += 1
                 continue
             
-            # 7. Xử lý heading (##, ###)
-            if line.startswith("### "):
-                heading_text = line.replace("### ", "").strip()
-                doc.add_heading(heading_text, level=3)
+            # ========== SOLUTION HEADER ==========
+            if is_solution_header(line):
+                buffer.solution_header = line.replace("**", "").strip()
+                buffer.state = QuestionState.IN_SOLUTION_HEADER
+                print(f"   → Lời giải")
+                
                 i += 1
                 continue
             
-            if line.startswith("## "):
-                heading_text = line.replace("## ", "").strip()
-                doc.add_heading(heading_text, level=2)
+            # ========== CORRECT ANSWER ==========
+            if buffer.state == QuestionState.IN_SOLUTION_HEADER and is_correct_answer(line):
+                buffer.correct_answer = line.strip()
+                buffer.state = QuestionState.IN_CORRECT_ANSWER
+                print(f"   → Đáp án đúng: {line.strip()}")
+                
                 i += 1
                 continue
             
-            if line.startswith("# "):
-                heading_text = line.replace("# ", "").strip()
-                doc.add_heading(heading_text, level=1)
+            # ========== SEPARATOR #### ==========
+            if is_separator(line):
+                buffer.state = QuestionState.AFTER_SEPARATOR
+                print(f"   → Separator")
+                
                 i += 1
                 continue
             
-            # 8. Xử lý text thông thường (đề bài, giải thích)
-            paragraph = doc.add_paragraph()
-            if "**" in line:
-                process_bold_text(line, paragraph)
-            else:
-                process_text(line, paragraph)
+            # ========== EXPLANATION ==========
+            if buffer.state in [QuestionState.AFTER_SEPARATOR, QuestionState.IN_EXPLANATION]:
+                if line.strip():
+                    buffer.explanation_lines.append(line)
+                    buffer.state = QuestionState.IN_EXPLANATION
+                    print(f"   → Giải thích: {line[:45]}...")
+                
+                i += 1
+                continue
+            
+            # ========== QUESTION CONTENT ==========
+            if buffer.state in [QuestionState.IN_TITLE, QuestionState.IN_CONTENT]:
+                buffer.content_lines.append(line)
+                buffer.state = QuestionState.IN_CONTENT
+                print(f"   → Nội dung: {line[:45]}...")
+                
+                i += 1
+                continue
             
             i += 1
         
-        # 4. Lưu file
+        # ========== FLUSH BUFFER CUỐI CÙNG ==========
+        if buffer.question_num > 0:
+            if buffer.flush_to_doc(doc):
+                question_count_in_doc += 1
+        
+        # ========== LƯU FILE ==========
         output_path = f"{output_filename}.docx"
         doc.save(output_path)
         
-        print(f"\n  ✓ Đã lưu file: {output_path}")
+        print(f"\n{'='*70}")
+        print(f"✅ HOÀN THÀNH!")
+        print(f"{'='*70}")
+        print(f"File: {output_path}")
+        print(f"Câu hỏi trong document: {question_count_in_doc}/{required_count}")
+        if question_count_in_doc < required_count:
+            print(f"⚠️  Còn thiếu: {required_count - question_count_in_doc} câu")
         if image_failed_count > 0:
-            print(f"  ⚠️ {image_failed_count} hình ảnh không sinh được (đã thêm placeholder)")
+            print(f"Ảnh lỗi: {image_failed_count}")
+        print(f"{'='*70}\n")
         
         return output_path
     
     except Exception as e:
-        print(f"✗ LỖI NGHIÊM TRỌNG: {e}")
+        print(f"\n❌ LỖI NGHIÊM TRỌNG: {e}")
         traceback.print_exc()
         return None

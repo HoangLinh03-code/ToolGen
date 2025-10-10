@@ -10,6 +10,19 @@
 6. Đáp án sai phải hợp lý, không quá dễ loại bỏ
 7. Lời giải phải nhận đúng những nội dung đã thuyết phục
 8. Trả về duy nhất nội dung viết câu, không những nội dung khác như: "Tất nhiên rồi...", "Dưới đây là...", "Tôi đã hiểu...rồi", "Chắc chắn rồi..."
+9. Nội dung sinh ra phải bám sát kiến thức của chủ đề vào bài đó, không được phép lấy chủ đề và kiến thức bài khác áp vào bài đang xử lí.
+
+## KIỂM TRA FORMAT BẮTBUỘC
+
+Mỗi câu hỏi PHẢI có:
+1. ✓ Dòng tiêu đề: **Câu X:**
+2. ✓ Nội dung câu 40-80 từ (không được tách thành nhiều dòng)
+3. ✓ (Tùy chọn) [HÌNH ẢNH: mô tả]
+4. ✓ 4 phát biểu A., B., C., D.
+5. ✓ Dòng **Lời giải:**
+6. ✓ Mã đáp án 1 ký tự (1/2/3/4 cho mỗi phát biểu)
+7. ✓ Dòng ####
+8. ✓ Giải thích chi tiết TỐI THIỂU 3 DÒNG cho phát biểu đúng
 
 ## VAI TRÒ
 
@@ -18,7 +31,7 @@ Bạn là một trợ lý AI chuyên về lĩnh vực giáo dục, có nhiệm v
 ## MỤC TIÊU
 
 Tạo một bộ đầy đủ **80** câu hỏi trắc nghiệm 4 đáp án cho môn **Tin học lớp 10** từ nội dung của file PDF được cung cấp.
-Phải đủ **80** câu hỏi, không được thiếu câu nào dù chỉ 1 câu
+Phải đủ **80** câu hỏi, nội dung, đáp án, lời giải, không được thiếu câu nào dù chỉ 1 câu
 Nếu không đủ **80** câu thì sẽ phải gen đến khi nào đủ **80** câu
 
 ## YÊU CẦU CHUNG
@@ -94,7 +107,7 @@ Dạng 1: Hình ảnh mô tả ngữ cảnh
 Dạng 2: Hình ảnh chứa dữ liệu có cấu trúc
 - [Hình ảnh: <Nội dung hình ảnh>]
 
-Nội dung hình ảnh có thể là mô tả ảnh, có thể là vị trí của hình ảnh trong file pdf (Trường hợp không chắc chắn, ảnh AI lấy từ PDF ra có thể bị thừa các đoạn text vô nghĩa trong ảnh).
+Nội dung hình ảnh có thể là mô tả ảnh, có thể là vị trí của hình ảnh trong file PDF (Trường hợp không chắc chắn, ảnh AI lấy từ PDF ra có thể bị thừa các đoạn text vô nghĩa trong ảnh).
 
 Hình ảnh phải nằm sau câu hỏi và đặt chính giữa
 
@@ -131,21 +144,15 @@ A. Ổn định điện áp cho các thiết bị điện.
 B. Tự động ngắt mạch khi có sự cố quá tải.
 C. Tăng cường độ dòng điện khi cần thiết.
 D. Đo lường lượng điện năng đã tiêu thụ.
-
 Lời giải (SAI):
 Đáp án đúng: B
-
 Giải thích: Đáp án B đúng vì cầu chì ngắt mạch khi quá tải. Đáp án A sai vì đó là chức năng của ổn áp. Đáp án D sai vì đó là chức năng của công tơ điện.
 
 ### Cách viết ĐÚNG (Bắt buộc phải làm theo cách này)
-
 Lời giải (ĐÚNG):
 2 
-
 ####
-
 Vai trò chính của cầu chì là bảo vệ mạch điện. Khi dòng điện tăng lên quá mức an toàn do quá tải hoặc ngắn mạch, dây chì sẽ nóng chảy và tự động ngắt mạch điện để bảo vệ các thiết bị. Do đó, nhận định cầu chì có chức năng tự động ngắt mạch khi có sự cố quá tải là chính xác.
-
 - Việc ổn định điện áp là chức năng của thiết bị ổn áp, không phải của cầu chì.
 - Chức năng đo lường lượng điện năng tiêu thụ thuộc về công tơ điện.
 - Cầu chì không tăng cường độ dòng điện, mà ngược lại, nó sẽ ngắt mạch nếu dòng điện tăng quá cao.
@@ -156,7 +163,8 @@ Vai trò chính của cầu chì là bảo vệ mạch điện. Khi dòng điệ
 
 MỨC ĐỘ NHẬN BIẾT
 
-**Câu 1:** [Nội dung câu hỏi]
+**Câu 1:** 
+[Nội dung câu hỏi]
 [HÌNH ẢNH: (Mô tả chi tiết nếu có)]
 
 A. [Nội dung đáp án 1]

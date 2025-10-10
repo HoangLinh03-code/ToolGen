@@ -15,8 +15,7 @@ class VertexClient:
 
     def send_data_to_AI(self, prompt, file_paths=None, temperature=0.5, top_p=0.8):
         parts = []
-
-        # Náº¿u cÃ³ nhiá»u file PDF
+        
         if file_paths:
             for file_path in file_paths:
                 with open(file_path, "rb") as f:
@@ -25,21 +24,21 @@ class VertexClient:
                     Part.from_data(data=pdf_bytes, mime_type="application/pdf")
                 )
             print("Load xong pdf\n")
-
-        # ThÃªm prompt dáº¡ng text
+        
         parts.append(Part.from_text(prompt))
-
-        # Config sinh ná»™i dung
+        
         generation_config = GenerationConfig(
             temperature=temperature,
-            top_p=top_p
+            top_p=top_p,
+            max_output_tokens=8192,  # THÊM DÒNG NÀY
+            candidate_count=1
         )
-
+        
         response = self.model.generate_content(
             parts, generation_config=generation_config
         )
         return response.text
-    
+        
     def send_data_to_check(self, prompt, temperature=0.5, top_p=0.8):
         parts = []
         # ThÃªm prompt dáº¡ng text
