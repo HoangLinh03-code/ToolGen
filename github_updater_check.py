@@ -42,6 +42,10 @@ def load_current_version():
             data = json.load(f)
             version_str = data.get("version", "1.0.0")
             print(f"[DEBUG] ✅ Đã đọc version hiện tại từ {VERSION_FILE}: {version_str}")
+            
+            # 🔍 KIỂM TRA LOG FILE CẬP NHẬT
+            check_update_log()
+            
             return version_str
     except json.JSONDecodeError as e:
         print(f"[DEBUG] ❌ Lỗi JSON trong {VERSION_FILE}: {e}")
@@ -51,6 +55,35 @@ def load_current_version():
     except Exception as e:
         print(f"[DEBUG] ❌ Lỗi khi đọc {VERSION_FILE}: {e}")
         return "1.0.0"
+
+def check_update_log():
+    """Kiểm tra và hiển thị log cập nhật nếu có"""
+    log_file = os.path.join(tempfile.gettempdir(), "update_install.log")
+    
+    if os.path.exists(log_file):
+        print("\n" + "="*60)
+        print("📋 TÌM THẤY LOG CẬP NHẬT GẦN ĐÂY:")
+        print("="*60)
+        
+        try:
+            with open(log_file, 'r', encoding='utf-8') as f:
+                log_content = f.read()
+                print(log_content)
+            
+            # Kiểm tra kết quả
+            if "SUCCESS:" in log_content:
+                print("\n✅ CẬP NHẬT THÀNH CÔNG!")
+            elif "FAILED:" in log_content:
+                print("\n❌ CẬP NHẬT THẤT BẠI!")
+            
+            print("="*60 + "\n")
+            
+            # Xóa log sau khi đọc (optional)
+            # os.remove(log_file)
+            
+        except Exception as e:
+            print(f"⚠️ Không thể đọc log file: {e}")
+
 
 def save_current_version(new_version):
     """Ghi version mới vào version.json"""
@@ -174,71 +207,97 @@ class GitHubUpdateChecker:
         """
         ✅ CẢI THIỆN: Thêm tham số new_version để ghi vào version.json sau khi update
         """
+        # 🔍 TẠO FILE LOG ĐỂ TRACKING
+        log_file = os.path.join(tempfile.gettempdir(), "update_install.log")
+        
+        def log_to_file(message):
+            """Ghi log vào file để debug"""
+            try:
+                with open(log_file, 'a', encoding='utf-8') as f:
+                    from datetime import datetime
+                    timestamp = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
+                    f.write(f"[{timestamp}] {message}\n")
+                print(message)
+            except:
+                print(message)
+        
+        log_to_file("="*60)
+        log_to_file("🚀 BẮT ĐẦU QUÁ TRÌNH CÀI ĐẶT CẬP NHẬT")
+        log_to_file("="*60)
+        
         try:
             # Kiểm tra chạy dưới dạng .exe
             if not getattr(sys, 'frozen', False):
-                print("⚠️ CẢNH BÁO: Không thể tự cập nhật khi đang chạy bằng Python script")
-                self._show_error(
-                    "Không thể tự cập nhật khi đang chạy bằng Python script (.py)\n"
-                    "Vui lòng build thành .exe trước."
-                )
-                return False
+                log_to_file("⚠️ CẢNH BÁO: Đang chạy bằng Python script, không phải .exe")
+                log_to_file("   => CHẾ ĐỘ TEST: Sẽ chỉ ghi version.json và tạo batch script")
+                
+                # CHẾ ĐỘ TEST: Chỉ ghi version và in batch script
+                log_to_file(f"[TEST] Ghi version {new_version} vào {VERSION_FILE}")
+                save_current_version(new_version)
+                
+                log_to_file("[TEST] Batch script sẽ được tạo (nhưng không chạy):")
+                return True  # ✅ Trả về True để test UI flow
 
             # Lấy đường dẫn file exe hiện tại
             current_exe = os.path.abspath(sys.executable)
-            print(f"[DEBUG] Đường dẫn file hiện tại: {current_exe}")
+            log_to_file(f"📍 Đường dẫn file hiện tại: {current_exe}")
             
             # Kiểm tra an toàn
             exe_name = os.path.basename(current_exe).lower()
             if exe_name in ['python.exe', 'pythonw.exe', 'python3.exe']:
-                print("❌ LỖI: Phát hiện đường dẫn là Python interpreter!")
+                log_to_file("❌ LỖI: Phát hiện đường dẫn là Python interpreter!")
                 self._show_error(f"Phát hiện đường dẫn là Python interpreter!\n{current_exe}")
                 return False
             
             exe_dir = os.path.dirname(current_exe).lower()
             dangerous_paths = ['python', 'scripts', 'lib', 'site-packages']
             if any(danger in exe_dir for danger in dangerous_paths):
-                print("❌ LỖI: File exe nằm trong thư mục Python!")
+                log_to_file("❌ LỖI: File exe nằm trong thư mục Python!")
                 self._show_error(f"File exe nằm trong thư mục hệ thống Python:\n{current_exe}")
                 return False
 
             # Kiểm tra file cập nhật
             if not os.path.exists(installer_path):
-                print(f"❌ Không tìm thấy file cập nhật: {installer_path}")
+                log_to_file(f"❌ Không tìm thấy file cập nhật: {installer_path}")
                 self._show_error(f"Không tìm thấy file cập nhật:\n{installer_path}")
                 return False
             
             if not installer_path.lower().endswith('.exe'):
-                print(f"❌ File cập nhật không hợp lệ: {installer_path}")
+                log_to_file(f"❌ File cập nhật không hợp lệ: {installer_path}")
                 self._show_error(f"File cập nhật không hợp lệ (phải là .exe)")
                 return False
             
             if os.path.abspath(installer_path) == current_exe:
-                print("❌ File cập nhật trùng với file hiện tại!")
+                log_to_file("❌ File cập nhật trùng với file hiện tại!")
                 self._show_error("File cập nhật trùng với file hiện tại!")
                 return False
 
             # In thông tin
-            print("\n" + "="*60)
-            print("📄 THÔNG TIN CẬP NHẬT:")
-            print(f"   File hiện tại: {current_exe}")
-            print(f"   File cập nhật:  {installer_path}")
-            print(f"   Phiên bản mới: {new_version}")
-            print(f"   Kích thước: {os.path.getsize(installer_path) / 1024 / 1024:.2f} MB")
-            print("="*60 + "\n")
+            log_to_file("\n" + "="*60)
+            log_to_file("📄 THÔNG TIN CẬP NHẬT:")
+            log_to_file(f"   File hiện tại: {current_exe}")
+            log_to_file(f"   File cập nhật:  {installer_path}")
+            log_to_file(f"   Phiên bản mới: {new_version}")
+            log_to_file(f"   Kích thước: {os.path.getsize(installer_path) / 1024 / 1024:.2f} MB")
+            log_to_file("="*60 + "\n")
 
             # ✅ GHI VERSION MỚI VÀO version.json TRƯỚC KHI CẬP NHẬT
-            # Lý do: Nếu cập nhật thành công, app mới sẽ đọc version đúng
             version_file_path = os.path.join(os.path.dirname(current_exe), VERSION_FILE)
-            print(f"[DEBUG] Ghi version mới vào: {version_file_path}")
+            log_to_file(f"📝 Ghi version mới vào: {version_file_path}")
             
             try:
                 with open(version_file_path, "w", encoding="utf-8") as f:
                     json.dump({"version": new_version}, f, indent=4, ensure_ascii=False)
-                print(f"[DEBUG] ✅ Đã ghi version {new_version} vào {version_file_path}")
+                log_to_file(f"✅ Đã ghi version {new_version} vào {version_file_path}")
+                
+                # Verify
+                with open(version_file_path, "r", encoding="utf-8") as f:
+                    verify = json.load(f)
+                    log_to_file(f"🔍 Verify: {verify}")
+                    
             except Exception as e:
-                print(f"[DEBUG] ⚠️ Không thể ghi version.json: {e}")
-                # Tiếp tục cập nhật, không fail
+                log_to_file(f"⚠️ Không thể ghi version.json: {e}")
+                # Tiếp tục cập nhật
 
             # Tạo batch script
             batch_script = f"""@echo off
@@ -247,19 +306,26 @@ echo ====================================
 echo    DANG CAP NHAT UNG DUNG...
 echo ====================================
 echo.
+echo [LOG] Bat dau cap nhat phien ban {new_version}
+echo [LOG] File hien tai: {current_exe}
+echo [LOG] File moi: {installer_path}
+echo.
 
 REM Đợi ứng dụng cũ đóng hoàn toàn
 echo [1/4] Cho ung dung cu dong...
-timeout /t 2 /nobreak > NUL
+timeout /t 3 /nobreak > NUL
 
 REM Xóa file exe cũ
 echo [2/4] Xoa file cu...
 del "{current_exe}" > NUL 2>&1
 if errorlevel 1 (
-    echo LOI: Khong the xoa file cu!
+    echo [ERROR] Khong the xoa file cu!
+    echo [LOG] Luu log loi tai: {log_file}
+    echo FAILED: Cannot delete old file >> "{log_file}"
     pause
     exit /b 1
 )
+echo [LOG] Da xoa file cu thanh cong
 
 timeout /t 1 /nobreak > NUL
 
@@ -267,10 +333,16 @@ REM Di chuyển file mới vào vị trí
 echo [3/4] Cai dat phien ban moi...
 move /Y "{installer_path}" "{current_exe}" > NUL 2>&1
 if errorlevel 1 (
-    echo LOI: Khong the cai dat file moi!
+    echo [ERROR] Khong the cai dat file moi!
+    echo [LOG] Luu log loi tai: {log_file}
+    echo FAILED: Cannot move new file >> "{log_file}"
     pause
     exit /b 1
 )
+echo [LOG] Da cai dat file moi thanh cong
+
+REM Ghi log thành công
+echo SUCCESS: Updated to {new_version} >> "{log_file}"
 
 REM Chạy ứng dụng mới
 echo [4/4] Khoi dong ung dung...
@@ -278,22 +350,28 @@ timeout /t 1 /nobreak > NUL
 start "" "{current_exe}"
 
 REM Tự xóa batch script
+echo [LOG] Hoan tat! Ung dung dang khoi dong lai...
+timeout /t 1 /nobreak > NUL
 del "%~f0"
 exit
 """
             
             # Lưu batch script
             batch_path = os.path.join(tempfile.gettempdir(), "app_updater.bat")
-            print(f"[DEBUG] Tạo batch script tại: {batch_path}")
+            log_to_file(f"📝 Tạo batch script tại: {batch_path}")
             
             with open(batch_path, 'w', encoding='utf-8-sig') as f:
                 f.write(batch_script)
             
-            print(f"✅ Đã tạo script cập nhật: {batch_path}")
+            log_to_file(f"✅ Đã tạo script cập nhật")
+            log_to_file(f"📋 Batch script content:\n{batch_script}")
 
             # Chạy batch script và thoát
-            print("🚀 Bắt đầu cập nhật...")
-            print("   Ứng dụng sẽ tự động khởi động lại sau khi cập nhật\n")
+            log_to_file("\n" + "="*60)
+            log_to_file("🚀 CHẠY BATCH SCRIPT VÀ THOÁT ỨNG DỤNG")
+            log_to_file(f"   Log file: {log_file}")
+            log_to_file(f"   Kiểm tra file này để xem kết quả!")
+            log_to_file("="*60)
             
             subprocess.Popen(
                 batch_path, 
@@ -301,19 +379,23 @@ exit
                 creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == 'win32' else 0
             )
             
-            import time
-            time.sleep(0.5)
-            sys.exit(0)
+            log_to_file("✅ Batch script đã được chạy")
+            
+            # ✅ KHÔNG THOÁT NGAY - Trả về True để UI xử lý
+            # App sẽ tự động bị terminate bởi batch script sau 3 giây
+            return True
 
         except PermissionError as e:
-            print(f"❌ Lỗi quyền truy cập: {e}")
+            log_to_file(f"❌ Lỗi quyền truy cập: {e}")
+            log_to_file("   Vui lòng chạy ứng dụng với quyền Administrator")
             self._show_error("Vui lòng chạy ứng dụng với quyền Administrator")
             return False
         
         except Exception as e:
-            print(f"💥 Lỗi khi cài đặt cập nhật: {e}")
+            log_to_file(f"💥 Lỗi khi cài đặt cập nhật: {e}")
             import traceback
-            traceback.print_exc()
+            tb = traceback.format_exc()
+            log_to_file(f"Traceback:\n{tb}")
             self._show_error(f"Lỗi khi cài đặt cập nhật:\n{e}")
             return False
     
@@ -386,53 +468,13 @@ exit
                 progress_label.config(text=f"Đang tải: {downloaded_mb:.1f} / {total_mb:.1f} MB ({percent:.1f}%)")
                 root.update_idletasks()
             
-            def download_thread():
-                temp_installer = None
-                try:
-                    temp_installer = os.path.join(tempfile.gettempdir(), "update_installer.exe")
-                    
-                    # Tải file
-                    if self.download_update_with_progress(update_info['download_url'], temp_installer, progress_callback):
-                        progress_label.config(text="Đang chuẩn bị cài đặt...")
-                        progress_bar['value'] = 100
-                        root.update_idletasks()
-                        
-                        # ✅ TRUYỀN new_version VÀO install_update
-                        success = self.install_update(temp_installer, update_info['version'])
-                        
-                        if success:
-                            # ✅ Nếu thành công (batch script đã chạy), hiển thị thông báo
-                            root.after(0, show_success_dialog)
-                        else:
-                            # ❌ Nếu thất bại, hiển thị lỗi và reset UI
-                            root.after(0, lambda: show_error_dialog("Không thể cài đặt bản cập nhật."))
-                            
-                            if temp_installer and os.path.exists(temp_installer):
-                                try:
-                                    os.remove(temp_installer)
-                                except Exception:
-                                    pass
-                    else:
-                        # ❌ Download thất bại
-                        root.after(0, lambda: show_error_dialog("Không thể tải xuống bản cập nhật."))
-                
-                except Exception as e:
-                    # ❌ Lỗi nghiêm trọng
-                    import traceback
-                    traceback.print_exc()
-                    root.after(0, lambda: show_error_dialog(f"Đã xảy ra lỗi:\n{e}"))
-            
-            def show_success_dialog():
-                """Hiển thị dialog thành công với nút Restart"""
+            def show_success_and_exit():
+                """Hiển thị thông báo thành công và thoát sau 3 giây"""
                 # Ẩn progress
                 progress_frame.pack_forget()
                 
-                # Ẩn changelog
-                changelog_label.pack_forget()
-                changelog_frame.pack_forget()
-                
-                # Hiển thị thông báo thành công
-                success_frame = tk.Frame(main_frame, bg='#E8F5E9', relief=tk.SOLID, borderwidth=1)
+                # Tạo success frame
+                success_frame = tk.Frame(main_frame, bg='#E8F5E9', relief=tk.SOLID, borderwidth=2)
                 success_frame.pack(fill=tk.BOTH, expand=True, pady=(10, 10))
                 
                 success_icon = tk.Label(success_frame, text="✅", font=('Arial', 48), bg='#E8F5E9')
@@ -449,47 +491,18 @@ exit
                 
                 success_msg = tk.Label(
                     success_frame,
-                    text=f"Đã cập nhật lên phiên bản {update_info['version']}\nỨng dụng sẽ khởi động lại tự động.",
+                    text=f"Đã cập nhật lên phiên bản {update_info['version']}\nỨng dụng đang khởi động lại...",
                     font=('Arial', 10),
                     bg='#E8F5E9',
                     justify=tk.CENTER
                 )
                 success_msg.pack(pady=(0, 20))
                 
-                # Clear button frame cũ
-                for widget in button_frame.winfo_children():
-                    widget.destroy()
-                
-                # Nút Restart ngay
-                restart_btn = tk.Button(
-                    button_frame, 
-                    text="🔄 Khởi động lại ngay", 
-                    command=lambda: restart_app(),
-                    bg='#4CAF50', 
-                    fg='white', 
-                    padx=20, 
-                    pady=8, 
-                    font=('Arial', 11, 'bold'),
-                    cursor='hand2'
-                )
-                restart_btn.pack(side=tk.LEFT, padx=5)
-                
-                # Nút Đóng
-                close_btn = tk.Button(
-                    button_frame, 
-                    text="Đóng", 
-                    command=root.destroy,
-                    padx=20, 
-                    pady=8,
-                    font=('Arial', 10)
-                )
-                close_btn.pack(side=tk.LEFT, padx=5)
-                
-                # Auto close sau 10 giây và restart
-                countdown = [10]
+                # Countdown
+                countdown = [3]
                 countdown_label = tk.Label(
                     success_frame,
-                    text=f"Tự động khởi động lại sau {countdown[0]} giây...",
+                    text=f"Tự động đóng sau {countdown[0]} giây...",
                     font=('Arial', 9),
                     bg='#E8F5E9',
                     fg='#666'
@@ -499,31 +512,92 @@ exit
                 def update_countdown():
                     countdown[0] -= 1
                     if countdown[0] > 0:
-                        countdown_label.config(text=f"Tự động khởi động lại sau {countdown[0]} giây...")
+                        countdown_label.config(text=f"Tự động đóng sau {countdown[0]} giây...")
                         root.after(1000, update_countdown)
                     else:
-                        restart_app()
+                        countdown_label.config(text="Đang thoát...")
+                        root.after(500, lambda: sys.exit(0))  # ✅ Thoát app để batch script chạy
                 
                 root.after(1000, update_countdown)
-            
-            def show_error_dialog(error_message):
-                """Hiển thị dialog lỗi và reset UI"""
-                messagebox.showerror("Lỗi cập nhật", error_message)
                 
+                # Clear buttons cũ
+                for widget in button_frame.winfo_children():
+                    widget.destroy()
+
+                def restart_app():
+                    """Khởi động lại ứng dụng ngay"""
+                    python = sys.executable
+                    os.execl(python, python, *sys.argv)
+
+                # Nút khởi động lại
+                # restart_btn = tk.Button(
+                #     button_frame,
+                #     text="Khởi động lại",
+                #     command=restart_app,
+                #     bg='#2196F3',
+                #     fg='white',
+                #     padx=20,
+                #     pady=8,
+                #     font=('Arial', 10, 'bold')
+                # )
+                # restart_btn.pack(side=tk.LEFT, padx=5)    
+                
+                # Nút thoát ngay
+                exit_now_btn = tk.Button(
+                    button_frame, 
+                    text="Thoát ngay", 
+                    command=lambda: sys.exit(0),
+                    bg='#4CAF50', 
+                    fg='white', 
+                    padx=20, 
+                    pady=8, 
+                    font=('Arial', 10, 'bold')
+                )
+                exit_now_btn.pack()
+            
+            def show_error(message):
+                """Hiển thị lỗi và reset UI"""
                 progress_label.config(text="Cập nhật thất bại")
                 progress_bar['value'] = 0
                 update_btn.config(state=tk.NORMAL)
                 skip_btn.config(state=tk.NORMAL)
+                messagebox.showerror("Lỗi cập nhật", message)
             
-            def restart_app():
-                """Khởi động lại ứng dụng"""
+            def download_thread():
+                temp_installer = None
                 try:
-                    current_exe = os.path.abspath(sys.executable)
-                    subprocess.Popen([current_exe], shell=False)
-                    root.destroy()
-                    sys.exit(0)
+                    temp_installer = os.path.join(tempfile.gettempdir(), "update_installer.exe")
+                    
+                    # Tải file
+                    if self.download_update_with_progress(update_info['download_url'], temp_installer, progress_callback):
+                        # Update UI
+                        root.after(0, lambda: progress_label.config(text="Đang chuẩn bị cài đặt..."))
+                        root.after(0, lambda: progress_bar.config(value=100))
+                        
+                        # ✅ Gọi install_update (sẽ tạo batch script và return True)
+                        success = self.install_update(temp_installer, update_info['version'])
+                        
+                        if success:
+                            # ✅ Hiển thị thành công và thoát sau 3s
+                            root.after(0, show_success_and_exit)
+                        else:
+                            # ❌ Thất bại - reset UI
+                            root.after(0, lambda: show_error("Không thể cài đặt bản cập nhật."))
+                            
+                            if temp_installer and os.path.exists(temp_installer):
+                                try:
+                                    os.remove(temp_installer)
+                                except Exception:
+                                    pass
+                    else:
+                        # ❌ Download thất bại
+                        root.after(0, lambda: show_error("Không thể tải xuống bản cập nhật."))
+                
                 except Exception as e:
-                    messagebox.showerror("Lỗi", f"Không thể khởi động lại:\n{e}")
+                    # ❌ Lỗi nghiêm trọng
+                    import traceback
+                    traceback.print_exc()
+                    root.after(0, lambda: show_error(f"Đã xảy ra lỗi:\n{e}"))
             
             threading.Thread(target=download_thread, daemon=True).start()
         
@@ -531,7 +605,7 @@ exit
             root.destroy()
         
         update_btn = tk.Button(button_frame, text="Cập nhật ngay", command=on_update, 
-                            bg='#4CAF50', fg='white', padx=20, pady=5, font=('Arial', 10, 'bold'))
+                               bg='#4CAF50', fg='white', padx=20, pady=5, font=('Arial', 10, 'bold'))
         update_btn.pack(side=tk.LEFT, padx=5)
         
         skip_btn = tk.Button(button_frame, text="Để sau", command=on_skip, 

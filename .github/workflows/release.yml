@@ -26,8 +26,7 @@ jobs:
         pip install pyinstaller
     
     - name: Build executable
-      run: |
-        pyinstaller --onefile --name ToolGen GenQues.py
+      run: pyinstaller ToolGen.spec
     
     - name: Create version.json
       run: |
