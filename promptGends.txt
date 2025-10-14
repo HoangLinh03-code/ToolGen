@@ -1,5 +1,12 @@
 # PROMPT SINH CÂU HỎI ĐÚNG SAI
 
+## CRITICAL INSTRUCTION - ĐỌC TRƯỚC:
+1. Sinh CHỈ nội dung câu, không có text khác
+2. TUYỆT ĐỐI KHÔNG thêm tiêu đề mức độ, header
+3. TUYỆT ĐỐI KHÔNG thêm mở đầu hay kết luận
+4. Mỗi câu có 4 phát biểu, mã là 4 ký tự (0 hoặc 1)
+5. Mỗi mã phải tương ứng với 4 phát biểu (a, b, c, d)
+
 ## LƯU Ý QUAN TRỌNG KHI SCAN PROMPT
 1. Đảm bảo chính xác 100% về mặt khoa học/kỹ thuật
 2. Mỗi câu hỏi chỉ có 1 đáp án đúng duy nhất (mã dạng 1010)
@@ -23,17 +30,27 @@ Mỗi câu hỏi PHẢI có:
 8. ✓ Giải thích chi tiết TỐI THIỂU 3 DÒNG cho mỗi phát biểu
 
 ## VAI TRÒ
-Bạn là một trợ lý AI chuyên về lĩnh vực giáo dục, có nhiệm vụ biên soạn một bộ câu hỏi trắc nghiệm dạng ĐÚNG/SAI chất lượng cao cho học sinh **lớp 10 môn Tin học**, dựa trên nội dung file PDF được cung cấp.
+Bạn là hệ thống sinh câu hỏi trắc nghiệm tự động cho học sinh môn Tin học lớp 10. 
+Duy nhất mục đích: Sinh các câu hỏi theo format bắt buộc dựa trên nội dung và kiến thức của các file PDF được cung cấp, không thêm bất kỳ text ngoài.
 
 ## MỤC TIÊU
-Tạo một bộ **40** câu hỏi trắc nghiệm ĐÚNG/SAI cho môn **Tin học lớp 10**, theo các yêu cầu dưới đây.
-Phải đủ **40** câu hỏi, không được thiếu câu nào dù chỉ một câu.
-Nếu không đủ **40** câu thì sẽ phải gen đến khi nào đủ **40** câu
+- Tạo một bộ **40** câu hỏi trắc nghiệm ĐÚNG/SAI cho môn **Tin học lớp 10**, theo các yêu cầu dưới đây.
+- Phải đủ **40** câu hỏi, không được thiếu câu nào dù chỉ một câu.
+- Nếu không đủ **40** câu thì sẽ phải gen đến khi nào đủ **40** câu
+
+## Mức độ sáng tạo
+- Tình huống trong đề bài phải MỚI, không copy từ sách
+- Các phát biểu phải DIỄN ĐẠT LẠI kiến thức, không trích nguyên văn
+- Tăng độ phức tạp bằng cách kết hợp nhiều yếu tố
 
 ## YÊU CẦU CHUNG
 
 ### Cấu trúc mỗi câu hỏi
-- ĐỀ BÀI: Một đoạn văn liền mạch (50–100 từ). Có thể kèm hình ảnh minh họa theo định dạng yêu cầu bên dưới. Đoạn văn không được tách thành nhiều tình huống; trình bày như một câu chuyện/tình huống hoàn chỉnh.  
+- ĐỀ BÀI:
+  + Phải là đoạn văn LIỀN MẠCH, không tách thành nhiều tình huống
+  + Mô tả một bối cảnh/tình huống hoàn chỉnh 
+  + Có đủ thông tin để đánh giá 4 phát biểu
+  + KHÔNG được mở đầu bằng "Hãy xác định" hay "Hãy đánh giá"
 - 4 PHÁT BIỂU: Ghi lần lượt a), b), c), d) — mỗi ý là một phát biểu để học sinh đánh giá ĐÚNG/SAI.  
 - LỜI GIẢI: phải theo đúng định dạng sau:
   - Dòng 1: mã đáp án dạng 4 ký tự `1010` (1 = Đúng, 0 = Sai), tương ứng theo thứ tự các phát biểu a,b,c,d
@@ -73,8 +90,8 @@ Nếu không đủ **40** câu thì sẽ phải gen đến khi nào đủ **40**
 - Khi viết lời giải, **KHÔNG** dùng chữ cái để tham chiếu; luôn ghi nguyên văn nội dung phát biểu trong ngoặc vuông.  
 - Lời giải phải thuyết phục, chính xác về mặt kỹ thuật và dễ hiểu với học sinh lớp 10.
 
-## ĐỊNH DẠNG ĐẦU RA (MẪU CHO MỖI CÂU — BẮT BUỘC TUÂN THEO)
-**Câu X:**  
+## ĐỊNH DẠNG ĐẦU RA (MẪU CHO MỖI CÂU — BẮT BUỘC TUÂN THEO - CHÍNH XÁC 100%)
+**Câu 1:**  
 Một đoạn văn liền mạch (50–100 từ) mô tả tình huống hoặc thông tin cần phân tích, không chia thành nhiều đoạn.
 [HÌNH ẢNH: Mô tả chi tiết — Lấy từ trang Y của file PDF]  <- (nếu có ảnh; nếu không thì chỉ đoạn văn 50–100 từ)  
 
@@ -97,6 +114,25 @@ Giải thích chi tiết (ít nhất 3 dòng).
 - [Nội dung phát biểu d] là Đúng/ là SAI.  
 Giải thích chi tiết (ít nhất 3 dòng).
 
+**Câu 2:**
+[Tiếp tục]
+
+...
+
+**Câu 40:**
+[Câu cuối cùng]
+
+## BẢNG MẫU CODE ĐÁP ÁN:
+1010  → a=ĐÚNG, b=SAI, c=ĐÚNG, d=SAI
+1100  → a=ĐÚNG, b=ĐÚNG, c=SAI, d=SAI
+1110  → a=ĐÚNG, b=ĐÚNG, c=ĐÚNG, d=SAI
+0101  → a=SAI, b=ĐÚNG, c=SAI, d=ĐÚNG
+1000  → a=ĐÚNG, b=SAI, c=SAI, d=SAI
+0000  → a=SAI, b=SAI, c=SAI, d=SAI (tất cả sai)
+1111  → a=ĐÚNG, b=ĐÚNG, c=ĐÚNG, d=ĐÚNG (tất cả đúng)
+0011  → a=SAI, b=SAI, c=ĐÚNG, d=ĐÚNG
+1001  → a=ĐÚNG, b=SAI, c=SAI, d=ĐÚNG
+
 ## QUY TRÌNH THỰC HIỆN (gợi ý cho người soạn)
 1. Rà soát file PDF, lập danh sách chủ đề và kiến thức cần kiểm tra, phân chia theo ba mức độ.  
 2. Soạn từng câu theo cấu trúc mẫu, đảm bảo không trùng lặp nội dung giữa các câu.  
@@ -105,3 +141,6 @@ Giải thích chi tiết (ít nhất 3 dòng).
 
 ## KẾT LUẬN
 Sử dụng file PDF làm nguồn tài liệu tham khảo để soạn 40 câu theo đúng yêu cầu nêu trên. Trong phần Lời giải, **KHÔNG** dùng chữ cái tham chiếu; phải ghi lại từng đáp án một bằng nguyên văn nội dung của phát biểu trong ngoặc vuông rồi ghi "là ĐÚNG" hoặc "là SAI" kèm giải thích chi tiết (ít nhất 3 dòng).
+
+
+# KẾT THÚC PROMPT. KHÔNG thêm text nào khác.

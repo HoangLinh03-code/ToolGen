@@ -21,7 +21,7 @@ class VertexClient:
         )
         self.model = GenerativeModel(model)
 
-    def send_data_to_AI(self, prompt, file_paths=None, temperature=0.5, top_p=0.8):
+    def send_data_to_AI(self, prompt, file_paths=None, temperature=0.7, top_p=0.8):
         parts = []
         
         if file_paths:
@@ -36,7 +36,7 @@ class VertexClient:
         parts.append(Part.from_text(prompt))
         
         generation_config = GenerationConfig(
-            temperature=temperature,
+            temperature=0.7,
             top_p=top_p,
             max_output_tokens=8192,  # THÊM DÒNG NÀY
             candidate_count=1
@@ -47,7 +47,7 @@ class VertexClient:
         )
         return response.text
         
-    def send_data_to_check(self, prompt, temperature=0.5, top_p=0.8):
+    def send_data_to_check(self, prompt, temperature=0.6, top_p=0.8):
         parts = []
         # ThÃªm prompt dáº¡ng text
         parts.append(Part.from_text(prompt))
@@ -87,3 +87,5 @@ def get_vertex_ai_credentials():
     except Exception as e:
         print(f"Lỗi khi tạo credentials trên service account: {e}")
         return None
+    
+
