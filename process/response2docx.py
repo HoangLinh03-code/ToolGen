@@ -12,55 +12,174 @@ from process.ques_valid import validate_and_fix_response
 from process.PDF_Scan import enhance_prompt_with_pdf_scan, regenerate_missing_questions
 from enum import Enum
 
+def validate_and_regenerate_if_needed(AIresponse_final, enhanced_prompt, 
+                                      all_allowed_topics, all_keywords,
+                                      client, question_type, max_attempts=3):
+    """
+    Kiểm tra câu hỏi, nếu không đúng format/chủ đề thì sinh lại
+    """
+    from process.ques_valid import QuestionValidator, validate_question_topic
+    from difflib import SequenceMatcher
+    
+    attempt = 0
+    current_text = AIresponse_final
+    required_count = 80 if question_type == "tracnghiem" else 40
+    
+    while attempt < max_attempts:
+        attempt += 1
+        print(f"\n{'='*70}")
+        print(f"LẦN KIỂM TRA & SINH LẠI {attempt}/{max_attempts}")
+        print(f"{'='*70}")
+        
+        validator = QuestionValidator(question_type=question_type)
+        parsed_questions = validator.parse_questions(current_text)
+        
+        # 1. Kiểm tra format
+        invalid_validations, missing_nums = validator.validate_all_questions(current_text)
+        
+        # 2. Kiểm tra chủ đề
+        off_topic_questions = []
+        for q_num, q_text in parsed_questions.items():
+            if not validate_question_topic(q_text, all_allowed_topics, all_keywords):
+                off_topic_questions.append(q_num)
+        
+        # 3. Kiểm tra header thừa
+        header_pattern = re.compile(r'(MỨC\s+ĐỘ|LEVEL|PHẦN\s+\d+|###?\s+)', re.IGNORECASE)
+        header_found = bool(re.search(header_pattern, current_text))
+        
+        print(f"\n📊 KẾT QUẢ KIỂM TRA:")
+        print(f"   - Tổng câu: {len(parsed_questions)}/{required_count}")
+        print(f"   - Format hợp lệ: {len(parsed_questions) - len(invalid_validations)}")
+        print(f"   - Format lỗi: {len(invalid_validations)}")
+        if off_topic_questions:
+            print(f"   - Lạc chủ đề: {len(off_topic_questions)} (câu {off_topic_questions[:5]}...)")
+        if missing_nums:
+            print(f"   - Thiếu câu: {len(missing_nums)} (câu {missing_nums[:5]}...)")
+        if header_found:
+            print(f"   - Có header thừa: Có")
+            
+        # 4. Kiểm tra trùng lặp giữa các câu
+        duplicate_pairs = []
+        questions_list = list(parsed_questions.items())
+        
+        for i, (num1, text1) in enumerate(questions_list):
+            content1 = re.sub(r'\*\*Câu\s+\d+:?\*\*', '', text1).strip()
+            content1 = content1.split('**Lời giải:**')[0].strip()[:250]
+            
+            for num2, text2 in questions_list[i+1:]:
+                content2 = re.sub(r'\*\*Câu\s+\d+:?\*\*', '', text2).strip()
+                content2 = content2.split('**Lời giải:**')[0].strip()[:250]
+                
+                similarity = SequenceMatcher(None, content1, content2).ratio()
+                if similarity > 0.65:
+                    duplicate_pairs.append((num1, num2, similarity))
+                    
+        print(f"\n📊 KẾT QUẢ KIỂM TRA:")
+        
+        # 👇 THÊM THÔNG BÁO TRÙNG
+        if duplicate_pairs:
+            print(f"   - Trùng lặp: {len(duplicate_pairs)} cặp")
+            for num1, num2, sim in duplicate_pairs[:3]:
+                print(f"      • Câu {num1} ≈ Câu {num2} ({sim*100:.1f}%)")
+        
+        
+        # Nếu hết lỗi -> OK
+        if (not invalid_validations and not off_topic_questions and 
+            not missing_nums and not header_found):
+            print(f"\n✅ ĐẬT TIÊU CHUẨN! Không cần sinh lại.")
+            return current_text
+        
+        # Nếu vẫn còn lỗi và còn lần -> Sinh lại
+        if attempt < max_attempts:
+            print(f"\n🔄 Còn lỗi, yêu cầu sinh lại (lần {attempt+1})...")
+            
+            problems = []
+            if invalid_validations:
+                problem_nums = [v.question_num for v in invalid_validations[:5]]
+                problems.append(f"Format lỗi câu: {problem_nums}")
+            if off_topic_questions:
+                problems.append(f"Lạc chủ đề câu: {off_topic_questions[:5]}")
+            if missing_nums:
+                problems.append(f"Thiếu câu: {missing_nums[:5]}")
+            if duplicate_pairs:
+                dup_nums = [f"{n1}-{n2}" for n1, n2, _ in duplicate_pairs[:3]]
+                problems.append(f"Trùng lặp: {', '.join(dup_nums)}")
+            if header_found:
+                problems.append("Có header thừa cần xóa")
+            
+            regenerate_prompt = f"""{enhanced_prompt}
+
+⚠️ **CẢNH BÁO - CẤP ĐỘ CAO: CẦN SỬA NGAY**
+
+Những lỗi phát hiện:
+{chr(10).join([f'  • {p}' for p in problems])}
+
+**YÊU CẦU SỬA CHỮA BẮTBUỘC:**
+1. XÓA HOÀN TOÀN mọi dòng tiêu đề mức độ (VD: "MỨC ĐỘ NHẬN BIẾT", "LEVEL...")
+2. CHỈ GIỮ format câu hỏi chuẩn, không thêm header hay giới thiệu nào
+3. Định dạng bắt buộc: **Câu X:** + nội dung + 4 đáp án (A,B,C,D) + **Lời giải:** + mã đáp án + #### + giải thích
+4. TUYỆT ĐỐI KHÔNG thêm bất kỳ text mở đầu/kết luận nào ngoài các câu hỏi
+5. Mỗi câu PHẢI liên quan ĐẾN (không phải trích từ) allowed_topics: {list(all_allowed_topics)[:3]}...
+6. Nội dung câu hỏi phải SÁNG TẠO, không copy nguyên văn từ tài liệu
+
+Hãy sửa/sinh lại toàn bộ và trả về CHỈ nội dung câu hỏi, không có bất kỳ text khác.
+"""
+            
+            try:
+                fixed_response = client.send_data_to_check(
+                    prompt=regenerate_prompt,
+                    temperature=0.5  # Giảm nhiệt độ để ổn định hơn
+                )
+                
+                # Làm sạch response
+                fixed_response = clean_level_headers(fixed_response)
+                current_text = fixed_response
+                
+            except Exception as e:
+                print(f"❌ Lỗi khi gọi API sửa: {e}")
+                return current_text
+        else:
+            # Hết lần -> dừng
+            print(f"\n❌ Đã chạy {max_attempts} lần vẫn còn lỗi.")
+            print(f"Gợi ý: Kiểm tra prompt hoặc model được sử dụng.")
+            return current_text
+    
+    return current_text
+
+
 # ============ LATEX & EQUATION FUNCTIONS ============
 # (Giữ nguyên các hàm latex như cũ - không thay đổi)
 
+
+
 def latex_to_omml_via_pandoc(latex_math_dollar):
-    """Chuyển đổi LaTeX sang OMML qua Pandoc"""
     try:
         with NamedTemporaryFile(suffix=".docx", delete=False) as temp_docx:
             result = subprocess.run(
                 ['pandoc', '--from=latex', '--to=docx', '-o', temp_docx.name],
-                input=latex_math_dollar,
-                text=True,
-                capture_output=True,
+                input=latex_math_dollar, text=True, capture_output=True,
                 creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
             )
-
-            if result.returncode != 0:
-                return None
-            
-            with zipfile.ZipFile(temp_docx.name, 'r') as z:
-                xml_content = z.read('word/document.xml').decode('utf-8')
-        
+        if result.returncode != 0: return None
+        with zipfile.ZipFile(temp_docx.name, 'r') as z:
+            xml_content = z.read('word/document.xml').decode('utf-8')
         match = re.search(r'(<m:oMath[^>]*>.*?</m:oMath>)', xml_content, re.DOTALL)
         return match.group(1) if match else None
-    
-    except Exception as e:
-        return None
+    except Exception: return None
 
 
 def insert_equation_into_paragraph(latex_math_dollar, paragraph):
-    """Chèn công thức toán học vào paragraph"""
     omml_str = latex_to_omml_via_pandoc(latex_math_dollar)
-    
     if not omml_str:
         paragraph.add_run(f" [{latex_math_dollar}] ")
         return
-    
     if 'xmlns:m=' not in omml_str:
-        omml_str = re.sub(
-            r'<m:oMath',
-            r'<m:oMath xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"',
-            omml_str,
-            count=1
-        )
-    
+        omml_str = re.sub(r'<m:oMath', r'<m:oMath xmlns:m="http://schemas.openxmlformats.org/officeDocument/2006/math"', omml_str, count=1)
     try:
         omml_element = parse_xml(omml_str)
         run = paragraph.add_run()
         run._r.append(omml_element)
-    except Exception as e:
+    except Exception:
         paragraph.add_run(f" [{latex_math_dollar}] ")
 
 
@@ -324,6 +443,24 @@ class QuestionBuffer:
 
 
 # ============ MAIN FUNCTION V3 WITH PDF SCANNER ============
+def clean_level_headers(text: str) -> str:
+    """Xóa header mức độ không cần thiết từ response"""
+    # Xóa các pattern như "MỨC ĐỘ NHẬN BIẾT", "MỨC ĐỘ THÔNG HIỂU", etc.
+    patterns_to_remove = [
+        r'\n*MỨC\s+ĐỘ\s+\w+\n*',
+        r'\n*LEVEL\s+\w+\n*',
+        r'\n*### MỨC.*?\n',
+        r'\n*## PHẦN.*?\n'
+    ]
+    
+    result = text
+    for pattern in patterns_to_remove:
+        result = re.sub(pattern, '\n', result, flags=re.IGNORECASE)
+    
+    # Dọn sạch multiple newlines
+    result = re.sub(r'\n{3,}', '\n\n', result)
+    return result.strip()
+
 
 def response2docx_improved(file_paths, prompt, output_filename, project_id, 
                      creds, model_name, question_type="tracnghiem"):
@@ -349,7 +486,7 @@ def response2docx_improved(file_paths, prompt, output_filename, project_id,
         print("BƯỚC 0: QUÉT PDF VÀ TẠO TOPIC GUIDE")
         print(f"{'='*70}\n")
         
-        enhanced_prompt = enhance_prompt_with_pdf_scan(
+        enhanced_prompt,all_allowed_topics, all_keywords = enhance_prompt_with_pdf_scan(
             prompt, file_paths, project_id, creds
         )
         
@@ -381,26 +518,65 @@ def response2docx_improved(file_paths, prompt, output_filename, project_id,
                 batch_response = client.send_data_to_AI(
                     batch_prompt, 
                     file_paths,
-                    temperature=0.7
+                    temperature=0.75
                 )
+                batch_response = clean_level_headers(batch_response)
             else:
+                previous_response = all_responses[-1]
+                last_questions = re.findall(r'(\*\*Câu\s+\d+:.*?####.*?)(?=\*\*Câu|\Z)', previous_response, re.DOTALL)
+                context_snippet = "\n\n".join(last_questions[-2:])
                 batch_prompt = f"""{enhanced_prompt}
 
+**[KIỂM SOÁT CHẤT LƯỢNG - BẮT BUỘC]**
+1. TỪ CÂU {generated_count+1} ĐẾN {generated_count+batch_count}
+2. KHÔNG sinh header mức độ (VD: "MỨC ĐỘ NHẬN BIẾT") - chỉ sinh nội dung câu
+3. KIỂM TRA TỰ: Mỗi câu PHẢI liên quan TRỰ TIẾP đến: {list(all_allowed_topics)[:5]}...
+4. TUYỆT ĐỐI KHÔNG lạc sang chủ đề khác ngoài pạm vi trên
+
 YÊU CẦU THÊM CÂU HỎI:
-- Sinh {batch_count} câu hỏi THÊM (từ câu {generated_count+1} đến {generated_count+batch_count})
-- TUYỆT ĐỐI KHÔNG sinh lại các câu đã sinh
-- Mỗi câu PHẢI ĐẦY ĐỦ: tiêu đề, nội dung, 4 đáp án, lời giải, giải thích
-- BÁM SÁT chủ đề đã được định nghĩa trong PHẠM VI CHỦ ĐỀ VÀ KIẾN THỨC
-- KHÔNG LẠC ĐỀ sang chủ đề khác
-- KHÔNG THÊM LỜI MỞ ĐẦU HOẶC KẾT LUẬN
+- Bối cảnh: Bạn đã sinh thành công {generated_count} câu. Đây là 2 câu cuối cùng bạn đã làm:
+---
+{context_snippet}
+---
+- Nhiệm vụ: Bây giờ, hãy sinh {batch_count} câu hỏi TIẾP THEO (từ câu {generated_count+1} đến {generated_count+batch_count}).
+- **MỆNH LỆNH:**
+    - TUYỆT ĐỐI KHÔNG sinh lại các câu đã sinh
+    - Mỗi câu PHẢI ĐẦY ĐỦ: tiêu đề, nội dung, 4 đáp án, lời giải, giải thích
+    - BÁM SÁT chủ đề đã được định nghĩa trong PHẠM VI CHỦ ĐỀ VÀ KIẾN THỨC
+    - KHÔNG LẠC ĐỀ sang chủ đề khác
+    - KHÔNG THÊM LỜI MỞ ĐẦU HOẶC KẾT LUẬN
 """
                 print(f"(Lần {attempt} - không có file PDF)")
                 batch_response = client.send_data_to_check(
                     prompt=batch_prompt,
-                    temperature=0.7
+                    temperature=0.8
                 )
-            
-            all_responses.append(batch_response)
+                # 👇 THÊM ĐOẠN NÀY NGAY SAU
+                # Kiểm tra trùng lặp với câu đã có
+                from process.ques_valid import QuestionValidator
+                validator = QuestionValidator(question_type=question_type)
+                new_questions = validator.parse_questions(batch_response)
+                existing_questions = validator.parse_questions("\n\n".join(all_responses))
+
+                # Lọc bỏ câu trùng
+                duplicates = []
+                for new_num, new_text in new_questions.items():
+                    new_content = re.sub(r'\*\*Câu\s+\d+:?\*\*', '', new_text).strip()[:200]
+                    for exist_num, exist_text in existing_questions.items():
+                        exist_content = re.sub(r'\*\*Câu\s+\d+:?\*\*', '', exist_text).strip()[:200]
+                        # So sánh độ giống nhau (dùng difflib)
+                        from difflib import SequenceMatcher
+                        similarity = SequenceMatcher(None, new_content, exist_content).ratio()
+                        if similarity > 0.7:  # Trùng > 70%
+                            duplicates.append(new_num)
+                            break
+
+                if duplicates:
+                    print(f"   ⚠️ Phát hiện {len(duplicates)} câu trùng lặp, yêu cầu sinh lại...")
+                    # Không thêm vào all_responses, sinh lại batch
+                    continue  # Quay lại đầu vòng while
+
+                all_responses.append(batch_response)
             
             # Đếm câu trong batch
             batch_questions = len(re.findall(r'\*?\*?Câu\s+\d+', batch_response, re.IGNORECASE))
@@ -427,15 +603,65 @@ YÊU CẦU THÊM CÂU HỎI:
             question_type
         )
         
+        print(f"\n{'='*70}")
+        print("BƯỚC 2.5: KIỂM TRA CHỦĐỀ & FORMAT CHỈ TỌC")
+        print(f"{'='*70}\n")
+
+        AIresponse_final = validate_and_regenerate_if_needed(
+            AIresponse_final,
+            enhanced_prompt,
+            all_allowed_topics,
+            all_keywords,
+            client,
+            question_type,
+            max_attempts=3
+        )
+        
         # ============ BƯỚC 2.5: SINH LẠI CÂU THIẾU (NẾU CÓ) ============
         print(f"\n{'='*70}")
         print("BƯỚC 2.5: KIỂM TRA VÀ SINH LẠI CÂU THIẾU")
         print(f"{'='*70}\n")
         
         # Import validator để kiểm tra
+        from process.ques_valid import validate_question_topic, detect_question_level
         from process.ques_valid import QuestionValidator
         validator = QuestionValidator(question_type=question_type)
+        parsed_questions = validator.parse_questions(AIresponse_final)
         validations, missing_nums = validator.validate_all_questions(AIresponse_final)
+        problematic_questions = []
+        level_distribution = {'nhận biết': 0, 'thông hiểu': 0, 'vận dụng': 0, 'vận dụng_cao': 0}
+        print(f"\nValidating topics...")
+        print(f"  - Allowed topics: {len(all_allowed_topics)}")
+        print(f"  - Allowed keywords: {len(all_keywords)}\n")
+        for q_num, q_text in parsed_questions.items():
+            # Kiểm tra chủ đề
+            is_on_topic = validate_question_topic(q_text, all_allowed_topics, all_keywords)
+            if not is_on_topic:
+                problematic_questions.append((q_num, "lạc chủ đề"))
+            
+            # Đếm mức độ
+            level = detect_question_level(q_text)
+            level_distribution[level] += 1
+
+        if validations:
+            print(f"\n⚠️ Phát hiện {len(validations)} câu hỏi bị lỗi:")
+            for v in validations[:5]:  # Hiển thị 5 câu đầu
+                print(f"   - Câu {v.question_num}: {', '.join(v.missing_parts)}")
+        else:
+            print(f"\n✓ Tất cả câu hỏi đều hợp lệ")
+        
+        if problematic_questions:
+            print(f"\n⚠️ Phát hiện {len(problematic_questions)} câu lạc chủ đề:")
+            for q_num, reason in problematic_questions[:5]:
+                print(f"   - Câu {q_num}: {reason}")
+
+        print(f"\nPhân bổ mức độ:")
+        total_q = len(parsed_questions)
+        if total_q > 0:
+            print(f"   - Nhận biết: {level_distribution['nhận biết']} ({level_distribution['nhận biết']*100/total_q:.1f}%)")
+            print(f"   - Thông hiểu: {level_distribution['thông hiểu']} ({level_distribution['thông hiểu']*100/total_q:.1f}%)")
+            print(f"   - Vận dụng: {level_distribution['vận dụng']} ({level_distribution['vận dụng']*100/total_q:.1f}%)")
+            print(f"   - Vận dụng cao: {level_distribution['vận dụng_cao']} ({level_distribution['vận dụng_cao']*100/total_q:.1f}%)")
         
         # Nếu vẫn còn câu thiếu, sinh lại
         regeneration_attempts = 0
