@@ -1,5 +1,5 @@
 import re
-from typing import List, Dict, Tuple
+from typing import List, Dict, Tuple, Set
 from dataclasses import dataclass
 from api.callAPI import VertexClient
 
@@ -28,7 +28,7 @@ class QuestionValidation:
             self.has_correct_answer and
             self.has_separator and
             self.has_explanation and
-            self.explanation_length >= 3  # Ít nhất 3 dòng giải thích
+            self.explanation_length >= 1  # Ít nhất 3 dòng giải thích
         )
     
     @property
@@ -52,6 +52,38 @@ class QuestionValidation:
         elif self.explanation_length < 3:
             missing.append(f"Giải thích quá ngắn ({self.explanation_length} dòng, cần ít nhất 3)")
         return missing
+
+class ValidQuestionStorage:
+    """Class lưu trữ các câu hỏi đã hợp lệ để tránh sinh lại"""
+    
+    def __init__(self):
+        self.valid_questions: Dict[int, str] = {}  # {question_num: question_text}
+        self.valid_nums: Set[int] = set()
+    
+    def add_valid_question(self, question_num: int, question_text: str):
+        """Thêm câu hỏi hợp lệ vào storage"""
+        self.valid_questions[question_num] = question_text
+        self.valid_nums.add(question_num)
+    
+    def get_valid_count(self) -> int:
+        """Đếm số câu hợp lệ"""
+        return len(self.valid_questions)
+    
+    def get_missing_nums(self, required_count: int) -> List[int]:
+        """Lấy danh sách số câu còn thiếu"""
+        required_nums = set(range(1, required_count + 1))
+        missing = sorted(required_nums - self.valid_nums)
+        return missing
+    
+    def reconstruct_full_text(self) -> str:
+        """Ghép lại text đầy đủ từ các câu hợp lệ"""
+        sorted_questions = sorted(self.valid_questions.items())
+        return "\n\n".join([text for _, text in sorted_questions])
+    
+    def has_question(self, question_num: int) -> bool:
+        """Kiểm tra câu hỏi đã tồn tại chưa"""
+        return question_num in self.valid_nums
+
 
 
 class QuestionValidator:
@@ -292,7 +324,6 @@ class QuestionValidator:
                 "B. [Đáp án 2]",
                 "C. [Đáp án 3]",
                 "D. [Đáp án 4]",
-                "",
                 "**Lời giải:**",
                 "2",
                 "####",
@@ -310,7 +341,6 @@ class QuestionValidator:
                 "b) [Phát biểu 2]",
                 "c) [Phát biểu 3]",
                 "d) [Phát biểu 4]",
-                "",
                 "**Lời giải:**",
                 "1010",
                 "####",
@@ -337,7 +367,7 @@ class QuestionValidator:
         return "\n".join(prompt_parts)
     
     def fix_questions_with_ai(self, text: str, original_prompt: str,
-                             client: VertexClient, max_attempts: int = 2) -> str:
+                             client: VertexClient, max_attempts: int = 5) -> str:
         """
         Tự động kiểm tra và bổ sung câu hỏi bằng AI
         
@@ -425,7 +455,172 @@ def validate_and_fix_response(AIresponse: str, original_prompt: str,
         AIresponse, 
         original_prompt, 
         client,
-        max_attempts=2
+        max_attempts=5
     )
     return fixed_text
+
+def validate_and_store_questions(text: str, storage: ValidQuestionStorage, 
+                                 question_type: str = "tracnghiem") -> Tuple[List[int], List[int]]:
+    """
+    Validate text và lưu các câu hợp lệ vào storage
+    
+    Returns:
+        List số câu không hợp lệ hoặc thiếu
+    """
+    validator = QuestionValidator(question_type=question_type)
+    
+    # Parse câu hỏi từ text
+    questions = validator.parse_questions(text)
+    
+    print(f"\n{'='*60}")
+    print(f"🔍 VALIDATE VÀ LƯU CÂU HỢP LỆ")
+    print(f"{'='*60}\n")
+    
+    invalid_nums = []
+    new_valid_count = 0
+    
+    for qnum, qtext in sorted(questions.items()):
+        # Bỏ qua câu đã lưu trước đó
+        if storage.has_question(qnum):
+            print(f"⏭️  Câu {qnum}: Đã lưu trước đó")
+            continue
+        
+        # Validate câu mới
+        validation = validator.validate_single_question(qtext, qnum)
+        
+        if validation.is_valid:
+            storage.add_valid_question(qnum, qtext)
+            new_valid_count += 1
+            print(f"\n✅ Câu {qnum}: Hợp lệ → LƯU\n")
+        else:
+            invalid_nums.append(qnum)
+            print(f"\n❌ Câu {qnum}: Thiếu {', '.join(validation.missing_parts)}\n")
+    required_count = validator.required_count
+    all_nums_in_text = set(questions.keys())
+    all_nums_needed = set(range(1, required_count + 1))
+    missing_nums = sorted(all_nums_needed - all_nums_in_text - storage.valid_nums)
+    
+    print(f"\n📊 Tổng kết:\n")
+    print(f"   - Câu mới hợp lệ: {new_valid_count}\n")
+    print(f"   - Câu không hợp lệ: {len(invalid_nums)}\n")
+    print(f"   - Câu thiếu hoàn toàn: {len(missing_nums)}\n")
+    print(f"   - Tổng đã lưu: {storage.get_valid_count()}\n")
+    
+    return invalid_nums, missing_nums
+
+def regenerate_invalid_questions(invalid_nums: List[int], 
+                                 original_prompt: str,
+                                 storage: ValidQuestionStorage,
+                                 client: VertexClient,
+                                 question_type: str = "tracnghiem",
+                                 max_attempts: int = 5) -> str:
+    """
+    Sinh lại chỉ các câu không hợp lệ/thiếu
+    
+    Returns:
+        Text chứa các câu mới được sinh
+    """
+    if not invalid_nums:
+        return ""
+    
+    print(f"\n{'='*60}")
+    print(f"\n🔄 SINH LẠI {len(invalid_nums)} CÂU\n")
+    print(f"Danh sách: {invalid_nums[:20]}" + (f"... và {len(invalid_nums)-20} câu khác" if len(invalid_nums) > 20 else ""))
+    print(f"\n{'='*60}\n")
+    
+    # Lấy mẫu từ các câu hợp lệ để tránh trùng
+    existing_samples = []
+    for qnum in sorted(storage.valid_nums)[:5]:
+        qtext = storage.valid_questions[qnum]
+        preview = qtext.split("\n")[1:3]
+        existing_samples.append(f"Câu {qnum}: {' '.join(preview)[:80]}...")
+    
+    # Tạo prompt sinh lại
+    regenerate_prompt = f"""{original_prompt}
+
+# YÊU CẦU BỔ SUNG CÂU HỎI
+
+## TÌNH HUỐNG
+Đã có {storage.get_valid_count()} câu hợp lệ. Cần sinh lại {len(invalid_nums)} câu BỊ LỖI hoặc THIẾU.
+
+## CÁC CÂU CẦN SINH (QUAN TRỌNG)
+Sinh CHÍNH XÁC các câu sau: {', '.join(map(str, invalid_nums[:20]))}
+{'... và ' + str(len(invalid_nums)-20) + ' câu khác' if len(invalid_nums) > 20 else ''}
+
+## MỘT SỐ CÂU ĐÃ HỢP LỆ (TRÁNH TRÙNG LẶP)
+{chr(10).join(existing_samples)}
+
+## YÊU CẦU TUYỆT ĐỐI
+1. CHỈ sinh các câu trong danh sách trên, ĐÚNG SỐ THỨ TỰ
+2. Nội dung HOÀN TOÀN KHÁC với các câu đã có
+3. Mỗi câu PHẢI ĐẦY ĐỦ format: tiêu đề, nội dung, 4 đáp án, lời giải, giải thích
+4. BÁM SÁT chủ đề từ PDF đã quét
+5. KHÔNG thêm lời mở đầu/kết thúc
+
+BẮT ĐẦU SINH:
+"""
+    successfully_generated = []
+    
+    # Sinh với retry
+    for attempt in range(1, max_attempts + 1):
+        try:
+            print(f"\n   Lần thử {attempt}/{max_attempts}...")
+            new_text = client.send_data_to_check(
+                prompt=regenerate_prompt,
+                temperature=0.6 + (attempt * 0.1)
+            )
+            
+            # Parse và validate từng câu mới sinh
+            from process.ques_valid import QuestionValidator
+            validator = QuestionValidator(question_type=question_type)
+            new_questions = validator.parse_questions(new_text)
+            
+            print(f"   📝 Nhận được {len(new_questions)} câu từ AI")
+            
+            # Validate và lưu từng câu
+            newly_valid = []
+            for qnum, qtext in sorted(new_questions.items()):
+                # Chỉ xử lý câu trong danh sách cần sinh
+                if qnum not in invalid_nums:
+                    print(f"   ⏭️  Câu {qnum}: Không trong danh sách cần sinh, bỏ qua")
+                    continue
+                
+                # Bỏ qua câu đã lưu trước đó
+                if storage.has_question(qnum):
+                    print(f"   ⏭️  Câu {qnum}: Đã hợp lệ từ trước")
+                    continue
+                
+                # Validate
+                validation = validator.validate_single_question(qtext, qnum)
+                
+                if validation.is_valid:
+                    storage.add_valid_question(qnum, qtext)
+                    newly_valid.append(qnum)
+                    successfully_generated.append(qnum)
+                    print(f"\n   ✅ Câu {qnum}: Hợp lệ → LƯU\n")
+                else:
+                    print(f"\n   ❌ Câu {qnum}: Vẫn thiếu {', '.join(validation.missing_parts)}\n")
+            
+            # Kiểm tra xem còn câu nào cần sinh không
+            remaining = [n for n in invalid_nums if n not in successfully_generated]
+            
+            if not remaining:
+                print(f"\n   🎉 Đã sinh đủ tất cả {len(invalid_nums)} câu!\n")
+                break
+            else:
+                print(f"\n   ⚠️  Còn {len(remaining)} câu cần sinh tiếp")
+                # Cập nhật danh sách cần sinh cho lần thử tiếp theo
+                invalid_nums = remaining
+                
+        except Exception as e:
+            print(f"   ✗ Lỗi: {e}")
+    
+    # Ghép lại text từ các câu đã sinh thành công
+    result_parts = []
+    for qnum in sorted(successfully_generated):
+        result_parts.append(storage.valid_questions[qnum])
+    
+    print(f"\n📊 Kết quả: Sinh thành công {len(successfully_generated)} câu")
+    return "\n\n".join(result_parts)
+
 

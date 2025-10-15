@@ -115,7 +115,7 @@ class APIChecker(QThread):
                 credentials=self.creds
             )
             
-            model = GenerativeModel("gemini-2.0-flash-exp")
+            model = GenerativeModel("gemini-2.5-pro")
             
             result = {
                 "status": "OK",

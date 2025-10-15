@@ -10,7 +10,7 @@ from api.callAPI import VertexClient
 class PDFScanner:
     """Class quét và phân tích nội dung từ 3 file PDF: SGK, SBT, SGV"""
     
-    def __init__(self, project_id: str, creds, model_name: str = "gemini-2.0-flash-exp"):
+    def __init__(self, project_id: str, creds, model_name: str = "gemini-2.5-pro"):
         """
         Args:
             project_id: Google Cloud Project ID
@@ -35,7 +35,7 @@ class PDFScanner:
             Dict {pdf_path: pdf_type} - VD: {"/path/to/file.pdf": "sgk"}
         """
         print(f"\n{'='*70}")
-        print("🔍 NHẬN DIỆN LOẠI FILE PDF")
+        print("\n🔍 NHẬN DIỆN LOẠI FILE PDF\n")
         print(f"{'='*70}\n")
         
         pdf_mapping = {}
@@ -60,7 +60,7 @@ class PDFScanner:
                     pdf_type = "sgv"
             
             pdf_mapping[pdf_path] = pdf_type
-            print(f"   ✓ {os.path.basename(pdf_path)} → {self.pdf_types[pdf_type]}")
+            print(f"\n   ✓ {os.path.basename(pdf_path)} → {self.pdf_types[pdf_type]}\n")
         
         print()
         return pdf_mapping
@@ -112,7 +112,7 @@ Liệt kê các khái niệm, thuật ngữ, định nghĩa quan trọng
 """
         
         for pdf_path, pdf_type in pdf_mapping.items():
-            print(f"📄 Đang quét {self.pdf_types[pdf_type]}: {os.path.basename(pdf_path)}")
+            print(f"📄 Đang quét {self.pdf_types[pdf_type]}: {os.path.basename(pdf_path)}\n")
             
             try:
                 content = self.client.send_data_to_AI(
@@ -122,7 +122,7 @@ Liệt kê các khái niệm, thuật ngữ, định nghĩa quan trọng
                 )
                 
                 content_summaries[pdf_type] = content
-                print(f"   ✓ Hoàn thành ({len(content)} ký tự)")
+                print(f"\n   ✓ Hoàn thành ({len(content)} ký tự)\n")
                 print(f"   Preview: {content[:100]}...\n")
                 
             except Exception as e:
