@@ -56,13 +56,12 @@ class VertexClient:
         return response.text
 
 def get_vertex_ai_credentials():
-    """Láº¥y Ä‘á»‘i tÆ°á»£ng credentials cho Vertex AI tá»« .env."""
     try:
         service_account_data = {
             "type": os.getenv("TYPE"),
             "project_id": os.getenv("PROJECT_ID"),
             "private_key_id": os.getenv("PRIVATE_KEY_ID"),
-            "private_key": os.getenv("PRIVATE_KEY").replace('\\n', '\n'), # Quan trá»ng: Thay tháº¿ chuá»—i \n
+            "private_key": os.getenv("PRIVATE_KEY").replace('\\n', '\n'), 
             "client_email": os.getenv("CLIENT_EMAIL"),
             "client_id": os.getenv("CLIENT_ID", ""),
             "auth_uri": os.getenv("AUTH_URI"),

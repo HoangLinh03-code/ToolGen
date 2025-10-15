@@ -8,8 +8,9 @@ import zipfile, subprocess, re
 from tempfile import NamedTemporaryFile
 from docx.oxml import parse_xml
 import traceback
-from process.ques_valid import validate_and_fix_response
-from process.PDF_Scan import enhance_prompt_with_pdf_scan, regenerate_missing_questions
+from process.ques_valid import ValidQuestionStorage, validate_and_store_questions, regenerate_invalid_questions
+from process.text2Image import generate_image_from_text, should_generate_image, calculate_optimal_image_count, ImageGenerationTracker
+from process.PDF_Scan import enhance_prompt_with_pdf_scan
 from enum import Enum
 
 # ============ LATEX & EQUATION FUNCTIONS ============
@@ -144,30 +145,39 @@ def process_bold_text(text, paragraph):
         process_text(current_text, paragraph)
 
 
-def handle_image_generation(description, doc):
+def handle_image_generation(description, doc,attempt_generate=True):
     """Xử lý sinh ảnh với kích thước và căn giữa"""
+    # Nếu không thử sinh ảnh, trả về placeholder luôn
+    img_paragraph = doc.add_paragraph()
+    img_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    if not attempt_generate:
+        run = img_paragraph.add_run(f"[HÌNH ẢNH MINH HỌA: {description}]")
+        run.font.color.rgb = RGBColor(128, 128, 128)
+        run.italic = True
+        print(f"     → Thêm placeholder (không sinh ảnh)")
+        return False, img_paragraph, True
+    
+    # Thử sinh ảnh
     try:
         print(f"   → Đang sinh ảnh: {description[:50]}...")
         image_bytes = generate_image_from_text(description)
-        
-        img_paragraph = doc.add_paragraph()
-        img_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
         
         run = img_paragraph.add_run()
         run.add_picture(BytesIO(image_bytes), width=Inches(3.5))
         
         print("     ✓ Đã sinh ảnh thành công")
-        return True, img_paragraph
+        return True, img_paragraph, False
     
     except Exception as e:
+        # Nếu sinh ảnh thất bại, thêm placeholder
         print(f"     ✗ Không thể sinh ảnh: {e}")
-        img_paragraph = doc.add_paragraph()
-        img_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        print(f"     → Thêm placeholder thay thế")
+        
         run = img_paragraph.add_run(f"[HÌNH ẢNH MINH HỌA: {description}]")
         run.font.color.rgb = RGBColor(128, 128, 128)
         run.italic = True
-        return False, img_paragraph
-
+        
+        return False, img_paragraph, True
 
 # ============ DETECTION FUNCTIONS ============
 # (Giữ nguyên các hàm detection như cũ)
@@ -221,6 +231,7 @@ class QuestionBuffer:
         self.title = ""
         self.content_lines = []
         self.image_description = None
+        self.should_generate_image = True
         self.answers = []
         self.solution_header = ""
         self.correct_answer = ""
@@ -249,7 +260,14 @@ class QuestionBuffer:
             self.has_explanation()
         )
     
-    def flush_to_doc(self, doc):
+    def flush_to_doc(self, doc, image_tracker=None):
+        """
+        Ghi câu hỏi vào document
+        
+        Returns:
+            bool - True nếu ghi thành công, False nếu câu không hợp lệ
+        """
+        # VALIDATION NGHIÊM NGẶT
         if not self.is_complete():
             missing = []
             if not self.title:
@@ -265,8 +283,8 @@ class QuestionBuffer:
             if not self.has_explanation():
                 missing.append("giải thích")
             
-            print(f"   ⚠️ Câu {self.question_num} THIẾU: {', '.join(missing)}")
-            return False
+            print(f"\n   ❌ Câu {self.question_num} THIẾU: {', '.join(missing)} → KHÔNG GHI VÀO DOC\n")
+            return False  # QUAN TRỌNG: Return False
         
         # 1. Thêm tiêu đề
         title_para = doc.add_paragraph()
@@ -285,7 +303,20 @@ class QuestionBuffer:
         
         # 3. Thêm hình ảnh (nếu có)
         if self.image_description:
-            handle_image_generation(self.image_description, doc)
+            success, img_para, is_placeholder = handle_image_generation(
+                self.image_description, 
+                doc,
+                attempt_generate=self.should_generate_image
+            )
+            
+            # Tracking
+            if image_tracker:
+                if success:
+                    image_tracker.record_success()
+                elif is_placeholder:
+                    image_tracker.record_placeholder()
+                else:
+                    image_tracker.record_failed()
         
         # 4. Thêm đáp án
         for answer in self.answers:
@@ -319,32 +350,119 @@ class QuestionBuffer:
                 else:
                     process_text(line, para)
         
-        print(f"   ✅ Câu {self.question_num}: Đã ghi vào document")
+        print(f"\n   ✅ Câu {self.question_num}: Đã ghi vào document\n")
         return True
+
+from typing import List
+def add_summary_at_end(doc, question_count_in_doc: int, 
+                       required_count: int, 
+                       missing_nums: List[int],
+                       image_tracker=None):
+    """
+    Thêm bảng tóm tắt vào CUỐI document (đơn giản hơn)
+    """
+    # Thêm ngắt trang
+    doc.add_page_break()
+    
+    # Thêm tiêu đề
+    heading = doc.add_heading('THÔNG TIN BỔ SUNG', level=1)
+    heading.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    # Thông tin tổng quan
+    para = doc.add_paragraph()
+    para.add_run("📊 Số câu hỏi trong đề: ").bold = True
+    run = para.add_run(f"{question_count_in_doc}/{required_count}")
+    if question_count_in_doc < required_count:
+        run.font.color.rgb = RGBColor(255, 0, 0)
+    else:
+        run.font.color.rgb = RGBColor(0, 128, 0)
+    run.bold = True
+    run.font.size = Pt(14)
+    
+    # Thông tin ảnh
+    if image_tracker:
+        doc.add_paragraph()
+        para = doc.add_paragraph()
+        para.add_run("🖼️  Thống kê ảnh:").bold = True
+        
+        para = doc.add_paragraph(style='List Bullet')
+        para.add_run(f"Ảnh sinh thành công: {image_tracker.generated_count}")
+        
+        para = doc.add_paragraph(style='List Bullet')
+        para.add_run(f"Ảnh placeholder: {image_tracker.placeholder_count}")
+        
+        para = doc.add_paragraph(style='List Bullet')
+        total_images = image_tracker.generated_count + image_tracker.placeholder_count
+        para.add_run(f"Tổng cộng: {total_images}")
+    
+    # Nếu có câu thiếu
+    if missing_nums:
+        doc.add_paragraph()
+        
+        para = doc.add_paragraph()
+        run = para.add_run(f"\n⚠️  CÒN THIẾU {len(missing_nums)} CÂU HỎI")
+        run.bold = True
+        run.font.color.rgb = RGBColor(255, 0, 0)
+        run.font.size = Pt(14)
+        
+        doc.add_paragraph()
+        
+        para = doc.add_paragraph()
+        para.add_run("\n💡 Danh sách câu cần bổ sung:").bold = True
+        
+        # Chia nhóm 10 câu/dòng
+        for i in range(0, len(missing_nums), 10):
+            chunk = missing_nums[i:i+10]
+            para = doc.add_paragraph(style='List Bullet')
+            run = para.add_run("Câu " + ", ".join(map(str, chunk)))
+            run.font.color.rgb = RGBColor(255, 0, 0)
+        
+        doc.add_paragraph()
+        
+        para = doc.add_paragraph()
+        para.add_run("\n📝 Hướng dẫn:").bold = True
+        para = doc.add_paragraph()
+        para.add_run("\n1. Tìm vị trí các câu thiếu trong đề bài")
+        para = doc.add_paragraph()
+        para.add_run("\n2. Bổ sung nội dung câu hỏi theo đúng format")
+        para = doc.add_paragraph()
+        para.add_run("\n3. Đảm bảo câu hỏi có đầy đủ: tiêu đề, nội dung, đáp án, lời giải")
+    
+    else:
+        doc.add_paragraph()
+        para = doc.add_paragraph()
+        run = para.add_run("✅ CÂU HỎI ĐÃ ĐẦY ĐỦ - NẾU CẦN THÌ BỔ SUNG ẢNH MINH HỌA")
+        run.bold = True
+        run.font.color.rgb = RGBColor(0, 128, 0)
+        run.font.size = Pt(14)
+
 
 
 # ============ MAIN FUNCTION V3 WITH PDF SCANNER ============
 
 def response2docx_improved(file_paths, prompt, output_filename, project_id, 
-                     creds, model_name, question_type="tracnghiem"):
+                           creds, model_name, question_type="tracnghiem"):
     """
-    VERSION 3: Tích hợp PDF Scanner và Missing Question Fixer
+    VERSION 4: TỐI ƯU BỘ NHỚ VÀ LOGIC
     
-    Cải tiến mới:
-    1. Quét 3 file PDF (SGK, SBT, SGV) để hiểu chủ đề
-    2. Tạo topic guide để sinh câu hỏi không lạc đề
-    3. Tự động sinh lại câu thiếu với nội dung hoàn toàn khác
-    4. Kiểm tra trùng lặp giữa các lần sinh
+    Cải tiến:
+    1. Chỉ lưu các câu hợp lệ, không lưu toàn bộ text
+    2. Chỉ sinh lại câu thiếu/không hợp lệ
+    3. Giảm số ảnh xuống 15% để tiết kiệm thời gian
+    4. Tập trung vào bám sát PDF và đủ số lượng
     """
     try:
         print(f"\n{'='*70}")
-        print(f"SINH {question_type.upper()} - VERSION 3 (PDF SCANNER)")
+        print(f"SINH {question_type.upper()} - VERSION 4 (OPTIMIZED)")
         print(f"{'='*70}\n")
         
         required_count = 80 if question_type == "tracnghiem" else 40
-        print(f"Yêu cầu: {required_count} câu\n")
+        target_image_count = calculate_optimal_image_count(required_count)
         
-        # ============ BƯỚC 0: QUÉT PDF VÀ CẢI THIỆN PROMPT ============
+        print(f"📋 Yêu cầu: {required_count} câu")
+        print(f"🖼️  Ảnh tối ưu: {target_image_count} ảnh (~15%)\n")
+        
+        # ============ BƯỚC 0: QUÉT PDF ============
         print(f"{'='*70}")
         print("BƯỚC 0: QUÉT PDF VÀ TẠO TOPIC GUIDE")
         print(f"{'='*70}\n")
@@ -353,135 +471,105 @@ def response2docx_improved(file_paths, prompt, output_filename, project_id,
             prompt, file_paths, project_id, creds
         )
         
-        # ============ BƯỚC 1: BATCH PROCESSING ============
-        print(f"{'='*70}")
-        print("BƯỚC 1: GEN THEO BATCH")
-        print(f"{'='*70}\n")
-        
+        # ============ KHỞI TẠO STORAGE ============
+        storage = ValidQuestionStorage()
         client = VertexClient(project_id, creds, model_name)
         
-        all_responses = []
-        generated_count = 0
-        MAX_QUESTIONS_PER_REQUEST = 20
-        max_attempts = 5
-        attempt = 0
+        # ============ BƯỚC 1: SINH BATCH ĐẦU TIÊN ============
+        print(f"\n{'='*70}")
+        print("BƯỚC 1: SINH BATCH ĐẦU TIÊN")
+        print(f"{'='*70}\n")
         
-        while generated_count < required_count and attempt < max_attempts:
-            attempt += 1
-            remaining = required_count - generated_count
-            batch_count = min(MAX_QUESTIONS_PER_REQUEST, remaining)
+        # ============ BƯỚC 2: VÒNG LẶP SINH BỔ SUNG ============
+        print(f"\n{'='*70}")
+        print("BƯỚC 2: SINH BỔ SUNG CÂU THIẾU/LỖI")
+        print(f"{'='*70}\n")
+
+        max_rounds = 10  # Tăng số vòng lặp
+        round_num = 0
+
+        while storage.get_valid_count() < required_count and round_num < max_rounds:
+            round_num += 1
+            
+            # Lấy danh sách câu cần sinh (cả thiếu và lỗi)
+            missing_nums = storage.get_missing_nums(required_count)
+            
+            if not missing_nums:
+                print("\n🎉 ĐÃ ĐỦ SỐ LƯỢNG CÂU HỢP LỆ!")
+                break
             
             print(f"\n{'─'*70}")
-            print(f"Lần {attempt}: Sinh câu {generated_count+1} đến {generated_count+batch_count}")
-            print(f"{'─'*70}")
+            print(f"\nVòng {round_num}: Còn thiếu {len(missing_nums)} câu\n")
+            print(f"Danh sách: {missing_nums[:15]}" + (f"..." if len(missing_nums) > 15 else ""))
+            print(f"\n{'─'*70}\n")
             
-            if generated_count == 0:
-                batch_prompt = enhanced_prompt
-                print(f"(Lần đầu - gồm cả file PDF và topic guide)")
-                batch_response = client.send_data_to_AI(
-                    batch_prompt, 
-                    file_paths,
-                    temperature=0.7
-                )
-            else:
-                batch_prompt = f"""{enhanced_prompt}
-
-YÊU CẦU THÊM CÂU HỎI:
-- Sinh {batch_count} câu hỏi THÊM (từ câu {generated_count+1} đến {generated_count+batch_count})
-- TUYỆT ĐỐI KHÔNG sinh lại các câu đã sinh
-- Mỗi câu PHẢI ĐẦY ĐỦ: tiêu đề, nội dung, 4 đáp án, lời giải, giải thích
-- BÁM SÁT chủ đề đã được định nghĩa trong PHẠM VI CHỦ ĐỀ VÀ KIẾN THỨC
-- KHÔNG LẠC ĐỀ sang chủ đề khác
-- KHÔNG THÊM LỜI MỞ ĐẦU HOẶC KẾT LUẬN
-"""
-                print(f"(Lần {attempt} - không có file PDF)")
-                batch_response = client.send_data_to_check(
-                    prompt=batch_prompt,
-                    temperature=0.7
-                )
+            # Sinh tối đa 15 câu/lần để tránh quá tải
+            batch_size = min(15, len(missing_nums))
+            batch_nums = missing_nums[:batch_size]
             
-            all_responses.append(batch_response)
+            print(f"\n📤 Yêu cầu AI sinh {len(batch_nums)} câu...")
             
-            # Đếm câu trong batch
-            batch_questions = len(re.findall(r'\*?\*?Câu\s+\d+', batch_response, re.IGNORECASE))
-            print(f"Kết quả batch: {batch_questions} câu (yêu cầu {batch_count})")
-            
-            # Cập nhật count
-            combined_text = "\n\n".join(all_responses)
-            current_count = len(re.findall(r'\*?\*?Câu\s+\d+', combined_text, re.IGNORECASE))
-            print(f"Tổng cộng: {current_count}/{required_count} câu")
-            
-            generated_count = current_count
-        
-        final_response = "\n\n".join(all_responses)
-        
-        # ============ BƯỚC 2: VALIDATE & FIX ============
-        print(f"\n{'='*70}")
-        print("BƯỚC 2: VALIDATE & AUTO-FIX")
-        print(f"{'='*70}\n")
-        
-        AIresponse_final = validate_and_fix_response(
-            final_response,
-            enhanced_prompt,
-            client,
-            question_type
-        )
-        
-        # ============ BƯỚC 2.5: SINH LẠI CÂU THIẾU (NẾU CÓ) ============
-        print(f"\n{'='*70}")
-        print("BƯỚC 2.5: KIỂM TRA VÀ SINH LẠI CÂU THIẾU")
-        print(f"{'='*70}\n")
-        
-        # Import validator để kiểm tra
-        from process.ques_valid import QuestionValidator
-        validator = QuestionValidator(question_type=question_type)
-        validations, missing_nums = validator.validate_all_questions(AIresponse_final)
-        
-        # Nếu vẫn còn câu thiếu, sinh lại
-        regeneration_attempts = 0
-        max_regeneration_attempts = 3
-        
-        while missing_nums and regeneration_attempts < max_regeneration_attempts:
-            regeneration_attempts += 1
-            print(f"\n🔄 Lần sinh lại thứ {regeneration_attempts}/{max_regeneration_attempts}")
-            print(f"   Cần sinh lại: {len(missing_nums)} câu\n")
-            
-            new_questions = regenerate_missing_questions(
-                missing_nums,
+            # Sinh các câu thiếu
+            new_text = regenerate_invalid_questions(
+                batch_nums,
                 enhanced_prompt,
-                AIresponse_final,
-                project_id,
-                creds,
-                question_type
+                storage,
+                client,
+                question_type,
+                max_attempts=5
             )
             
-            if new_questions:
-                # Thêm câu mới vào text hiện tại
-                AIresponse_final = AIresponse_final + "\n\n" + new_questions
+            if not new_text:
+                print("⚠️ Không thể sinh thêm. Thử tăng số lần retry hoặc kiểm tra prompt.")
                 
-                # Validate lại
-                validations, missing_nums = validator.validate_all_questions(AIresponse_final)
-                
-                if not missing_nums:
-                    print("✅ Đã sinh đủ tất cả các câu!\n")
+                # Thử lại với batch nhỏ hơn
+                if batch_size > 5:
+                    print(f"🔄 Thử lại với batch nhỏ hơn ({batch_size//2} câu)...")
+                    continue
+                else:
                     break
-            else:
-                print("⚠️ Không thể sinh thêm câu. Dừng lại.\n")
+            
+            current_valid = storage.get_valid_count()
+            print(f"\n✓ Hiện có {current_valid}/{required_count} câu hợp lệ")
+            
+            # Nếu không tiến triển sau 3 vòng, dừng
+            if round_num >= 5 and current_valid == storage.get_valid_count():
+                print("\n⚠️ Không có tiến triển. Dừng lại.\n")
                 break
+
+            # Kiểm tra cuối cùng
+        final_missing = storage.get_missing_nums(required_count)
+        if final_missing:
+            print(f"\n{'='*70}")
+            print(f"\n⚠️  CẢNH BÁO: VẪN CÒN {len(final_missing)} CÂU THIẾU\n")
+            print(f"{'='*70}")
+            print(f"\nDanh sách: {final_missing[:20]}" + (f"... và {len(final_missing)-20} câu khác" if len(final_missing) > 20 else ""))
+            print(f"\n💡 Gợi ý:")
+            print(f"\n   - Chạy lại hàm với số vòng lặp cao hơn")
+            print(f"\n   - Kiểm tra prompt có rõ ràng không")
+            print(f"\n   - Kiểm tra PDF có đủ nội dung không")
+            print(f"{'='*70}\n")
         
-        # ============ BƯỚC 3: TẠO DOCUMENT VỚI BUFFER ============
+        # ============ BƯỚC 3: TẠO DOCUMENT ============
         print(f"\n{'='*70}")
-        print("BƯỚC 3: TẠO DOCUMENT VỚI BUFFER")
+        print("\nBƯỚC 3: TẠO DOCUMENT\n")
         print(f"{'='*70}\n")
         
         doc = Document()
-        lines = AIresponse_final.split("\n")
+        target_image_count = calculate_optimal_image_count(required_count)
+        image_tracker = ImageGenerationTracker(target_image_count)
+
+        print(f"🖼️  Mục tiêu ảnh: {target_image_count} (~15%)")
+        
+        # Ghép lại text từ storage
+        final_text = storage.reconstruct_full_text()
+        lines = final_text.split("\n")
+        
+        question_count_in_doc = 0  # Số câu hợp lệ trong document
         
         buffer = QuestionBuffer()
-        image_failed_count = 0
-        question_count_in_doc = 0
-        
         i = 0
+        
         while i < len(lines):
             line = lines[i].strip()
             
@@ -492,8 +580,8 @@ YÊU CẦU THÊM CÂU HỎI:
             # ========== HEADING ==========
             if is_heading(line):
                 if buffer.question_num > 0:
-                    if buffer.flush_to_doc(doc):
-                        question_count_in_doc += 1
+                    if buffer.flush_to_doc(doc, image_tracker):
+                        question_count_in_doc += 1  # CHỈ TĂNG NẾU GHI THÀNH CÔNG
                     buffer.reset()
                 
                 if line.startswith("### "):
@@ -512,9 +600,9 @@ YÊU CẦU THÊM CÂU HỎI:
             # ========== QUESTION TITLE ==========
             if is_question_title(line):
                 if buffer.question_num > 0:
-                    if buffer.flush_to_doc(doc):
-                        question_count_in_doc += 1
-                        doc.add_paragraph()
+                    if buffer.flush_to_doc(doc, image_tracker):
+                        question_count_in_doc += 1  # CHỈ TĂNG NẾU GHI THÀNH CÔNG
+                    doc.add_paragraph()
                     buffer.reset()
                 
                 buffer.title = line.replace("**", "").strip()
@@ -528,12 +616,25 @@ YÊU CẦU THÊM CÂU HỎI:
                 i += 1
                 continue
             
-            # ========== IMAGE ==========
+            # ========== IMAGE (LOGIC TỐI ƯU) ==========
             if is_image_line(line):
                 img_desc = extract_image_description(line)
+                
                 if img_desc:
+                    # Quyết định có sinh ảnh thật không
+                    should_gen = image_tracker.should_generate(
+                        buffer.question_num, 
+                        required_count
+                    )
+                    
+                    # Lưu mô tả + flag
                     buffer.image_description = img_desc
-                    print(f"   → Lưu ảnh: {img_desc[:40]}...")
+                    buffer.should_generate_image = should_gen
+                    
+                    if should_gen:
+                        print(f"\n   → Sẽ sinh ảnh {image_tracker.generated_count + 1}/{target_image_count}\n")
+                    else:
+                        print(f"   → Sẽ dùng placeholder\n")
                 
                 i += 1
                 continue
@@ -542,8 +643,7 @@ YÊU CẦU THÊM CÂU HỎI:
             if is_answer_option(line):
                 buffer.answers.append(line)
                 buffer.state = QuestionState.IN_ANSWERS
-                print(f"   → Đáp án {len(buffer.answers)}: {line[:35]}...")
-                
+                print(f"   → Đáp án {len(buffer.answers)}\n")
                 i += 1
                 continue
             
@@ -551,8 +651,7 @@ YÊU CẦU THÊM CÂU HỎI:
             if is_solution_header(line):
                 buffer.solution_header = line.replace("**", "").strip()
                 buffer.state = QuestionState.IN_SOLUTION_HEADER
-                print(f"   → Lời giải")
-                
+                print(f"   → Lời giải\n")
                 i += 1
                 continue
             
@@ -560,16 +659,13 @@ YÊU CẦU THÊM CÂU HỎI:
             if buffer.state == QuestionState.IN_SOLUTION_HEADER and is_correct_answer(line):
                 buffer.correct_answer = line.strip()
                 buffer.state = QuestionState.IN_CORRECT_ANSWER
-                print(f"   → Đáp án đúng: {line.strip()}")
-                
+                print(f"   → Đáp án: {line.strip()}\n")
                 i += 1
                 continue
             
             # ========== SEPARATOR #### ==========
             if is_separator(line):
                 buffer.state = QuestionState.AFTER_SEPARATOR
-                print(f"   → Separator")
-                
                 i += 1
                 continue
             
@@ -578,8 +674,6 @@ YÊU CẦU THÊM CÂU HỎI:
                 if line.strip():
                     buffer.explanation_lines.append(line)
                     buffer.state = QuestionState.IN_EXPLANATION
-                    print(f"   → Giải thích: {line[:45]}...")
-                
                 i += 1
                 continue
             
@@ -587,36 +681,48 @@ YÊU CẦU THÊM CÂU HỎI:
             if buffer.state in [QuestionState.IN_TITLE, QuestionState.IN_CONTENT]:
                 buffer.content_lines.append(line)
                 buffer.state = QuestionState.IN_CONTENT
-                print(f"   → Nội dung: {line[:45]}...")
-                
                 i += 1
                 continue
             
             i += 1
         
-        # ========== FLUSH BUFFER CUỐI CÙNG ==========
+        # Flush buffer cuối
         if buffer.question_num > 0:
-            if buffer.flush_to_doc(doc):
-                question_count_in_doc += 1
+            if buffer.flush_to_doc(doc, image_tracker):
+                question_count_in_doc += 1  # CHỈ TĂNG NẾU GHI THÀNH CÔNG
+        
+        missing_nums = storage.get_missing_nums(required_count)
+        add_summary_at_end(
+            doc, 
+            question_count_in_doc, 
+            required_count, 
+            missing_nums,
+            image_tracker
+        )
         
         # ========== LƯU FILE ==========
         output_path = f"{output_filename}.docx"
         doc.save(output_path)
         
-        print(f"\n{'='*70}")
-        print(f"✅ HOÀN THÀNH!")
+        print(f"\n{'='*70}\n")
+        print(f"✅ HOÀN THÀNH!\n")
         print(f"{'='*70}")
-        print(f"File: {output_path}")
-        print(f"Câu hỏi trong document: {question_count_in_doc}/{required_count}")
+        print(f"\nFile: {output_path}\n")
+        print(f"Câu hỏi: {question_count_in_doc}/{required_count}\n")
+        
         if question_count_in_doc < required_count:
-            print(f"⚠️  Còn thiếu: {required_count - question_count_in_doc} câu")
-        if image_failed_count > 0:
-            print(f"Ảnh lỗi: {image_failed_count}")
+            missing_count = required_count - question_count_in_doc
+            print(f"\n ⚠️  CÒN THIẾU: {missing_count} câu\n")
+            print(f"💡 Các câu thiếu: {storage.get_missing_nums(required_count)}\n")
+        
+        print(f"\n📊 THỐNG KÊ ẢNH:")
+        print(image_tracker.get_summary())
+                
         print(f"{'='*70}\n")
         
         return output_path
     
     except Exception as e:
-        print(f"\n❌ LỖI NGHIÊM TRỌNG: {e}")
+        print(f"\n❌ LỖI: {e}")
         traceback.print_exc()
         return None
