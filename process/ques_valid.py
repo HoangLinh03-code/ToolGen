@@ -28,7 +28,7 @@ class QuestionValidation:
             self.has_correct_answer and
             self.has_separator and
             self.has_explanation and
-            self.explanation_length >= 1  # Ít nhất 3 dòng giải thích
+            self.explanation_length >= 3  # Ít nhất 3 dòng giải thích
         )
     
     @property
@@ -62,6 +62,12 @@ class ValidQuestionStorage:
     
     def add_valid_question(self, question_num: int, question_text: str):
         """Thêm câu hỏi hợp lệ vào storage"""
+        # Cho phép thay thế nếu đã tồn tại (dùng cho trường hợp regen/sửa câu)
+        self.valid_questions[question_num] = question_text
+        self.valid_nums.add(question_num)
+
+    def replace_question(self, question_num: int, question_text: str):
+        """Thay thế nội dung câu hỏi (nếu đã có thì ghi đè)."""
         self.valid_questions[question_num] = question_text
         self.valid_nums.add(question_num)
     
@@ -75,10 +81,77 @@ class ValidQuestionStorage:
         missing = sorted(required_nums - self.valid_nums)
         return missing
     
-    def reconstruct_full_text(self) -> str:
-        """Ghép lại text đầy đủ từ các câu hợp lệ"""
-        sorted_questions = sorted(self.valid_questions.items())
-        return "\n\n".join([text for _, text in sorted_questions])
+    def reconstruct_full_text(self, required_count=None) -> str:
+        """Ghép lại text đầy đủ từ các câu hợp lệ, luôn sắp xếp đúng thứ tự từ 1 đến required_count (nếu có)"""
+        if required_count is not None:
+            question_nums = list(range(1, required_count + 1))
+        else:
+            question_nums = sorted(self.valid_questions.keys())
+        parts = []
+        for qn in question_nums:
+            if qn in self.valid_questions:
+                parts.append(self.valid_questions[qn])
+        return "\n\n".join(parts)
+
+    def count_questions_with_image(self) -> int:
+        """Đếm số câu có hình ảnh trong valid_questions"""
+        pattern = re.compile(r'\[HÌNH ?ẢNH[\]:]', re.IGNORECASE)
+        count = 0
+        for text in self.valid_questions.values():
+            if pattern.search(text):
+                count += 1
+        return count
+
+    def count_level_distribution(self, level_regexes=None) -> dict:
+        """Đếm số câu ở mỗi mức độ theo heading (trả ra dict)"""
+        if not level_regexes:
+            level_regexes = {
+                'Nhận biết': re.compile(r'(MỨC ĐỘ|#|##|###)?\s*Nhận biết', re.IGNORECASE),
+                'Thông hiểu': re.compile(r'(MỨC ĐỘ|#|##|###)?\s*Thông hiểu', re.IGNORECASE),
+                'Vận dụng': re.compile(r'(MỨC ĐỘ|#|##|###)?\s*Vận dụng(?! cao)', re.IGNORECASE),
+                'Vận dụng cao': re.compile(r'(MỨC ĐỘ|#|##|###)?\s*Vận dụng cao', re.IGNORECASE)
+            }
+        levels_count = {lv: 0 for lv in level_regexes}
+        for text in self.valid_questions.values():
+            for lv, rgx in level_regexes.items():
+                if rgx.search(text):
+                    levels_count[lv] += 1
+                    break
+        return levels_count
+
+    def validate_distribution(self, required_count, required_img_percent=0.2, level_targets=None):
+        """Kiểm tra số lượng hình và mức độ theo tỷ lệ định nghĩa"""
+        results = {}
+        # Check ảnh
+        img_count = self.count_questions_with_image()
+        min_required_img = int(round(required_count * required_img_percent))
+        results["image_enough"] = img_count >= min_required_img
+        results["img_have"] = img_count
+        results["img_need"] = min_required_img
+
+        # Check mức độ
+        if not level_targets:
+            # Default theo prompt_Gen.txt
+            level_targets = {
+                'Nhận biết': int(required_count * 0.3),
+                'Thông hiểu': int(required_count * 0.3),
+                'Vận dụng': int(required_count * 0.3),
+                'Vận dụng cao': int(required_count * 0.1),
+            }
+        levels_count = self.count_level_distribution()
+        level_ok = True
+        short_levels = {}
+        for lv, req_num in level_targets.items():
+            have = levels_count.get(lv, 0)
+            short = req_num - have
+            short_levels[lv] = short if short > 0 else 0
+            if have < req_num:
+                level_ok = False
+        results['level_ok'] = level_ok
+        results['level_stat'] = levels_count
+        results['level_target'] = level_targets
+        results['level_short'] = short_levels
+        return results
     
     def has_question(self, question_num: int) -> bool:
         """Kiểm tra câu hỏi đã tồn tại chưa"""
@@ -199,7 +272,6 @@ class QuestionValidator:
     def validate_all_questions(self, text: str) -> Tuple[List[QuestionValidation], List[int]]:
         """
         Kiểm tra toàn bộ đề bài
-        
         Returns:
             Tuple (list_validations, missing_question_numbers)
         """
@@ -212,6 +284,11 @@ class QuestionValidator:
         
         print(f"📊 Tìm thấy {len(questions)} câu trong đề bài")
         print(f"📋 Yêu cầu: {self.required_count} câu\n")
+        
+        # Lưu lại các câu question_num -> text để hỗ trợ kiểm tra phân bố
+        temp_storage = ValidQuestionStorage()
+        for qnum, qtext in questions.items():
+            temp_storage.add_valid_question(qnum, qtext)
         
         # Kiểm tra từng câu có trong text
         for qnum, qtext in sorted(questions.items()):
@@ -242,23 +319,41 @@ class QuestionValidator:
         print(f"❌ Câu thiếu hoàn toàn: {len(missing_nums)}")
         print(f"{'='*60}\n")
         
+        # --- Validate phân bố mức độ và hình ảnh NẾU đã đủ số lượng câu ---
+        if valid_count >= self.required_count:
+            dist_stat = temp_storage.validate_distribution(self.required_count)
+            print("▶️ Phân bố mức độ nhận thức:")
+            for lv, num in dist_stat['level_stat'].items():
+                tar = dist_stat['level_target'][lv]
+                short = dist_stat['level_short'][lv]
+                status = "OK" if num >= tar else f"Thiếu {short}"
+                print(f"- {lv}: {num}/{tar} ({status})")
+            if not dist_stat['level_ok']:
+                print("❌ Cảnh báo: Chưa đủ phân bố theo mức độ (")
+                for lv, n in dist_stat['level_short'].items():
+                    if n > 0:
+                        print(f"  - Thiếu {n} câu mức {lv}")
+                print(") Bạn cần sinh/bổ sung đúng các nhóm câu còn thiếu!")
+            else:
+                print("✅ Đã đủ tỷ lệ các mức độ!")
+            print("▶️ Phân bố số câu có hình ảnh:")
+            print(f"- Có hình ảnh: {dist_stat['img_have']}/{dist_stat['img_need']} câu ({'Đủ' if dist_stat['image_enough'] else 'Thiếu'})")
+            if not dist_stat['image_enough']:
+                print(f"❌ Cảnh báo: Chưa đủ số câu có hình ảnh theo yêu cầu!")
+        else:
+            print("ℹ️ Chưa kiểm tra phân bố mức độ và hình ảnh do chưa đủ số lượng câu hợp lệ.")
+        
         return validations, missing_nums
     
     def generate_fix_prompt(self, validations: List[QuestionValidation], 
                            missing_nums: List[int],
                            original_prompt: str,
-                           full_text: str) -> str:
+                           full_text: str,
+                           image_short_count: int = 0,
+                           levels_short_dict: dict = None) -> str:
         """
-        Tạo prompt để AI bổ sung/sửa các câu hỏi
-        
-        Args:
-            validations: Danh sách kết quả kiểm tra
-            missing_nums: Danh sách số câu thiếu hoàn toàn
-            original_prompt: Prompt gốc
-            full_text: Toàn bộ text hiện tại
-            
-        Returns:
-            Prompt để gửi cho AI
+        Tạo prompt để AI bổ sung/sửa các câu hỏi.
+        Có thể truyền thêm số lượng câu thiếu hình ảnh (image_short_count) và dict thiếu mức độ (levels_short_dict) để AI ưu tiên sinh đúng nhóm còn thiếu, tránh lạc phân bố!
         """
         # Lấy các câu cần sửa
         questions_to_fix = [v for v in validations if not v.is_valid]
@@ -270,6 +365,17 @@ class QuestionValidator:
             "# YÊU CẦU BỔ SUNG VÀ SỬA CHỮA ĐỀ BÀI\n",
             "## TÌNH TRẠNG HIỆN TẠI\n"
         ]
+
+        # Báo thêm về thiếu hình ảnh / mức độ nếu có
+        custom_notice = []
+        if image_short_count and image_short_count > 0:
+            custom_notice.append(f"- 💡 Còn thiếu {image_short_count} câu có hình ảnh. Phải ưu tiên bổ sung group này!")
+        if levels_short_dict:
+            for lv, n in levels_short_dict.items():
+                if n > 0:
+                    custom_notice.append(f"- 💡 Thiếu {n} câu mức '{lv}'. Phải ưu tiên sinh group này!")
+        if custom_notice:
+            prompt_parts.append("\n".join(custom_notice)+"\n")
         
         # 1. Liệt kê câu thiếu hoàn toàn
         if missing_nums:
@@ -370,15 +476,7 @@ class QuestionValidator:
                              client: VertexClient, max_attempts: int = 5) -> str:
         """
         Tự động kiểm tra và bổ sung câu hỏi bằng AI
-        
-        Args:
-            text: Text đề bài hiện tại
-            original_prompt: Prompt gốc để tham khảo format
-            client: VertexClient để gọi API
-            max_attempts: Số lần thử tối đa
-            
-        Returns:
-            Text đề bài đã được sửa chữa
+        Khi regen, nếu phát hiện thiếu mức độ hoặc hình ảnh, sẽ thêm chú dẫn rõ ràng vào prompt gửi AI!
         """
         current_text = text
         attempt = 0
@@ -392,20 +490,22 @@ class QuestionValidator:
             # Kiểm tra
             validations, missing_nums = self.validate_all_questions(current_text)
             
-            # Kiểm tra xem có cần sửa không
-            invalid_questions = [v for v in validations if not v.is_valid]
-            
-            if not invalid_questions and not missing_nums:
-                print("\n🎉 ĐỀ BÀI ĐÃ HOÀN HẢO! Không cần sửa gì thêm.\n")
-                return current_text
-            
+            # Kiểm tra phân bổ mức độ/hình ảnh nếu đã đủ basic
+            temp_storage = ValidQuestionStorage()
+            for v in validations:
+                if v.is_valid:
+                    temp_storage.add_valid_question(v.question_num, f"dummy") # chỉ cần num không cần text
+            dist_stat = temp_storage.validate_distribution(self.required_count)
+            img_short = dist_stat['img_need'] - dist_stat['img_have'] if dist_stat['img_need'] > dist_stat['img_have'] else 0
+            levels_short = dist_stat['level_short']
             # Tạo prompt sửa
             fix_prompt = self.generate_fix_prompt(
-                validations, missing_nums, original_prompt, current_text
+                validations, missing_nums, original_prompt, current_text,
+                image_short_count=img_short, levels_short_dict=levels_short
             )
             
             print(f"\n📤 Gửi yêu cầu sửa chữa đến AI...")
-            print(f"   - Số câu cần sửa thành phần: {len(invalid_questions)}")
+            print(f"   - Số câu cần sửa thành phần: {len([v for v in validations if not v.is_valid])}")
             print(f"   - Số câu thiếu hoàn toàn: {len(missing_nums)}\n")
             
             # Gọi AI
@@ -439,16 +539,7 @@ class QuestionValidator:
 def validate_and_fix_response(AIresponse: str, original_prompt: str,
                               client: VertexClient, question_type: str = "tracnghiem") -> str:
     """
-    Hàm tiện ích để tích hợp vào response2docx_improved()
-    
-    Usage trong response2docx_improved():
-        # Sau khi nhận AIresponse_final từ AI
-        AIresponse_final = validate_and_fix_response(
-            AIresponse_final, 
-            prompt, 
-            client, 
-            question_type
-        )
+    CHÚ Ý: original_prompt PHẢI LÀ prompt đã được thay thế subject/grade động!
     """
     validator = QuestionValidator(question_type=question_type)
     fixed_text = validator.fix_questions_with_ai(
@@ -459,55 +550,7 @@ def validate_and_fix_response(AIresponse: str, original_prompt: str,
     )
     return fixed_text
 
-def validate_and_store_questions(text: str, storage: ValidQuestionStorage, 
-                                 question_type: str = "tracnghiem") -> Tuple[List[int], List[int]]:
-    """
-    Validate text và lưu các câu hợp lệ vào storage
-    
-    Returns:
-        List số câu không hợp lệ hoặc thiếu
-    """
-    validator = QuestionValidator(question_type=question_type)
-    
-    # Parse câu hỏi từ text
-    questions = validator.parse_questions(text)
-    
-    print(f"\n{'='*60}")
-    print(f"🔍 VALIDATE VÀ LƯU CÂU HỢP LỆ")
-    print(f"{'='*60}\n")
-    
-    invalid_nums = []
-    new_valid_count = 0
-    
-    for qnum, qtext in sorted(questions.items()):
-        # Bỏ qua câu đã lưu trước đó
-        if storage.has_question(qnum):
-            print(f"⏭️  Câu {qnum}: Đã lưu trước đó")
-            continue
-        
-        # Validate câu mới
-        validation = validator.validate_single_question(qtext, qnum)
-        
-        if validation.is_valid:
-            storage.add_valid_question(qnum, qtext)
-            new_valid_count += 1
-            print(f"\n✅ Câu {qnum}: Hợp lệ → LƯU\n")
-        else:
-            invalid_nums.append(qnum)
-            print(f"\n❌ Câu {qnum}: Thiếu {', '.join(validation.missing_parts)}\n")
-    required_count = validator.required_count
-    all_nums_in_text = set(questions.keys())
-    all_nums_needed = set(range(1, required_count + 1))
-    missing_nums = sorted(all_nums_needed - all_nums_in_text - storage.valid_nums)
-    
-    print(f"\n📊 Tổng kết:\n")
-    print(f"   - Câu mới hợp lệ: {new_valid_count}\n")
-    print(f"   - Câu không hợp lệ: {len(invalid_nums)}\n")
-    print(f"   - Câu thiếu hoàn toàn: {len(missing_nums)}\n")
-    print(f"   - Tổng đã lưu: {storage.get_valid_count()}\n")
-    
-    return invalid_nums, missing_nums
-
+# ====== CHÚ Ý: PROMPT PHẢI LUÔN LÀ BẢN ĐÃ REPLACE subject/grade TUYỆT ĐỐI KHÔNG ĐỌC FILE LẠI ======
 def regenerate_invalid_questions(invalid_nums: List[int], 
                                  original_prompt: str,
                                  storage: ValidQuestionStorage,
@@ -516,9 +559,7 @@ def regenerate_invalid_questions(invalid_nums: List[int],
                                  max_attempts: int = 5) -> str:
     """
     Sinh lại chỉ các câu không hợp lệ/thiếu
-    
-    Returns:
-        Text chứa các câu mới được sinh
+    CHÚ Ý: original_prompt phải truyền bản đã thay thế subject/grade động.
     """
     if not invalid_nums:
         return ""
@@ -585,16 +626,16 @@ BẮT ĐẦU SINH:
                     print(f"   ⏭️  Câu {qnum}: Không trong danh sách cần sinh, bỏ qua")
                     continue
                 
-                # Bỏ qua câu đã lưu trước đó
+                # Cho phép ghi đè câu đã có nếu đang sinh lại để sửa
                 if storage.has_question(qnum):
-                    print(f"   ⏭️  Câu {qnum}: Đã hợp lệ từ trước")
-                    continue
+                    print(f"   ✏️  Câu {qnum}: Đang thay thế nội dung cũ bằng nội dung mới")
                 
                 # Validate
                 validation = validator.validate_single_question(qtext, qnum)
                 
                 if validation.is_valid:
-                    storage.add_valid_question(qnum, qtext)
+                    # Ghi đè/ghi mới đều qua replace cho rõ ràng
+                    storage.replace_question(qnum, qtext)
                     newly_valid.append(qnum)
                     successfully_generated.append(qnum)
                     print(f"\n   ✅ Câu {qnum}: Hợp lệ → LƯU\n")
