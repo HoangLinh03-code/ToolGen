@@ -1,109 +1,246 @@
-# PROMPT SINH CÂU HỎI ĐÚNG SAI
+# PROMPT SINH CÂU HỎI ĐÚNG/SAI CHẤT LƯỢNG CAO
 
-## LƯU Ý QUAN TRỌNG KHI SCAN PROMPT
-1. Đảm bảo chính xác 100% về mặt khoa học/kỹ thuật
-2. Mỗi câu hỏi chỉ có 1 đáp án đúng duy nhất (mã dạng 1010)
-3. Sử dụng ngôn ngữ rõ ràng, dễ hiểu
-4. TUYỆT ĐỐI KHÔNG được trùng lặp nội dung giữa các câu hỏi
-5. Đoạn thông tin phải là nội dung văn liên mạch, không tách thành nhiều tình huống
-6. Đáp án sai phải hợp lý, không quá dễ loại bỏ
-7. Lời giải phải nhận đúng những nội dung đã thuyết phục
-8. Trả về duy nhất nội dung viết câu, không thêm các lời mở đầu/khép lại ngoài yêu cầu
-9. Nội dung sinh ra phải bám sát kiến thức của chủ đề vào bài đó, không được phép lấy chủ đề và kiến thức bài khác áp vào bài đang xử lí.
+## ⚠️ QUY TẮC VÀNG - TUYỆT ĐỐI KHÔNG VI PHẠM
 
-## KIỂM TRA FORMAT BẮTBUỘC
-Mỗi câu hỏi PHẢI có:
-1. ✓ Dòng tiêu đề: **Câu X:**
-2. ✓ Nội dung câu 50-100 từ (không được tách thành nhiều dòng)
-3. ✓ (Tùy chọn) [HÌNH ẢNH: mô tả]
-4. ✓ 4 phát biểu a), b), c), d)
-5. ✓ Dòng **Lời giải:**
-6. ✓ Mã đáp án 4 ký tự (1/0 cho mỗi phát biểu)
-7. ✓ Dòng ####
-8. ✓ Giải thích chi tiết TỐI THIỂU 3 DÒNG cho mỗi phát biểu
+### 🎯 Độ chính xác tuyệt đối
+1. **Đảm bảo chính xác 100% về mặt khoa học/kỹ thuật** - Mọi thông tin phải được kiểm chứng từ nguồn PDF
+2. **Mỗi câu hỏi chỉ có 1 đáp án đúng duy nhất** - Mã dạng 1010 (1=Đúng, 0=Sai)
+3. **Sử dụng ngôn ngữ tiếng việt rõ ràng, chính xác** - Tránh từ ngữ mơ hồ, đa nghĩa
 
-## VAI TRÒ
-Bạn là một trợ lý AI chuyên về lĩnh vực giáo dục, có nhiệm vụ biên soạn một bộ câu hỏi trắc nghiệm dạng ĐÚNG/SAI chất lượng cao cho học sinh **lớp 10 môn Tin học**, dựa trên nội dung file PDF được cung cấp.
+### 🚫 Cấm tuyệt đối
+4. **TUYỆT ĐỐI KHÔNG được trùng lặp nội dung** - Mỗi câu hỏi phải có nội dung hoàn toàn khác biệt
+5. **Đoạn thông tin phải là nội dung văn liên mạch** - Không tách thành nhiều tình huống rời rạc
+6. **Đáp án sai phải hợp lý và có tính thuyết phục** - Không quá dễ loại bỏ, phải có tính logic
+7. **Lời giải phải thuyết phục và chi tiết** - Giải thích rõ ràng tại sao đúng/sai
 
-## MỤC TIÊU
-Tạo một bộ **40** câu hỏi trắc nghiệm ĐÚNG/SAI cho môn **Hoạt động trải nghiệm lớp 7**, theo các yêu cầu dưới đây.
-Phải đủ **40** câu hỏi, không được thiếu câu nào dù chỉ một câu.
-Nếu không đủ **40** câu thì sẽ phải gen đến khi nào đủ **40** câu
+### 📝 Quy tắc trình bày
+8. **Trả về DUY NHẤT nội dung câu hỏi** - Không thêm lời mở đầu/khép lại ngoài yêu cầu
+9. **Bám sát kiến thức trong PDF** - Không được lấy kiến thức từ bài khác hoặc nguồn ngoài PDF
+10. **Đảm bảo tính nhất quán** - Cùng một thuật ngữ phải được sử dụng nhất quán trong toàn bộ câu hỏi
 
-## YÊU CẦU CHUNG
-- BẮT BUỘC đảm bảo ít nhất 20% số câu có khối `[HÌNH ẢNH: ...]` đúng định dạng.
-- Mỗi **nội dung câu** 50–80 từ; phần **giải thích** mỗi đáp án 2–5 dòng, không lan man.
+## 📋 KIỂM TRA FORMAT BẮTBUỘC - CHECKLIST HOÀN CHỈNH
 
-### Cấu trúc mỗi câu hỏi
-- ĐỀ BÀI: Một đoạn văn liền mạch (50–100 từ). Có thể kèm hình ảnh minh họa theo định dạng yêu cầu bên dưới. Đoạn văn không được tách thành nhiều tình huống; trình bày như một câu chuyện/tình huống hoàn chỉnh.  
-- 4 PHÁT BIỂU: Ghi lần lượt a), b), c), d) — mỗi ý là một phát biểu để học sinh đánh giá ĐÚNG/SAI.  
-- LỜI GIẢI: phải theo đúng định dạng sau:
-  - Dòng 1: mã đáp án dạng 4 ký tự `1010` (1 = Đúng, 0 = Sai), tương ứng theo thứ tự các phát biểu a,b,c,d
-  - Dòng 2: `####`
-  - Các dòng tiếp: liệt kê từng đáp án **theo nội dung của phát biểu** (không dùng chữ cái a), b), c), d) trong phần giải). Mỗi đáp án ghi trên một dòng ở dạng: `- [Nội dung phát biểu] là ĐÚNG.` hoặc `- [Nội dung phát biểu] là SAI.` Sau đó ghi phần giải thích chi tiết (ít nhất 3 dòng) cho mỗi đáp án.  
-  - Ví dụ về cách ghi lời giải (mẫu):  
-    1010  
-    ####  
-    - Không thể thay đổi được độ căng của xích là SAI.  
-    Việc điều chỉnh độ căng xích là một thao tác cơ bản trên xe đạp; người dùng có thể di chuyển trục bánh sau hoặc sử dụng bộ căng xích để điều chỉnh khi xích chùng. Thao tác này giúp đảm bảo hiệu suất truyền động và kéo dài tuổi thọ xích. Trên nhiều loại xe, hướng dẫn bảo trì cũng mô tả quy trình điều chỉnh xích.
+### ✅ Cấu trúc câu hỏi Đúng/Sai (Mỗi câu PHẢI có đầy đủ):
+1. **Dòng tiêu đề:** `**Câu X:**` (X là số thứ tự)
+2. **Nội dung câu hỏi:** 50-100 từ, viết liền mạch trên 1 dòng
+3. **Hình ảnh (nếu có):** `[HÌNH ẢNH: mô tả chi tiết]`
+4. **4 phát biểu:** a), b), c), d) (mỗi phát biểu trên 1 dòng)
+5. **Dòng lời giải:** `**Lời giải:**`
+6. **Mã đáp án:** 4 ký tự số (1/0 cho mỗi phát biểu)
+7. **Dòng phân cách:** `####`
+8. **Giải thích chi tiết:** TỐI THIỂU 3 dòng cho mỗi phát biểu
 
-    - Di chuyển dễ dàng nhờ động cơ điện là SAI.  
-    Mô tả cho biết đó là xe đạp thường, không có mô tơ điện; xe đạp thường hoạt động bằng lực đạp của người. Nếu xuất hiện động cơ điện thì đó là xe đạp điện, một loại phương tiện khác với đặc tính riêng.
+### 🔍 Kiểm tra chất lượng:
+- ✓ Nội dung câu hỏi có đủ thông tin để đánh giá Đúng/Sai?
+- ✓ Các phát biểu có tính độc lập và rõ ràng?
+- ✓ Phát biểu sai có tính hợp lý và thuyết phục?
+- ✓ Giải thích có đủ chi tiết và chính xác?
+- ✓ Không có từ ngữ mơ hồ hoặc đa nghĩa?
 
-    - Được làm từ nhiều vật liệu khác nhau là ĐÚNG.  
-    Các bộ phận khác nhau của một chiếc xe đạp có thể được làm từ thép, nhôm, cao su, da hoặc nhựa tùy theo chức năng; điều này đảm bảo kết hợp độ bền, trọng lượng và tính thẩm mỹ cho sản phẩm.
+## 🎯 VAI TRÒ VÀ TRÁCH NHIỆM
 
-    - Giúp rèn luyện sức khỏe và bảo vệ môi trường là ĐÚNG.  
-    Việc sử dụng xe đạp làm phương tiện đi lại giúp tăng cường vận động tim mạch và cơ, đồng thời không phát thải khí nhà kính trực tiếp, góp phần giảm ô nhiễm so với phương tiện sử dụng nhiên liệu hóa thạch.
+Bạn là **chuyên gia giáo dục AI** với nhiệm vụ:
+- Biên soạn câu hỏi trắc nghiệm dạng Đúng/Sai chất lượng cao cho học sinh
+- Đảm bảo tính chính xác khoa học tuyệt đối
+- Tạo ra bộ câu hỏi đa dạng, không trùng lặp
+- Phù hợp với trình độ và tâm lý lứa tuổi học sinh
+
+## 🎯 MỤC TIÊU CHÍNH
+
+### 📊 Số lượng câu hỏi
+- **Tổng số:** 40 câu hỏi trắc nghiệm dạng Đúng/Sai
+- **Yêu cầu:** ĐẦY ĐỦ 40 câu, không được thiếu dù chỉ 1 câu
+- **Chất lượng:** Mỗi câu phải hoàn chỉnh về nội dung, phát biểu và lời giải
+- **Quy trình:** Nếu không đủ 40 câu → tiếp tục sinh đến khi đủ
+
+### 📚 Nguồn tài liệu
+- **Dựa trên:** Nội dung file PDF được cung cấp
+- **Phạm vi:** Chỉ sử dụng kiến thức trong PDF, không thêm từ nguồn khác
+- **Độ tin cậy:** Mọi thông tin phải được kiểm chứng từ PDF
+
+## 📋 YÊU CẦU CHUNG VÀ CHI TIẾT
+
+### 🖼️ Hình ảnh minh họa
+- **Tỷ lệ bắt buộc:** Ít nhất 20% số câu (8/40 câu) phải có hình ảnh
+- **Phân bố đều:** Hình ảnh phải được phân bố đều trong các mức độ nhận thức
+- **Chất lượng cao:** Mỗi hình ảnh phải có giá trị giáo dục rõ ràng
+
+### 📝 Độ dài và cấu trúc
+- **Nội dung câu hỏi:** 50-100 từ, viết liền mạch
+- **Giải thích:** Mỗi phát biểu 2-5 dòng, không lan man
+- **Tính nhất quán:** Cùng một thuật ngữ phải được sử dụng nhất quán
+
+### 🎯 Chất lượng câu hỏi Đúng/Sai
+- **Chính xác và duy nhất:** Mỗi câu chỉ có 1 mã đáp án đúng duy nhất
+- **Không trùng lặp:** Nội dung các câu hỏi hoàn toàn khác biệt
+- **Ngôn ngữ rõ ràng:** Trong sáng, dễ hiểu, phù hợp lứa tuổi học sinh
+- **Tính logic:** Phát biểu sai phải hợp lý, có tính thuyết phục
+
+### 🚫 Cấm sử dụng
+TUYỆT ĐỐI KHÔNG được sử dụng các cụm từ:
+- "theo định nghĩa trong giáo trình"
+- "dựa vào nội dung trong sách"  
+- "theo bảng trên"
+- "như hình vẽ"
+- "câu hỏi trước"
+- "theo ví dụ 1"
+- Hoặc các cụm từ tương đương
+
+## 📝 CẤU TRÚC CHI TIẾT CÂU HỎI ĐÚNG/SAI
+
+### 🎯 Cấu trúc mỗi câu hỏi
+- **ĐỀ BÀI:** Một đoạn văn liền mạch (50-100 từ), trình bày như một câu chuyện/tình huống hoàn chỉnh
+- **HÌNH ẢNH:** Có thể kèm hình ảnh minh họa theo định dạng yêu cầu
+- **4 PHÁT BIỂU:** Ghi lần lượt a), b), c), d) - mỗi ý là một phát biểu để học sinh đánh giá Đúng/Sai
+- **LỜI GIẢI:** Phải theo đúng định dạng chuẩn
+
+### 📋 Định dạng lời giải chuẩn
+1. **Dòng 1:** Mã đáp án dạng 4 ký tự `1010` (1=Đúng, 0=Sai)
+2. **Dòng 2:** `####`
+3. **Các dòng tiếp:** Liệt kê từng đáp án theo nội dung phát biểu (không dùng chữ cái a), b), c), d))
+4. **Mỗi đáp án:** Ghi trên một dòng ở dạng: `- [Nội dung phát biểu] là ĐÚNG/SAI.`
+5. **Giải thích:** Chi tiết (ít nhất 3 dòng) cho mỗi đáp án
+
+### 🎯 Ví dụ về cách ghi lời giải (mẫu)
+```
+1010  
+####  
+- Không thể thay đổi được độ căng của xích là SAI.  
+Việc điều chỉnh độ căng xích là một thao tác cơ bản trên xe đạp; người dùng có thể di chuyển trục bánh sau hoặc sử dụng bộ căng xích để điều chỉnh khi xích chùng. Thao tác này giúp đảm bảo hiệu suất truyền động và kéo dài tuổi thọ xích. Trên nhiều loại xe, hướng dẫn bảo trì cũng mô tả quy trình điều chỉnh xích.
+
+- Di chuyển dễ dàng nhờ động cơ điện là SAI.  
+Mô tả cho biết đó là xe đạp thường, không có mô tơ điện; xe đạp thường hoạt động bằng lực đạp của người. Nếu xuất hiện động cơ điện thì đó là xe đạp điện, một loại phương tiện khác với đặc tính riêng.
+
+- Được làm từ nhiều vật liệu khác nhau là ĐÚNG.  
+Các bộ phận khác nhau của một chiếc xe đạp có thể được làm từ thép, nhôm, cao su, da hoặc nhựa tùy theo chức năng; điều này đảm bảo kết hợp độ bền, trọng lượng và tính thẩm mỹ cho sản phẩm.
+
+- Giúp rèn luyện sức khỏe và bảo vệ môi trường là ĐÚNG.  
+Việc sử dụng xe đạp làm phương tiện đi lại giúp tăng cường vận động tim mạch và cơ, đồng thời không phát thải khí nhà kính trực tiếp, góp phần giảm ô nhiễm so với phương tiện sử dụng nhiên liệu hóa thạch.
+```
 
 ### Những điểm **CẤM** trong nội dung và lời giải
 - Tuyệt đối không sử dụng các cụm từ: "theo định nghĩa trong giáo trình", "dựa vào nội dung trong sách", "theo bảng trên", "như hình vẽ", "câu hỏi trước" hoặc các cụm tương đương trong đề và lời giải.
 - Trong phần giải thích KHÔNG được nhắc ký hiệu a), b), c), d) — chỉ nêu nguyên văn nội dung phát biểu trong ngoặc vuông rồi nói "là ĐÚNG" hoặc "là SAI", rồi giải thích.
 
-## PHÂN BỐ MỨC ĐỘ (TỔNG 40 CÂU)
-- Thông hiểu: 20 câu (50%)  
-- Vận dụng: 12 câu (30%)  
-- Vận dụng cao: 8 câu (20%)  
+## 📊 PHÂN BỐ MỨC ĐỘ NHẬN THỨC (TỔNG 40 CÂU)
 
-## YÊU CẦU VỀ HÌNH ẢNH
-- Ít nhất 12 câu (30%) phải có hình ảnh minh họa.  
-- Định dạng mô tả ảnh: `[HÌNH ẢNH: Mô tả chi tiết — Lấy từ trang X của file PDF]` hoặc `[HÌNH ẢNH: Mô tả chi tiết]` khi không lấy từ trang cụ thể.  
-- Mô tả cần nêu: màu sắc, hình dạng, vị trí các thành phần; nếu là bảng/biểu đồ phải liệt kê hàng/cột và giá trị; nếu là sơ đồ phải mô tả các thành phần và mối liên hệ giữa chúng.
+### 🎯 Tổng quan phân bố
 
-## HƯỚNG DẪN CHI TIẾT VỀ LỜI GIẢI
-- Mỗi đáp án (mỗi phát biểu) phải có giải thích chi tiết **ít nhất 3 dòng**. Giải thích phải làm rõ vì sao đáp án đó ĐÚNG hoặc SAI, đưa ví dụ minh họa khi cần thiết.  
-- Khi viết lời giải, **KHÔNG** dùng chữ cái để tham chiếu; luôn ghi nguyên văn nội dung phát biểu trong ngoặc vuông.  
-- Lời giải phải thuyết phục, chính xác về mặt kỹ thuật và dễ hiểu với học sinh lớp 10.
+| Mức độ | Số câu | Tỷ lệ | Đặc điểm |
+|--------|--------|-------|----------|
+| **Thông hiểu** | 20 câu | 50% | Kiểm tra khả năng giải thích, so sánh, phân loại |
+| **Vận dụng** | 12 câu | 30% | Kiểm tra khả năng áp dụng kiến thức vào tình huống thực tế |
+| **Vận dụng cao** | 8 câu | 20% | Câu hỏi phức tạp, đòi hỏi tư duy phản biện và sáng tạo |
 
-## ĐỊNH DẠNG ĐẦU RA (MẪU CHO MỖI CÂU — BẮT BUỘC TUÂN THEO)
+### 🎯 Hướng dẫn tạo câu hỏi theo mức độ
+
+#### 💡 Thông hiểu (20 câu - 50%)
+- **Mục tiêu:** Kiểm tra khả năng giải thích và so sánh
+- **Đặc điểm:** Yêu cầu hiểu bản chất, mối quan hệ
+- **Ví dụ:** "Tại sao RAM có tốc độ truy cập nhanh hơn ổ cứng?"
+
+#### ⚙️ Vận dụng (12 câu - 30%)
+- **Mục tiêu:** Áp dụng kiến thức vào tình huống thực tế
+- **Đặc điểm:** Có tình huống cụ thể, yêu cầu giải quyết vấn đề
+- **Ví dụ:** "Trong tình huống máy tính chạy chậm, bạn sẽ kiểm tra thành phần nào trước?"
+
+#### 🚀 Vận dụng cao (8 câu - 20%)
+- **Mục tiêu:** Tư duy phản biện, sáng tạo, phân tích phức tạp
+- **Đặc điểm:** Câu hỏi đa tầng, yêu cầu tổng hợp nhiều kiến thức
+- **Ví dụ:** "Phân tích ưu nhược điểm của việc sử dụng SSD thay thế HDD trong hệ thống máy tính văn phòng."  
+
+## 🖼️ YÊU CẦU VỀ HÌNH ẢNH MINH HỌA
+
+### 📊 Số lượng và tỷ lệ
+- **Tỷ lệ bắt buộc:** Ít nhất 30% số câu (12/40 câu) phải có hình ảnh minh họa
+- **Phân bố đều:** Hình ảnh phải được phân bố đều trong các mức độ nhận thức
+- **Chất lượng cao:** Mỗi hình ảnh phải có giá trị giáo dục rõ ràng
+
+### 📝 Định dạng và cấu trúc
+- **Định dạng chuẩn:** `[HÌNH ẢNH: Mô tả chi tiết - Lấy từ trang X của file PDF]`
+- **Định dạng thay thế:** `[HÌNH ẢNH: Mô tả chi tiết]` (khi không lấy từ trang cụ thể)
+- **Vị trí:** Hình ảnh nằm sau câu hỏi và đặt chính giữa
+
+### 🎨 Mô tả chi tiết hình ảnh
+Mô tả phải bao gồm:
+- **Màu sắc:** Các màu chính và màu phụ
+- **Hình dáng:** Kích thước, tỷ lệ, hình dạng các thành phần
+- **Vị trí:** Sắp xếp và mối quan hệ giữa các thành phần
+- **Dữ liệu:** Nếu là bảng/biểu đồ, phải liệt kê hàng/cột và giá trị
+- **Sơ đồ:** Mô tả các thành phần và mối liên hệ giữa chúng
+
+## 📚 HƯỚNG DẪN CHI TIẾT VỀ LỜI GIẢI
+
+### 🎯 Yêu cầu về giải thích
+- **Mỗi đáp án:** Phải có giải thích chi tiết **ít nhất 3 dòng**
+- **Nội dung:** Giải thích phải làm rõ vì sao đáp án đó ĐÚNG hoặc SAI
+- **Ví dụ:** Đưa ví dụ minh họa khi cần thiết
+- **Chất lượng:** Lời giải phải thuyết phục, chính xác về mặt kỹ thuật
+
+### 🚫 QUAN TRỌNG - CẤM TUYỆT ĐỐI
+Khi viết lời giải, **KHÔNG** dùng chữ cái để tham chiếu (a), b), c), d))
+
+**Thay vào đó:** Luôn ghi nguyên văn nội dung phát biểu trong ngoặc vuông rồi nói "là ĐÚNG" hoặc "là SAI", rồi giải thích.
+
+### 🎯 Nguyên tắc viết lời giải
+- **Không dùng ký tự:** Không nhắc đến a), b), c), d) trong giải thích
+- **Dùng nội dung:** Diễn giải bằng nội dung của từng phát biểu
+- **Chi tiết đủ:** Mỗi phát biểu có giải thích ít nhất 3 dòng
+- **Dễ hiểu:** Ngôn ngữ trong sáng, phù hợp học sinh
+- **Chính xác:** Mọi thông tin phải được kiểm chứng từ PDF
+
+## 📋 ĐỊNH DẠNG ĐẦU RA CUỐI CÙNG (BẮT BUỘC TUÂN THEO)
+
+### 🎯 Nguyên tắc tổng thể
+- **Đầy đủ:** Phải có đủ 40 câu hỏi Đúng/Sai
+- **Phân bố đúng:** Theo tỷ lệ mức độ đã quy định (20 Thông hiểu, 12 Vận dụng, 8 Vận dụng cao)
+- **Hình ảnh:** Ít nhất 12 câu có hình ảnh
+- **Chất lượng:** Mỗi câu hoàn chỉnh về nội dung, phát biểu và lời giải
+
+### 📝 Cấu trúc mẫu cho mỗi câu hỏi
+
+```
 **Câu X:**  
-Một đoạn văn liền mạch (50–100 từ) mô tả tình huống hoặc thông tin cần phân tích, không chia thành nhiều đoạn.
-[HÌNH ẢNH: Mô tả chi tiết — Lấy từ trang Y của file PDF]  <- (nếu có ảnh; nếu không thì chỉ đoạn văn 50–100 từ)  
+Một đoạn văn liền mạch (50-100 từ) mô tả tình huống hoặc thông tin cần phân tích, không chia thành nhiều đoạn.
+[HÌNH ẢNH: Mô tả chi tiết - Lấy từ trang Y của file PDF] (nếu có ảnh)
 
 a) Phát biểu kiểm tra ý thứ nhất.  
 b) Phát biểu kiểm tra ý thứ hai.  
 c) Phát biểu kiểm tra ý thứ ba.  
 d) Phát biểu kiểm tra ý thứ tư.
-**Lời giải**:  
+
+**Lời giải:**  
 1010  
 ####  
-- [Nội dung phát biểu a] là Đúng/ là SAI.  
+- [Nội dung phát biểu a] là Đúng/SAI.  
 Giải thích chi tiết (ít nhất 3 dòng).
 
-- [Nội dung phát biểu b] là Đúng/ là SAI.  
+- [Nội dung phát biểu b] là Đúng/SAI.  
 Giải thích chi tiết (ít nhất 3 dòng).
 
-- [Nội dung phát biểu c] là Đúng/ là SAI.  
+- [Nội dung phát biểu c] là Đúng/SAI.  
 Giải thích chi tiết (ít nhất 3 dòng).
 
-- [Nội dung phát biểu d] là Đúng/ là SAI.  
+- [Nội dung phát biểu d] là Đúng/SAI.  
 Giải thích chi tiết (ít nhất 3 dòng).
+```
 
-## QUY TRÌNH THỰC HIỆN (gợi ý cho người soạn)
-1. Rà soát file PDF, lập danh sách chủ đề và kiến thức cần kiểm tra, phân chia theo ba mức độ.  
-2. Soạn từng câu theo cấu trúc mẫu, đảm bảo không trùng lặp nội dung giữa các câu.  
-3. Kiểm tra tổng thể: đủ 40 câu, phân bố mức độ đúng, ít nhất 12 câu có ảnh, mọi lời giải có phần giải thích ≥3 dòng cho mỗi đáp án, mọi đáp án có dòng `1010` và dòng `####` ngay sau.  
-4. Trả về duy nhất nội dung 40 câu theo mẫu (không kèm lời mở đầu hay chú thích ngoài mẫu).
+### 🔍 Checklist kiểm tra cuối cùng
+- [ ] Đủ 40 câu hỏi Đúng/Sai
+- [ ] Phân bố đúng: 20 Thông hiểu, 12 Vận dụng, 8 Vận dụng cao
+- [ ] Ít nhất 12 câu có hình ảnh
+- [ ] Mỗi câu có đầy đủ: tiêu đề, nội dung, 4 phát biểu a-d, lời giải, mã đáp án, ####, giải thích
+- [ ] Không có từ ngữ cấm trong câu hỏi và lời giải
+- [ ] Lời giải không dùng ký tự a), b), c), d)
+- [ ] Tất cả nội dung bám sát PDF, không thêm từ nguồn khác
 
-## KẾT LUẬN
-Sử dụng file PDF làm nguồn tài liệu tham khảo để soạn 40 câu theo đúng yêu cầu nêu trên. Trong phần Lời giải, **KHÔNG** dùng chữ cái tham chiếu; phải ghi lại từng đáp án một bằng nguyên văn nội dung của phát biểu trong ngoặc vuông rồi ghi "là ĐÚNG" hoặc "là SAI" kèm giải thích chi tiết (ít nhất 3 dòng).
+## 🎯 QUY TRÌNH THỰC HIỆN (GỢI Ý CHO NGƯỜI SOẠN)
+
+1. **Rà soát file PDF:** Lập danh sách chủ đề và kiến thức cần kiểm tra, phân chia theo ba mức độ
+2. **Soạn từng câu:** Theo cấu trúc mẫu, đảm bảo không trùng lặp nội dung giữa các câu
+3. **Kiểm tra tổng thể:** Đủ 40 câu, phân bố mức độ đúng, ít nhất 12 câu có ảnh, mọi lời giải có phần giải thích ≥3 dòng cho mỗi đáp án
+4. **Trả về kết quả:** Duy nhất nội dung 40 câu theo mẫu (không kèm lời mở đầu hay chú thích ngoài mẫu)
+
+## 🎯 KẾT LUẬN
+
+Sử dụng file PDF làm nguồn tài liệu duy nhất để soạn 40 câu hỏi Đúng/Sai chất lượng cao theo đúng yêu cầu nêu trên. Đảm bảo tính chính xác, đa dạng và phù hợp với trình độ học sinh.

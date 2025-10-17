@@ -8,8 +8,8 @@ import zipfile, subprocess, re
 from tempfile import NamedTemporaryFile
 from docx.oxml import parse_xml
 import traceback
-from process.ques_valid import ValidQuestionStorage, validate_and_store_questions, regenerate_invalid_questions
-from process.text2Image import generate_image_from_text, should_generate_image, calculate_optimal_image_count, ImageGenerationTracker
+from process.ques_valid import ValidQuestionStorage, regenerate_invalid_questions
+from process.text2Image import generate_image_from_text,calculate_optimal_image_count, ImageGenerationTracker
 from process.PDF_Scan import enhance_prompt_with_pdf_scan
 from enum import Enum
 
@@ -248,7 +248,7 @@ class QuestionBuffer:
         return len(self.answers) >= 4
     
     def has_explanation(self):
-        return len(self.explanation_lines) > 0
+        return len(self.explanation_lines) >= 3
     
     def is_complete(self):
         return (
@@ -260,7 +260,23 @@ class QuestionBuffer:
             self.has_explanation()
         )
     
-    def flush_to_doc(self, doc, image_tracker=None):
+    def _dedupe_answers(self):
+        """Giữ tối đa 4 đáp án, loại trùng theo nội dung (không phân biệt chữ A-D)."""
+        seen_contents = set()
+        unique_answers = []
+        for ans in self.answers:
+            # Chuẩn hóa nội dung để so trùng: bỏ tiền tố A./B)/... và khoảng trắng
+            content = re.sub(r'^[A-Da-d][\.)]\s*', '', ans).strip()
+            norm = re.sub(r'\s+', ' ', content.lower())
+            if norm in seen_contents:
+                continue
+            seen_contents.add(norm)
+            unique_answers.append(ans)
+            if len(unique_answers) == 4:
+                break
+        self.answers = unique_answers
+
+    def flush_to_doc(self, doc, image_tracker=None, skipped_log=None, written_log=None):
         """
         Ghi câu hỏi vào document
         
@@ -268,6 +284,10 @@ class QuestionBuffer:
             bool - True nếu ghi thành công, False nếu câu không hợp lệ
         """
         # VALIDATION NGHIÊM NGẶT
+        # Dedupe đáp án trước khi validate/ghi
+        if self.answers:
+            self._dedupe_answers()
+
         if not self.is_complete():
             missing = []
             if not self.title:
@@ -284,6 +304,8 @@ class QuestionBuffer:
                 missing.append("giải thích")
             
             print(f"\n   ❌ Câu {self.question_num} THIẾU: {', '.join(missing)} → KHÔNG GHI VÀO DOC\n")
+            if skipped_log is not None and self.question_num:
+                skipped_log.append(self.question_num)
             return False  # QUAN TRỌNG: Return False
         
         # 1. Thêm tiêu đề
@@ -341,8 +363,8 @@ class QuestionBuffer:
         run = separator_para.add_run("####")
         run.bold = True
         
-        # 9. Thêm giải thích
-        for line in self.explanation_lines:
+        # 9. Thêm giải thích (đảm bảo ít nhất 3 dòng)
+        for line in self.explanation_lines[:max(3, len(self.explanation_lines))]:
             if line.strip():
                 para = doc.add_paragraph()
                 if "**" in line:
@@ -351,6 +373,8 @@ class QuestionBuffer:
                     process_text(line, para)
         
         print(f"\n   ✅ Câu {self.question_num}: Đã ghi vào document\n")
+        if written_log is not None and self.question_num:
+            written_log.append(self.question_num)
         return True
 
 from typing import List
@@ -440,16 +464,12 @@ def add_summary_at_end(doc, question_count_in_doc: int,
 
 # ============ MAIN FUNCTION V3 WITH PDF SCANNER ============
 
+# ====== CHÚ Ý: MỌI PROMPT TRUYỀN VÀO response2docx_improved PHẢI LÀ prompt động (đã thay thế subject/grade phù hợp), không được truyền gốc từ file =====
 def response2docx_improved(file_paths, prompt, output_filename, project_id, 
                            creds, model_name, question_type="tracnghiem"):
     """
     VERSION 4: TỐI ƯU BỘ NHỚ VÀ LOGIC
-    
-    Cải tiến:
-    1. Chỉ lưu các câu hợp lệ, không lưu toàn bộ text
-    2. Chỉ sinh lại câu thiếu/không hợp lệ
-    3. Giảm số ảnh xuống 15% để tiết kiệm thời gian
-    4. Tập trung vào bám sát PDF và đủ số lượng
+    CHÚ Ý: prompt truyền vào từ ngoài PHẢI là prompt đã qua replace subject/grade!
     """
     try:
         print(f"\n{'='*70}")
@@ -488,6 +508,7 @@ def response2docx_improved(file_paths, prompt, output_filename, project_id,
         max_rounds = 10  # Tăng số vòng lặp
         round_num = 0
 
+        previous_valid_count = storage.get_valid_count()
         while storage.get_valid_count() < required_count and round_num < max_rounds:
             round_num += 1
             
@@ -512,7 +533,7 @@ def response2docx_improved(file_paths, prompt, output_filename, project_id,
             # Sinh các câu thiếu
             new_text = regenerate_invalid_questions(
                 batch_nums,
-                enhanced_prompt,
+                enhanced_prompt,  # PHẢI DÙNG PROMPT ĐÃ REPLACE, KHÔNG ĐỌC FILE LẠI!
                 storage,
                 client,
                 question_type,
@@ -532,10 +553,11 @@ def response2docx_improved(file_paths, prompt, output_filename, project_id,
             current_valid = storage.get_valid_count()
             print(f"\n✓ Hiện có {current_valid}/{required_count} câu hợp lệ")
             
-            # Nếu không tiến triển sau 3 vòng, dừng
-            if round_num >= 5 and current_valid == storage.get_valid_count():
+            # Nếu không tiến triển sau 3 vòng liên tiếp, dừng
+            if round_num >= 5 and current_valid <= previous_valid_count:
                 print("\n⚠️ Không có tiến triển. Dừng lại.\n")
                 break
+            previous_valid_count = current_valid
 
             # Kiểm tra cuối cùng
         final_missing = storage.get_missing_nums(required_count)
@@ -566,6 +588,8 @@ def response2docx_improved(file_paths, prompt, output_filename, project_id,
         lines = final_text.split("\n")
         
         question_count_in_doc = 0  # Số câu hợp lệ trong document
+        skipped_or_failed_nums = []  # Theo dõi câu bị bỏ qua/không ghi được
+        written_nums = []  # Theo dõi câu thực sự đã ghi vào DOCX
         
         buffer = QuestionBuffer()
         i = 0
@@ -580,7 +604,7 @@ def response2docx_improved(file_paths, prompt, output_filename, project_id,
             # ========== HEADING ==========
             if is_heading(line):
                 if buffer.question_num > 0:
-                    if buffer.flush_to_doc(doc, image_tracker):
+                    if buffer.flush_to_doc(doc, image_tracker, skipped_log=skipped_or_failed_nums, written_log=written_nums):
                         question_count_in_doc += 1  # CHỈ TĂNG NẾU GHI THÀNH CÔNG
                     buffer.reset()
                 
@@ -600,7 +624,7 @@ def response2docx_improved(file_paths, prompt, output_filename, project_id,
             # ========== QUESTION TITLE ==========
             if is_question_title(line):
                 if buffer.question_num > 0:
-                    if buffer.flush_to_doc(doc, image_tracker):
+                    if buffer.flush_to_doc(doc, image_tracker, skipped_log=skipped_or_failed_nums, written_log=written_nums):
                         question_count_in_doc += 1  # CHỈ TĂNG NẾU GHI THÀNH CÔNG
                     doc.add_paragraph()
                     buffer.reset()
@@ -688,10 +712,16 @@ def response2docx_improved(file_paths, prompt, output_filename, project_id,
         
         # Flush buffer cuối
         if buffer.question_num > 0:
-            if buffer.flush_to_doc(doc, image_tracker):
+            if buffer.flush_to_doc(doc, image_tracker, skipped_log=skipped_or_failed_nums, written_log=written_nums):
                 question_count_in_doc += 1  # CHỈ TĂNG NẾU GHI THÀNH CÔNG
         
-        missing_nums = storage.get_missing_nums(required_count)
+        # Tính missing dựa trên những câu THỰC SỰ đã ghi vào docx
+        written_set = set(written_nums)
+        missing_nums = sorted(set(range(1, required_count + 1)) - written_set)
+        # Ghi log bổ sung để truy vết rõ ràng
+        if skipped_or_failed_nums:
+            print(f"\n🧾 Danh sách số câu bị bỏ qua/không ghi được: {sorted(set(skipped_or_failed_nums))}\n")
+        print(f"\n🧾 Danh sách số câu đã ghi: {sorted(written_set)}\n")
         add_summary_at_end(
             doc, 
             question_count_in_doc, 

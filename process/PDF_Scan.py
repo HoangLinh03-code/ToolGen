@@ -227,8 +227,9 @@ Liệt kê các khái niệm, thuật ngữ, định nghĩa quan trọng
 
 
 class MissingQuestionFixer:
-    """Class xử lý sinh lại câu hỏi bị thiếu"""
-    
+    """Class xử lý sinh lại câu hỏi bị thiếu
+    CHÚ Ý: Các hàm generate phải nhận prompt đã replace subject/grade, không tự ý đọc lại từ file hoặc nhận biến gốc chưa qua replace!
+    """
     def __init__(self, project_id: str, creds, model_name: str = "gemini-2.5-pro"):
         self.client = VertexClient(project_id, creds, model_name)
     
@@ -237,16 +238,8 @@ class MissingQuestionFixer:
                                    existing_text: str,
                                    question_type: str = "tracnghiem") -> str:
         """
-        Sinh lại các câu hỏi bị thiếu
-        
-        Args:
-            missing_nums: Danh sách số câu bị thiếu
-            original_prompt: Prompt gốc (đã có topic guide)
-            existing_text: Text hiện tại (để tránh trùng lặp)
-            question_type: "tracnghiem" hoặc "dungsai"
-            
-        Returns:
-            Text chứa các câu hỏi mới
+        Sinh lại các câu hỏi bị thiếu. 
+        original_prompt PHẢI là prompt đã thay thế subject/grade (không tự đọc lại file nguyên gốc!)
         """
         print(f"\n{'='*70}")
         print(f"🔄 SINH LẠI {len(missing_nums)} CÂU BỊ THIẾU")
