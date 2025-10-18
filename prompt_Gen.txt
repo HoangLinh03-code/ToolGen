@@ -31,6 +31,18 @@
 8. **Dòng phân cách:** `####`
 9. **Giải thích chi tiết:** TỐI THIỂU 3 dòng cho đáp án đúng
 
+### 📈 Phân bố mức độ câu hỏi (BẮT BUỘC)
+- **Nhận biết:** 20 câu (25%) - Câu 1-20: Kiến thức cơ bản, định nghĩa, khái niệm
+- **Thông hiểu:** 20 câu (25%) - Câu 21-40: Giải thích, so sánh, phân tích mối quan hệ
+- **Vận dụng:** 20 câu (25%) - Câu 41-60: Áp dụng kiến thức vào tình huống cụ thể
+- **Vận dụng cao:** 20 câu (25%) - Câu 61-80: Phân tích, tổng hợp, đánh giá phức tạp
+- **Yêu cầu:** CHỈ câu đầu mỗi nhóm có dòng **MỨC ĐỘ [NHẬN BIẾT/THÔNG HIỂU/VẬN DỤNG/VẬN DỤNG CAO]**:
+  - Câu 1: **MỨC ĐỘ NHẬN BIẾT**
+  - Câu 21: **MỨC ĐỘ THÔNG HIỂU** 
+  - Câu 41: **MỨC ĐỘ VẬN DỤNG**
+  - Câu 61: **MỨC ĐỘ VẬN DỤNG CAO**
+
+
 ### 🔍 Kiểm tra chất lượng:
 - ✓ Nội dung câu hỏi có đủ thông tin để trả lời?
 - ✓ Các đáp án có độ dài tương đương?

@@ -212,7 +212,7 @@ class ProcessingThread(QThread):
                 if os.path.exists(old_output_folder):
                     old_output_exists = True
                     break
-            
+
             if old_output_exists:
                 self.progress.emit("⚠️ Phát hiện file cũ trong cấu trúc output cũ")
                 self.progress.emit("💡 File mới sẽ được lưu theo cấu trúc: output/[Môn học]/Lớp [X]/[Bài]/")
@@ -263,7 +263,6 @@ class ProcessingThread(QThread):
                         continue
                     else:
                         self.progress.emit(f"⏳ {bai_name} chưa hoàn thành, sẽ xử lý")
-                    
                     # 1. Xử lý trắc nghiệm
                     self.progress.emit(f"📝 Đang sinh 80 câu trắc nghiệm...")
                     self.image_progress.emit(f"[TracNghiem-{bai_name}] Bắt đầu xử lý")
@@ -720,7 +719,7 @@ class MainWindow(QWidget):
         control_layout.addWidget(self.stop_button)
         control_layout.addWidget(self.reset_button)
         control_layout.addWidget(self.migrate_button)
-        
+
         # Progress bar
         progress_group = QGroupBox("📊 Tiến trình xử lý")
         progress_layout = QVBoxLayout()
@@ -893,6 +892,7 @@ class MainWindow(QWidget):
             
             <h2>📁 Kết quả</h2>
             <p>File docx được lưu trong: <code>output/[Môn học]/Lớp [X]/[Tên bài]/</code></p>
+            <p><strong>Ví dụ:</strong> Nếu nhập môn "Khoa học", lớp "11" → <code>output/Khoa học/Lớp 11/Bài 1/</code></p>   
             <p><strong>Ví dụ:</strong> Nếu nhập môn "Khoa học", lớp "11" → <code>output/Khoa học/Lớp 11/Bài 1/</code></p>
             <ul>
                 <li>[Tên bài]_TracNghiem.docx - 80 câu trắc nghiệm</li>
@@ -1075,7 +1075,6 @@ class MainWindow(QWidget):
         for bai_name in bai_folders:
             bai_path = os.path.join(self.root_folder, bai_name)
             pdf_count = len(glob.glob(os.path.join(bai_path, "*.pdf")))
-            
             # Tạo đường dẫn output theo cấu trúc mới
             subject = self.subject_input.text().strip() or "Tin học"
             grade = self.grade_input.text().strip() or "10"
@@ -1215,6 +1214,71 @@ class MainWindow(QWidget):
             self.log_text.append("\n🔄 Đã reset toàn bộ tiến trình!")
             self.update_progress_table()
             QMessageBox.information(self, "Thành công", "Đã xóa tiến trình!")
+            
+    def migrate_old_files(self):
+        """Di chuyển file từ cấu trúc cũ sang cấu trúc mới"""
+        if not self.root_folder or not os.path.isdir(self.root_folder):
+            QMessageBox.warning(self, "Lỗi", "Vui lòng chọn folder gốc trước!")
+            return
+
+        subject = self.subject_input.text().strip() or "Tin học"
+        grade = self.grade_input.text().strip() or "10"
+
+        # Tìm file trong cấu trúc cũ
+        old_files = []
+        for bai_name in os.listdir(self.root_folder):
+            bai_path = os.path.join(self.root_folder, bai_name)
+            if os.path.isdir(bai_path):
+                old_output_folder = os.path.join("output", bai_name)
+                if os.path.exists(old_output_folder):
+                    old_files.append((bai_name, old_output_folder))
+
+        if not old_files:
+            QMessageBox.information(self, "Thông báo", "Không tìm thấy file cũ để di chuyển!")
+            return
+
+        reply = QMessageBox.question(
+            self, "Xác nhận",
+            f"Tìm thấy {len(old_files)} bài có file cũ.\n"
+            f"Di chuyển từ: output/[Bài]/ → output/{subject}/Lớp {grade}/[Bài]/\n\n"
+            f"Bạn có muốn tiếp tục?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            migrated_count = 0
+            for bai_name, old_folder in old_files:
+                new_folder = os.path.join("output", subject, f"Lớp {grade}", bai_name)
+
+                try:
+                    # Tạo thư mục mới
+                    os.makedirs(new_folder, exist_ok=True)
+
+                    # Di chuyển file
+                    for file_name in os.listdir(old_folder):
+                        old_file = os.path.join(old_folder, file_name)
+                        new_file = os.path.join(new_folder, file_name)
+
+                        if os.path.isfile(old_file):
+                            import shutil
+                            shutil.move(old_file, new_file)
+
+                    # Xóa thư mục cũ nếu trống
+                    if not os.listdir(old_folder):
+                        os.rmdir(old_folder)
+
+                    migrated_count += 1
+                    self.log_text.append(f"✅ Đã di chuyển {bai_name}")
+
+                except Exception as e:
+                    self.log_text.append(f"❌ Lỗi di chuyển {bai_name}: {str(e)}")
+
+            self.log_text.append(f"\n🎉 Hoàn thành di chuyển {migrated_count}/{len(old_files)} bài!")
+            self.update_progress_table()
+            QMessageBox.information(
+                self, "Thành công", 
+                f"Đã di chuyển {migrated_count} bài từ cấu trúc cũ sang cấu trúc mới!"
+            )
     
     def migrate_old_files(self):
         """Di chuyển file từ cấu trúc cũ sang cấu trúc mới"""

@@ -118,8 +118,9 @@ Liệt kê các khái niệm, thuật ngữ, định nghĩa quan trọng
                 content = self.client.send_data_to_AI(
                     prompt=scan_prompt,
                     file_paths=[pdf_path],
-                    temperature=0.4
-                )
+
+                    temperature=0.45
+
                 
                 content_summaries[pdf_type] = content
                 print(f"\n   ✓ Hoàn thành ({len(content)} ký tự)\n")
@@ -264,7 +265,7 @@ class MissingQuestionFixer:
             print(f"📤 Gửi yêu cầu sinh {len(missing_nums)} câu...")
             new_questions = self.client.send_data_to_check(
                 prompt=regenerate_prompt,
-                temperature=0.7
+                temperature=0.75
             )
             print(f"✓ Đã nhận {len(new_questions)} ký tự\n")
             return new_questions
