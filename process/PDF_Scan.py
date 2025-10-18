@@ -314,7 +314,7 @@ class MissingQuestionFixer:
             "## YÊU CẦU TUYỆT ĐỐI",
             "1. **Không trùng lặp:** Nội dung phải HOÀN TOÀN KHÁC với các câu đã có",
             "2. **Đúng số thứ tự:** Mỗi câu phải có đúng số thứ tự trong danh sách trên",
-            "3. **Đầy đủ format:** Mỗi câu phải có: tiêu đề, nội dung, đáp án, lời giải, giải thích",
+            "3. **Đầy đủ format:** Mỗi câu phải có: tiêu đề, nội dung, đáp án, lời giải, giải thích (ít nhất 3 dòng)",
             "4. **Không thêm gì khác:** Chỉ trả về nội dung câu hỏi, không lời mở đầu/kết",
             "",
             "## MỘT SỐ CÂU ĐÃ CÓ (ĐỂ TRÁNH TRÙNG LẶP)",

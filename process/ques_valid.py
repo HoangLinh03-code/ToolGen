@@ -28,7 +28,7 @@ class QuestionValidation:
             self.has_correct_answer and
             self.has_separator and
             self.has_explanation and
-            self.explanation_length >= 3  # Ít nhất 3 dòng giải thích
+            self.explanation_length >= 1  # Ít nhất 3 dòng giải thích cho đáp án đúng
         )
     
     @property
@@ -49,8 +49,8 @@ class QuestionValidation:
             missing.append("Dấu phân cách ####")
         if not self.has_explanation:
             missing.append("Giải thích")
-        elif self.explanation_length < 3:
-            missing.append(f"Giải thích quá ngắn ({self.explanation_length} dòng, cần ít nhất 3)")
+        elif self.explanation_length < 1:
+            missing.append(f"Giải thích quá ngắn ({self.explanation_length} dòng, cần ít nhất 3 dòng cho đáp án đúng)")
         return missing
 
 class ValidQuestionStorage:
@@ -118,8 +118,28 @@ class ValidQuestionStorage:
                     levels_count[lv] += 1
                     break
         return levels_count
+    
+    def get_question_level_by_number(self, question_num: int, question_type: str = "tracnghiem") -> str:
+        """Xác định mức độ nhận thức dựa trên số thứ tự câu hỏi"""
+        if question_type == "tracnghiem":
+            if 1 <= question_num <= 24:
+                return "Nhận biết"
+            elif 25 <= question_num <= 48:
+                return "Thông hiểu"
+            elif 49 <= question_num <= 72:
+                return "Vận dụng"
+            elif 73 <= question_num <= 80:
+                return "Vận dụng cao"
+        else:  # dungsai
+            if 1 <= question_num <= 20:
+                return "Thông hiểu"
+            elif 21 <= question_num <= 32:
+                return "Vận dụng"
+            elif 33 <= question_num <= 40:
+                return "Vận dụng cao"
+        return "Không xác định"
 
-    def validate_distribution(self, required_count, required_img_percent=0.2, level_targets=None):
+    def validate_distribution(self, required_count, required_img_percent=0.2, level_targets=None, question_type="tracnghiem"):
         """Kiểm tra số lượng hình và mức độ theo tỷ lệ định nghĩa"""
         results = {}
         # Check ảnh
@@ -129,16 +149,32 @@ class ValidQuestionStorage:
         results["img_have"] = img_count
         results["img_need"] = min_required_img
 
-        # Check mức độ
+        # Check mức độ dựa trên số thứ tự câu hỏi (chính xác hơn)
         if not level_targets:
-            # Default theo prompt_Gen.txt
-            level_targets = {
-                'Nhận biết': int(required_count * 0.3),
-                'Thông hiểu': int(required_count * 0.3),
-                'Vận dụng': int(required_count * 0.3),
-                'Vận dụng cao': int(required_count * 0.1),
-            }
-        levels_count = self.count_level_distribution()
+            if question_type == "tracnghiem":
+                level_targets = {
+                    'Nhận biết': 24,    # Câu 1-24
+                    'Thông hiểu': 24,   # Câu 25-48
+                    'Vận dụng': 24,     # Câu 49-72
+                    'Vận dụng cao': 8,  # Câu 73-80
+                }
+            else:  # dungsai
+                level_targets = {
+                    'Thông hiểu': 20,   # Câu 1-20
+                    'Vận dụng': 12,     # Câu 21-32
+                    'Vận dụng cao': 8,  # Câu 33-40
+                }
+        
+        # Đếm câu hỏi theo mức độ dựa trên số thứ tự
+        levels_count = {}
+        for lv in level_targets.keys():
+            levels_count[lv] = 0
+        
+        for qnum in self.valid_nums:
+            level = self.get_question_level_by_number(qnum, question_type)
+            if level in levels_count:
+                levels_count[level] += 1
+        
         level_ok = True
         short_levels = {}
         for lv, req_num in level_targets.items():
@@ -178,7 +214,12 @@ class QuestionValidator:
             Dict {question_num: question_text}
         """
         questions = {}
-        lines = text.split("\n")
+        # Làm sạch hội thoại/thinking và code fences ở mức thô trước khi parse
+        cleaned = re.sub(r'```[a-zA-Z0-9_-]*\n?', '', text)
+        cleaned = cleaned.replace('```', '')
+        cleaned = re.sub(r'(?im)^\s*(assistant|user|system)\s*:\s*.*$', '', cleaned)
+        cleaned = re.sub(r'(?im)^(thought|reasoning|chain[- ]of[- ]thought|let\'s|as an ai).*$', '', cleaned)
+        lines = cleaned.split("\n")
         current_question_num = None
         current_question_lines = []
         
@@ -222,6 +263,13 @@ class QuestionValidator:
         explanation_lines = 0
         
         for line in lines:
+            # Sanitize AI dialogue/thinking inline while validating
+            if re.match(r'(?im)^\s*(assistant|user|system)\s*:\s*', line):
+                continue
+            if re.match(r'(?im)^(thought|reasoning|chain[- ]of[- ]thought|let\'s|as an ai)', line.strip()):
+                continue
+            if line.strip().startswith('```'):
+                continue
             line_stripped = line.strip()
             if not line_stripped:
                 continue
@@ -321,7 +369,7 @@ class QuestionValidator:
         
         # --- Validate phân bố mức độ và hình ảnh NẾU đã đủ số lượng câu ---
         if valid_count >= self.required_count:
-            dist_stat = temp_storage.validate_distribution(self.required_count)
+            dist_stat = temp_storage.validate_distribution(self.required_count, question_type=self.question_type)
             print("▶️ Phân bố mức độ nhận thức:")
             for lv, num in dist_stat['level_stat'].items():
                 tar = dist_stat['level_target'][lv]
@@ -329,11 +377,11 @@ class QuestionValidator:
                 status = "OK" if num >= tar else f"Thiếu {short}"
                 print(f"- {lv}: {num}/{tar} ({status})")
             if not dist_stat['level_ok']:
-                print("❌ Cảnh báo: Chưa đủ phân bố theo mức độ (")
+                print("❌ Cảnh báo: Chưa đủ phân bố theo mức độ:")
                 for lv, n in dist_stat['level_short'].items():
                     if n > 0:
                         print(f"  - Thiếu {n} câu mức {lv}")
-                print(") Bạn cần sinh/bổ sung đúng các nhóm câu còn thiếu!")
+                print("Bạn cần sinh/bổ sung đúng các nhóm câu còn thiếu!")
             else:
                 print("✅ Đã đủ tỷ lệ các mức độ!")
             print("▶️ Phân bố số câu có hình ảnh:")
@@ -377,6 +425,27 @@ class QuestionValidator:
         if custom_notice:
             prompt_parts.append("\n".join(custom_notice)+"\n")
         
+        # Thêm hướng dẫn phân bố mức độ cụ thể
+        if self.question_type == "tracnghiem":
+            prompt_parts.extend([
+                "\n## 🎯 QUY TẮC PHÂN BỐ MỨC ĐỘ (80 CÂU TRẮC NGHIỆM)\n",
+                "**TUYỆT ĐỐI PHẢI TUÂN THEO THỨ TỰ SAU:**\n",
+                "- Câu 1-24: MỨC ĐỘ NHẬN BIẾT (30%)\n",
+                "- Câu 25-48: MỨC ĐỘ THÔNG HIỂU (30%)\n", 
+                "- Câu 49-72: MỨC ĐỘ VẬN DỤNG (30%)\n",
+                "- Câu 73-80: MỨC ĐỘ VẬN DỤNG CAO (10%)\n",
+                "\n**QUAN TRỌNG:** Khi sinh câu hỏi, phải xác định rõ câu đó thuộc mức độ nào và sinh theo đúng đặc điểm của mức độ đó!\n"
+            ])
+        else:  # dungsai
+            prompt_parts.extend([
+                "\n## 🎯 QUY TẮC PHÂN BỐ MỨC ĐỘ (40 CÂU ĐÚNG/SAI)\n",
+                "**TUYỆT ĐỐI PHẢI TUÂN THEO THỨ TỰ SAU:**\n",
+                "- Câu 1-20: MỨC ĐỘ THÔNG HIỂU (50%)\n",
+                "- Câu 21-32: MỨC ĐỘ VẬN DỤNG (30%)\n",
+                "- Câu 33-40: MỨC ĐỘ VẬN DỤNG CAO (20%)\n",
+                "\n**QUAN TRỌNG:** Khi sinh câu hỏi, phải xác định rõ câu đó thuộc mức độ nào và sinh theo đúng đặc điểm của mức độ đó!\n"
+            ])
+        
         # 1. Liệt kê câu thiếu hoàn toàn
         if missing_nums:
             prompt_parts.append(f"\n### ❌ THIẾU HOÀN TOÀN {len(missing_nums)} CÂU:")
@@ -410,11 +479,11 @@ class QuestionValidator:
             "   - Header: **Lời giải:**",
             "   - Đáp án đúng: 1 số từ 1-4 (hoặc mã 1010 với đúng/sai)",
             "   - Dấu phân cách: ####",
-            "   - Giải thích chi tiết (ít nhất 3 dòng)",
+            "   - Giải thích tối thiểu 3 dòng, CHỈ giải thích đáp án đúng, không giải thích các đáp án sai",
             "4. **TUYỆT ĐỐI KHÔNG:**",
             "   - Thay đổi số thứ tự câu hỏi",
             "   - Thay đổi nội dung các câu đã hợp lệ",
-            "   - Thêm lời mở đầu hay kết thúc ngoài yêu cầu",
+            "   - Thêm lời mở đầu, hội thoại, thinking, hoặc kết thúc ngoài yêu cầu",
             "\n## FORMAT MONG MUỐN\n"
         ])
         
@@ -430,10 +499,10 @@ class QuestionValidator:
                 "B. [Đáp án 2]",
                 "C. [Đáp án 3]",
                 "D. [Đáp án 4]",
-                "**Lời giải:**",
+                "**Lời giải:** (chỉ giải thích đáp án đúng, tối thiểu 3 dòng)",
                 "2",
                 "####",
-                "[Giải thích chi tiết tại sao đáp án 2 đúng, ít nhất 3 dòng]",
+                "[Giải thích chi tiết, tối thiểu 3 dòng, chỉ lý do đáp án 2 đúng]",
                 "```\n"
             ])
         else:  # dungsai
@@ -447,14 +516,12 @@ class QuestionValidator:
                 "b) [Phát biểu 2]",
                 "c) [Phát biểu 3]",
                 "d) [Phát biểu 4]",
-                "**Lời giải:**",
+                "**Lời giải:** (chỉ giải thích vì sao từng phát biểu đúng/sai, tránh hội thoại)",
                 "1010",
                 "####",
-                "- [Nội dung phát biểu a] là ĐÚNG.",
-                "Giải thích chi tiết (ít nhất 3 dòng).",
+                "- [Nội dung phát biểu a] là ĐÚNG. Giải thích 1-2 dòng.",
                 "",
-                "- [Nội dung phát biểu b] là SAI.",
-                "Giải thích chi tiết (ít nhất 3 dòng).",
+                "- [Nội dung phát biểu b] là SAI. Giải thích 1-2 dòng.",
                 "...",
                 "```\n"
             ])
@@ -473,7 +540,7 @@ class QuestionValidator:
         return "\n".join(prompt_parts)
     
     def fix_questions_with_ai(self, text: str, original_prompt: str,
-                             client: VertexClient, max_attempts: int = 5) -> str:
+                             client: VertexClient, max_attempts: int = 7) -> str:
         """
         Tự động kiểm tra và bổ sung câu hỏi bằng AI
         Khi regen, nếu phát hiện thiếu mức độ hoặc hình ảnh, sẽ thêm chú dẫn rõ ràng vào prompt gửi AI!
@@ -495,7 +562,7 @@ class QuestionValidator:
             for v in validations:
                 if v.is_valid:
                     temp_storage.add_valid_question(v.question_num, f"dummy") # chỉ cần num không cần text
-            dist_stat = temp_storage.validate_distribution(self.required_count)
+            dist_stat = temp_storage.validate_distribution(self.required_count, question_type=self.question_type)
             img_short = dist_stat['img_need'] - dist_stat['img_have'] if dist_stat['img_need'] > dist_stat['img_have'] else 0
             levels_short = dist_stat['level_short']
             # Tạo prompt sửa
@@ -546,7 +613,7 @@ def validate_and_fix_response(AIresponse: str, original_prompt: str,
         AIresponse, 
         original_prompt, 
         client,
-        max_attempts=5
+        max_attempts=7
     )
     return fixed_text
 
@@ -556,7 +623,7 @@ def regenerate_invalid_questions(invalid_nums: List[int],
                                  storage: ValidQuestionStorage,
                                  client: VertexClient,
                                  question_type: str = "tracnghiem",
-                                 max_attempts: int = 5) -> str:
+                                 max_attempts: int = 7) -> str:
     """
     Sinh lại chỉ các câu không hợp lệ/thiếu
     CHÚ Ý: original_prompt phải truyền bản đã thay thế subject/grade động.
@@ -576,6 +643,30 @@ def regenerate_invalid_questions(invalid_nums: List[int],
         preview = qtext.split("\n")[1:3]
         existing_samples.append(f"Câu {qnum}: {' '.join(preview)[:80]}...")
     
+    # Tạo prompt sinh lại với hướng dẫn phân bố mức độ
+    level_guidance = ""
+    if question_type == "tracnghiem":
+        level_guidance = """
+## 🎯 QUY TẮC PHÂN BỐ MỨC ĐỘ (80 CÂU TRẮC NGHIỆM)
+**TUYỆT ĐỐI PHẢI TUÂN THEO THỨ TỰ SAU:**
+- Câu 1-24: MỨC ĐỘ NHẬN BIẾT (30%) - Câu hỏi ngắn gọn, kiểm tra khả năng nhớ và nhận diện
+- Câu 25-48: MỨC ĐỘ THÔNG HIỂU (30%) - Kiểm tra khả năng giải thích, so sánh, phân loại
+- Câu 49-72: MỨC ĐỘ VẬN DỤNG (30%) - Kiểm tra khả năng áp dụng kiến thức vào tình huống thực tế
+- Câu 73-80: MỨC ĐỘ VẬN DỤNG CAO (10%) - Câu hỏi phức tạp, đòi hỏi tư duy phản biện và sáng tạo
+
+**QUAN TRỌNG:** Khi sinh câu hỏi, phải xác định rõ câu đó thuộc mức độ nào và sinh theo đúng đặc điểm của mức độ đó!
+"""
+    else:  # dungsai
+        level_guidance = """
+## 🎯 QUY TẮC PHÂN BỐ MỨC ĐỘ (40 CÂU ĐÚNG/SAI)
+**TUYỆT ĐỐI PHẢI TUÂN THEO THỨ TỰ SAU:**
+- Câu 1-20: MỨC ĐỘ THÔNG HIỂU (50%) - Kiểm tra khả năng giải thích và so sánh
+- Câu 21-32: MỨC ĐỘ VẬN DỤNG (30%) - Kiểm tra khả năng áp dụng kiến thức vào tình huống thực tế
+- Câu 33-40: MỨC ĐỘ VẬN DỤNG CAO (20%) - Câu hỏi phức tạp, đòi hỏi tư duy phản biện và sáng tạo
+
+**QUAN TRỌNG:** Khi sinh câu hỏi, phải xác định rõ câu đó thuộc mức độ nào và sinh theo đúng đặc điểm của mức độ đó!
+"""
+
     # Tạo prompt sinh lại
     regenerate_prompt = f"""{original_prompt}
 
@@ -583,6 +674,8 @@ def regenerate_invalid_questions(invalid_nums: List[int],
 
 ## TÌNH HUỐNG
 Đã có {storage.get_valid_count()} câu hợp lệ. Cần sinh lại {len(invalid_nums)} câu BỊ LỖI hoặc THIẾU.
+
+{level_guidance}
 
 ## CÁC CÂU CẦN SINH (QUAN TRỌNG)
 Sinh CHÍNH XÁC các câu sau: {', '.join(map(str, invalid_nums[:20]))}
@@ -594,9 +687,10 @@ Sinh CHÍNH XÁC các câu sau: {', '.join(map(str, invalid_nums[:20]))}
 ## YÊU CẦU TUYỆT ĐỐI
 1. CHỈ sinh các câu trong danh sách trên, ĐÚNG SỐ THỨ TỰ
 2. Nội dung HOÀN TOÀN KHÁC với các câu đã có
-3. Mỗi câu PHẢI ĐẦY ĐỦ format: tiêu đề, nội dung, 4 đáp án, lời giải, giải thích
+3. Mỗi câu PHẢI ĐẦY ĐỦ format: tiêu đề, nội dung, 4 đáp án, lời giải, giải thích (tối thiểu 3 dòng)
 4. BÁM SÁT chủ đề từ PDF đã quét
 5. KHÔNG thêm lời mở đầu/kết thúc
+6. **QUAN TRỌNG:** Mỗi câu phải được sinh theo đúng mức độ nhận thức tương ứng với số thứ tự của nó!
 
 BẮT ĐẦU SINH:
 """

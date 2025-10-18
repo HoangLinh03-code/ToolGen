@@ -2,8 +2,15 @@ import vertexai, os
 from vertexai.generative_models import GenerativeModel, Part, GenerationConfig
 from dotenv import load_dotenv
 from google.oauth2 import service_account
-
+import sys
 load_dotenv()
+if getattr(sys, 'frozen', False):
+    base_path = sys._MEIPASS
+else:
+    base_path = os.path.dirname(__file__)
+ 
+dotenv_path = os.path.join(base_path, '.env')
+load_dotenv(dotenv_path)
 class VertexClient:
     def __init__(self, project_id, creds, model, region="us-central1"):
         vertexai.init(
