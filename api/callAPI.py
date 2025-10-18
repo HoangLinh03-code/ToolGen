@@ -3,6 +3,7 @@ from vertexai.generative_models import GenerativeModel, Part, GenerationConfig
 from dotenv import load_dotenv
 from google.oauth2 import service_account
 import sys
+import traceback
 load_dotenv()
 if getattr(sys, 'frozen', False):
     base_path = sys._MEIPASS
@@ -19,8 +20,41 @@ class VertexClient:
             credentials=creds
         )
         self.model = GenerativeModel(model)
+    
+    def _safe_extract_text(self, response):
+        """Xử lý response an toàn, tránh lỗi multiple content parts"""
+        try:
+            # Thử lấy text trực tiếp trước
+            if hasattr(response, 'text') and response.text:
+                return response.text.strip()
+            
+            # Nếu không có text, thử lấy từ candidates
+            if hasattr(response, 'candidates') and response.candidates:
+                candidate = response.candidates[0]
+                if hasattr(candidate, 'content') and candidate.content:
+                    if hasattr(candidate.content, 'parts') and candidate.content.parts:
+                        # Ghép tất cả text parts lại
+                        text_parts = []
+                        for part in candidate.content.parts:
+                            if hasattr(part, 'text') and part.text:
+                                text_parts.append(part.text.strip())
+                        if text_parts:
+                            return '\n'.join(text_parts)
+            
+            # Nếu vẫn không có text, thử lấy từ finish_reason
+            if hasattr(response, 'candidates') and response.candidates:
+                candidate = response.candidates[0]
+                if hasattr(candidate, 'finish_reason'):
+                    return f"Response finished with reason: {candidate.finish_reason}"
+            
+            return "Không thể lấy được nội dung từ AI response"
+            
+        except Exception as e:
+            print(f"Lỗi xử lý response: {str(e)}")
+            print(f"Traceback: {traceback.format_exc()}")
+            return f"Lỗi xử lý response: {str(e)}"
 
-    def send_data_to_AI(self, prompt, file_paths=None, temperature=0.5, top_p=0.8):
+    def send_data_to_AI(self, prompt, file_paths=None, temperature=0.55, top_p=0.8):
         parts = []
         
         if file_paths:
@@ -44,7 +78,8 @@ class VertexClient:
         response = self.model.generate_content(
             parts, generation_config=generation_config
         )
-        return response.text
+        
+        return self._safe_extract_text(response)
         
     def send_data_to_check(self, prompt, temperature=0.5, top_p=0.8):
         parts = []
@@ -60,7 +95,8 @@ class VertexClient:
         response = self.model.generate_content(
             parts, generation_config=generation_config
         )
-        return response.text
+        
+        return self._safe_extract_text(response)
 
 def get_vertex_ai_credentials():
     try:
