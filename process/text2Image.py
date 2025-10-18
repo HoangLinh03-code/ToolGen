@@ -13,7 +13,7 @@ vertexai.init(
 )
 
 # Singleton model + in-memory cache
-_MODEL = ImageGenerationModel.from_pretrained("imagen-4.0-generate-preview-06-06")
+_MODEL = ImageGenerationModel.from_pretrained("imagen-4.0-generate-001")
 _IMAGE_CACHE = {}
 
 def _key(prompt: str) -> str:

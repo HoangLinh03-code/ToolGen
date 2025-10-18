@@ -21,14 +21,27 @@
 ## 📋 KIỂM TRA FORMAT BẮTBUỘC - CHECKLIST HOÀN CHỈNH
 
 ### ✅ Cấu trúc câu hỏi Đúng/Sai (Mỗi câu PHẢI có đầy đủ):
-1. **Dòng tiêu đề:** `**Câu X:**` (X là số thứ tự)
-2. **Nội dung câu hỏi:** 50-100 từ, viết liền mạch trên 1 dòng
-3. **Hình ảnh (nếu có):** `[HÌNH ẢNH: mô tả chi tiết]`
-4. **4 phát biểu:** a), b), c), d) (mỗi phát biểu trên 1 dòng)
-5. **Dòng lời giải:** `**Lời giải:**`
-6. **Mã đáp án:** 4 ký tự số (1/0 cho mỗi phát biểu)
-7. **Dòng phân cách:** `####`
-8. **Giải thích chi tiết:** TỐI THIỂU 3 dòng cho mỗi phát biểu
+1. **Mức độ (chỉ câu đầu mỗi nhóm):** `**MỨC ĐỘ [NHẬN BIẾT/THÔNG HIỂU/VẬN DỤNG/VẬN DỤNG CAO]**`
+2. **Dòng tiêu đề:** `**Câu X:**` (X là số thứ tự)
+3. **Nội dung câu hỏi:** 50-100 từ, viết liền mạch trên 1 dòng
+4. **Hình ảnh (nếu có):** `[HÌNH ẢNH: mô tả chi tiết]`
+5. **4 phát biểu:** a), b), c), d) (mỗi phát biểu trên 1 dòng)
+6. **Dòng lời giải:** `**Lời giải:**`
+7. **Mã đáp án:** 4 ký tự số (1/0 cho mỗi phát biểu)
+8. **Dòng phân cách:** `####`
+9. **Giải thích chi tiết:** TỐI THIỂU 3 dòng cho mỗi phát biểu
+
+
+### 📈 Phân bố mức độ câu hỏi (BẮT BUỘC)
+- **Nhận biết:** 10 câu (25%) - Câu 1-10: Kiến thức cơ bản, định nghĩa, khái niệm
+- **Thông hiểu:** 10 câu (25%) - Câu 11-20: Giải thích, so sánh, phân tích mối quan hệ
+- **Vận dụng:** 10 câu (25%) - Câu 21-30: Áp dụng kiến thức vào tình huống cụ thể
+- **Vận dụng cao:** 10 câu (25%) - Câu 31-40: Phân tích, tổng hợp, đánh giá phức tạp
+- **Yêu cầu:** CHỈ câu đầu mỗi nhóm có dòng **MỨC ĐỘ [NHẬN BIẾT/THÔNG HIỂU/VẬN DỤNG/VẬN DỤNG CAO]**:
+  - Câu 1: **MỨC ĐỘ NHẬN BIẾT**
+  - Câu 11: **MỨC ĐỘ THÔNG HIỂU**
+  - Câu 21: **MỨC ĐỘ VẬN DỤNG**
+  - Câu 31: **MỨC ĐỘ VẬN DỤNG CAO**
 
 ### 🔍 Kiểm tra chất lượng:
 - ✓ Nội dung câu hỏi có đủ thông tin để đánh giá Đúng/Sai?

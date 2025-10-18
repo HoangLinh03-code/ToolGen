@@ -150,7 +150,7 @@ class ProcessingThread(QThread):
     console_output = pyqtSignal(str)
     
     def __init__(self, root_folder, prompt_tracnghiem_content, prompt_dungsai_content, 
-                 project_id, creds, batch_size=2, max_lessons=None, resume=False):
+                 project_id, creds, batch_size=2, max_lessons=None, resume=False, subject="Tin học", grade="10"):
         super().__init__()
         self.root_folder = root_folder
         self.prompt_tracnghiem_content = prompt_tracnghiem_content
@@ -160,6 +160,8 @@ class ProcessingThread(QThread):
         self.batch_size = batch_size
         self.max_lessons = max_lessons
         self.resume = resume
+        self.subject = subject
+        self.grade = grade
         self.progress_manager = ProgressManager()
         self.stop_requested = False
     
@@ -183,9 +185,12 @@ class ProcessingThread(QThread):
                 pending_folders = []
                 for bf in bai_folders:
                     bai_name = os.path.basename(bf)
-                    output_folder = os.path.join("output", bai_name)
+                    # Sử dụng cấu trúc thư mục mới
+                    output_folder = os.path.join("output", self.subject, f"Lớp {self.grade}", bai_name)
+                    self.progress.emit(f"🔍 Resume check: {output_folder}")
                     if not self.progress_manager.is_completed(bai_name, output_folder):
                         pending_folders.append(bf)
+                        self.progress.emit(f"⏳ {bai_name} sẽ xử lý")
                     else:
                         self.progress.emit(f"⏭️ Bỏ qua {bai_name} (đã hoàn thành)")
                 bai_folders = pending_folders
@@ -198,6 +203,20 @@ class ProcessingThread(QThread):
                 total_bai = self.max_lessons
             
             self.progress.emit(f"📊 Tổng số bài cần xử lý: {total_bai}")
+            
+            # Kiểm tra và thông báo về file cũ
+            old_output_exists = False
+            for bf in bai_folders:
+                bai_name = os.path.basename(bf)
+                old_output_folder = os.path.join("output", bai_name)
+                if os.path.exists(old_output_folder):
+                    old_output_exists = True
+                    break
+
+            if old_output_exists:
+                self.progress.emit("⚠️ Phát hiện file cũ trong cấu trúc output cũ")
+                self.progress.emit("💡 File mới sẽ được lưu theo cấu trúc: output/[Môn học]/Lớp [X]/[Bài]/")
+                self.progress.emit("🔄 Để sử dụng file cũ, hãy tắt Resume hoặc di chuyển file")
             
             processed_count = 0
             
@@ -230,16 +249,20 @@ class ProcessingThread(QThread):
                     
                     self.progress.emit(f"📄 Tìm thấy {len(pdf_files)} file PDF")
                     
-                    # Tạo output folder
-                    output_folder = os.path.join("output", bai_name)
+                    # Tạo output folder theo cấu trúc môn học/lớp
+                    subject = getattr(self, 'subject', 'Tin học')
+                    grade = getattr(self, 'grade', '10')
+                    output_folder = os.path.join("output", subject, f"Lớp {grade}", bai_name)
                     os.makedirs(output_folder, exist_ok=True)
                     
                     # Kiểm tra đã hoàn thành chưa
+                    self.progress.emit(f"🔍 Kiểm tra: {output_folder}")
                     if self.progress_manager.is_completed(bai_name, output_folder):
                         self.progress.emit(f"✅ {bai_name} đã hoàn thành trước đó")
                         processed_count += 1
                         continue
-                    
+                    else:
+                        self.progress.emit(f"⏳ {bai_name} chưa hoàn thành, sẽ xử lý")
                     # 1. Xử lý trắc nghiệm
                     self.progress.emit(f"📝 Đang sinh 80 câu trắc nghiệm...")
                     self.image_progress.emit(f"[TracNghiem-{bai_name}] Bắt đầu xử lý")
@@ -688,10 +711,14 @@ class MainWindow(QWidget):
         self.reset_button = QPushButton("🔄 Reset")
         self.reset_button.clicked.connect(self.reset_progress)
         
+        self.migrate_button = QPushButton("📁 Di chuyển file cũ")
+        self.migrate_button.clicked.connect(self.migrate_old_files)
+        self.migrate_button.setStyleSheet("background-color: #f39c12;")
+        
         control_layout.addWidget(self.start_button)
         control_layout.addWidget(self.stop_button)
         control_layout.addWidget(self.reset_button)
-        
+        control_layout.addWidget(self.migrate_button)
         # Progress bar
         progress_group = QGroupBox("📊 Tiến trình xử lý")
         progress_layout = QVBoxLayout()
@@ -863,7 +890,8 @@ class MainWindow(QWidget):
             </div>
             
             <h2>📁 Kết quả</h2>
-            <p>File docx được lưu trong: <code>output/[Tên bài]/</code></p>
+            <p>File docx được lưu trong: <code>output/[Môn học]/Lớp [X]/[Tên bài]/</code></p>
+            <p><strong>Ví dụ:</strong> Nếu nhập môn "Khoa học", lớp "11" → <code>output/Khoa học/Lớp 11/Bài 1/</code></p>   
             <ul>
                 <li>[Tên bài]_TracNghiem.docx - 80 câu trắc nghiệm</li>
                 <li>[Tên bài]_DungSai.docx - 40 câu đúng/sai</li>
@@ -1045,7 +1073,10 @@ class MainWindow(QWidget):
         for bai_name in bai_folders:
             bai_path = os.path.join(self.root_folder, bai_name)
             pdf_count = len(glob.glob(os.path.join(bai_path, "*.pdf")))
-            output_folder = os.path.join("output", bai_name)
+            # Tạo đường dẫn output theo cấu trúc mới
+            subject = self.subject_input.text().strip() or "Tin học"
+            grade = self.grade_input.text().strip() or "10"
+            output_folder = os.path.join("output", subject, f"Lớp {grade}", bai_name)
             
             is_completed = self.progress_manager.is_completed(bai_name, output_folder)
             status = "✅" if is_completed else "⏳"
@@ -1130,6 +1161,7 @@ class MainWindow(QWidget):
         self.log_text.append("="*60)
         self.log_text.append(f"📚 Môn học: {subject} - Lớp {grade}")
         self.log_text.append(f"📁 Folder: {self.root_folder}")
+        self.log_text.append(f"📂 Output: output/{subject}/Lớp {grade}/")
         self.log_text.append(f"📦 Số bài xử lý cùng lúc: {self.batch_spinbox.value()}")
         self.log_text.append(f"📊 Giới hạn: {max_lessons if max_lessons else 'Không'}")
         self.log_text.append(f"🔄 Resume: {'Có' if resume else 'Không'}")
@@ -1144,7 +1176,9 @@ class MainWindow(QWidget):
             self.credentials,
             self.batch_spinbox.value(),
             max_lessons,
-            resume
+            resume,
+            subject,
+            grade
         )
         
         self.processing_thread.progress.connect(self.update_log)
@@ -1178,6 +1212,71 @@ class MainWindow(QWidget):
             self.log_text.append("\n🔄 Đã reset toàn bộ tiến trình!")
             self.update_progress_table()
             QMessageBox.information(self, "Thành công", "Đã xóa tiến trình!")
+            
+    def migrate_old_files(self):
+        """Di chuyển file từ cấu trúc cũ sang cấu trúc mới"""
+        if not self.root_folder or not os.path.isdir(self.root_folder):
+            QMessageBox.warning(self, "Lỗi", "Vui lòng chọn folder gốc trước!")
+            return
+
+        subject = self.subject_input.text().strip() or "Tin học"
+        grade = self.grade_input.text().strip() or "10"
+
+        # Tìm file trong cấu trúc cũ
+        old_files = []
+        for bai_name in os.listdir(self.root_folder):
+            bai_path = os.path.join(self.root_folder, bai_name)
+            if os.path.isdir(bai_path):
+                old_output_folder = os.path.join("output", bai_name)
+                if os.path.exists(old_output_folder):
+                    old_files.append((bai_name, old_output_folder))
+
+        if not old_files:
+            QMessageBox.information(self, "Thông báo", "Không tìm thấy file cũ để di chuyển!")
+            return
+
+        reply = QMessageBox.question(
+            self, "Xác nhận",
+            f"Tìm thấy {len(old_files)} bài có file cũ.\n"
+            f"Di chuyển từ: output/[Bài]/ → output/{subject}/Lớp {grade}/[Bài]/\n\n"
+            f"Bạn có muốn tiếp tục?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+
+        if reply == QMessageBox.Yes:
+            migrated_count = 0
+            for bai_name, old_folder in old_files:
+                new_folder = os.path.join("output", subject, f"Lớp {grade}", bai_name)
+
+                try:
+                    # Tạo thư mục mới
+                    os.makedirs(new_folder, exist_ok=True)
+
+                    # Di chuyển file
+                    for file_name in os.listdir(old_folder):
+                        old_file = os.path.join(old_folder, file_name)
+                        new_file = os.path.join(new_folder, file_name)
+
+                        if os.path.isfile(old_file):
+                            import shutil
+                            shutil.move(old_file, new_file)
+
+                    # Xóa thư mục cũ nếu trống
+                    if not os.listdir(old_folder):
+                        os.rmdir(old_folder)
+
+                    migrated_count += 1
+                    self.log_text.append(f"✅ Đã di chuyển {bai_name}")
+
+                except Exception as e:
+                    self.log_text.append(f"❌ Lỗi di chuyển {bai_name}: {str(e)}")
+
+            self.log_text.append(f"\n🎉 Hoàn thành di chuyển {migrated_count}/{len(old_files)} bài!")
+            self.update_progress_table()
+            QMessageBox.information(
+                self, "Thành công", 
+                f"Đã di chuyển {migrated_count} bài từ cấu trúc cũ sang cấu trúc mới!"
+            )
     
     # ==================== UPDATE METHODS ====================
     def update_log(self, message):
@@ -1228,7 +1327,10 @@ class MainWindow(QWidget):
         self.progress_table.setRowCount(len(bai_folders))
         
         for idx, bai_name in enumerate(bai_folders):
-            output_folder = os.path.join("output", bai_name)
+            # Tạo đường dẫn output theo cấu trúc mới
+            subject = self.subject_input.text().strip() or "Tin học"
+            grade = self.grade_input.text().strip() or "10"
+            output_folder = os.path.join("output", subject, f"Lớp {grade}", bai_name)
             is_completed = self.progress_manager.is_completed(bai_name, output_folder)
             
             # Tên bài

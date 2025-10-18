@@ -702,7 +702,7 @@ BẮT ĐẦU SINH:
             print(f"\n   Lần thử {attempt}/{max_attempts}...")
             new_text = client.send_data_to_check(
                 prompt=regenerate_prompt,
-                temperature=0.6 + (attempt * 0.1)
+                temperature=0.65 + (attempt * 0.1)
             )
             
             # Parse và validate từng câu mới sinh
