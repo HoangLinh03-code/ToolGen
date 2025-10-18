@@ -125,6 +125,22 @@ def process_text(text, paragraph, bold=False):
             run = paragraph.add_run(cleaned_part)
             if bold:
                 run.bold = True
+def sanitize_ai_artifacts(raw_text: str) -> str:
+    """Loại bỏ hội thoại/thinking của AI, code fences và tiền tố không mong muốn."""
+    if not raw_text:
+        return raw_text
+    text = raw_text
+    # Remove common chat prefixes
+    text = re.sub(r'(?im)^\s*(assistant|user|system)\s*:\s*', '', text)
+    text = re.sub(r'(?im)^\s*(assistant|bot|ai)\s*(đang|:)?.*$', lambda m: '' if len(m.group(0)) < 60 else m.group(0), text)
+    # Remove code fences
+    text = re.sub(r'```[a-zA-Z0-9_-]*\n?', '', text)
+    text = text.replace('```', '')
+    # Remove obvious chain-of-thought markers
+    text = re.sub(r'(?im)^(thought|reasoning|chain[- ]of[- ]thought|let\'s|sure,|as an ai).*$', '', text)
+    # Collapse excessive blank lines
+    text = re.sub(r'\n{3,}', '\n\n', text)
+    return text.strip()
 
 def process_bold_text(text, paragraph):
     current_text = text
@@ -248,7 +264,7 @@ class QuestionBuffer:
         return len(self.answers) >= 4
     
     def has_explanation(self):
-        return len(self.explanation_lines) >= 3
+        return len(self.explanation_lines) >= 1
     
     def is_complete(self):
         return (
@@ -276,7 +292,7 @@ class QuestionBuffer:
                 break
         self.answers = unique_answers
 
-    def flush_to_doc(self, doc, image_tracker=None, skipped_log=None, written_log=None):
+    def flush_to_doc(self, doc, image_tracker=None, skipped_log=None, written_log=None, question_type="tracnghiem"):
         """
         Ghi câu hỏi vào document
         
@@ -363,8 +379,14 @@ class QuestionBuffer:
         run = separator_para.add_run("####")
         run.bold = True
         
-        # 9. Thêm giải thích (đảm bảo ít nhất 3 dòng)
-        for line in self.explanation_lines[:max(3, len(self.explanation_lines))]:
+        # 9. Thêm giải thích
+        # - Trắc nghiệm: giới hạn 3-5 dòng, chỉ giải thích đáp án đúng
+        # - Đúng/sai: KHÔNG cắt cụt để tránh mất phần giải thích của mục d)
+        if question_type == "dungsai":
+            explanation_to_write = self.explanation_lines
+        else:
+            explanation_to_write = self.explanation_lines[:max(1, min(5, len(self.explanation_lines)))]
+        for line in explanation_to_write:
             if line.strip():
                 para = doc.add_paragraph()
                 if "**" in line:
@@ -525,7 +547,7 @@ def response2docx_improved(file_paths, prompt, output_filename, project_id,
             print(f"\n{'─'*70}\n")
             
             # Sinh tối đa 15 câu/lần để tránh quá tải
-            batch_size = min(15, len(missing_nums))
+            batch_size = min(10, len(missing_nums))
             batch_nums = missing_nums[:batch_size]
             
             print(f"\n📤 Yêu cầu AI sinh {len(batch_nums)} câu...")
@@ -537,7 +559,7 @@ def response2docx_improved(file_paths, prompt, output_filename, project_id,
                 storage,
                 client,
                 question_type,
-                max_attempts=5
+                max_attempts=7
             )
             
             if not new_text:
@@ -585,6 +607,8 @@ def response2docx_improved(file_paths, prompt, output_filename, project_id,
         
         # Ghép lại text từ storage
         final_text = storage.reconstruct_full_text()
+        # Làm sạch hội thoại AI trước khi xử lý
+        final_text = sanitize_ai_artifacts(final_text)
         lines = final_text.split("\n")
         
         question_count_in_doc = 0  # Số câu hợp lệ trong document
@@ -604,7 +628,7 @@ def response2docx_improved(file_paths, prompt, output_filename, project_id,
             # ========== HEADING ==========
             if is_heading(line):
                 if buffer.question_num > 0:
-                    if buffer.flush_to_doc(doc, image_tracker, skipped_log=skipped_or_failed_nums, written_log=written_nums):
+                    if buffer.flush_to_doc(doc, image_tracker, skipped_log=skipped_or_failed_nums, written_log=written_nums, question_type=question_type):
                         question_count_in_doc += 1  # CHỈ TĂNG NẾU GHI THÀNH CÔNG
                     buffer.reset()
                 
@@ -624,7 +648,7 @@ def response2docx_improved(file_paths, prompt, output_filename, project_id,
             # ========== QUESTION TITLE ==========
             if is_question_title(line):
                 if buffer.question_num > 0:
-                    if buffer.flush_to_doc(doc, image_tracker, skipped_log=skipped_or_failed_nums, written_log=written_nums):
+                    if buffer.flush_to_doc(doc, image_tracker, skipped_log=skipped_or_failed_nums, written_log=written_nums, question_type=question_type):
                         question_count_in_doc += 1  # CHỈ TĂNG NẾU GHI THÀNH CÔNG
                     doc.add_paragraph()
                     buffer.reset()
@@ -712,7 +736,7 @@ def response2docx_improved(file_paths, prompt, output_filename, project_id,
         
         # Flush buffer cuối
         if buffer.question_num > 0:
-            if buffer.flush_to_doc(doc, image_tracker, skipped_log=skipped_or_failed_nums, written_log=written_nums):
+            if buffer.flush_to_doc(doc, image_tracker, skipped_log=skipped_or_failed_nums, written_log=written_nums, question_type=question_type):
                 question_count_in_doc += 1  # CHỈ TĂNG NẾU GHI THÀNH CÔNG
         
         # Tính missing dựa trên những câu THỰC SỰ đã ghi vào docx
@@ -743,7 +767,7 @@ def response2docx_improved(file_paths, prompt, output_filename, project_id,
         if question_count_in_doc < required_count:
             missing_count = required_count - question_count_in_doc
             print(f"\n ⚠️  CÒN THIẾU: {missing_count} câu\n")
-            print(f"💡 Các câu thiếu: {storage.get_missing_nums(required_count)}\n")
+            print(f"💡 Các câu thiếu: {skipped_or_failed_nums}\n")
         
         print(f"\n📊 THỐNG KÊ ẢNH:")
         print(image_tracker.get_summary())

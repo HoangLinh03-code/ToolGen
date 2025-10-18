@@ -88,14 +88,23 @@ TUYỆT ĐỐI KHÔNG được sử dụng các cụm từ:
 
 ## 📊 PHÂN BỐ NỘI DUNG VÀ MỨC ĐỘ NHẬN THỨC
 
-### 🎯 Tổng quan phân bố (80 câu)
+### 🎯 Tổng quan phân bố (80 câu) - TUYỆT ĐỐI PHẢI TUÂN THEO
 
 | Mức độ | Số câu | Tỷ lệ | Đặc điểm |
 |--------|--------|-------|----------|
-| **Nhận biết** | 24 câu | 30% | Câu hỏi ngắn gọn (10-15 từ), kiểm tra khả năng nhớ và nhận diện |
-| **Thông hiểu** | 24 câu | 30% | Kiểm tra khả năng giải thích, so sánh, phân loại |
-| **Vận dụng** | 24 câu | 30% | Kiểm tra khả năng áp dụng kiến thức vào tình huống thực tế |
-| **Vận dụng cao** | 8 câu | 10% | Câu hỏi phức tạp, đòi hỏi tư duy phản biện và sáng tạo |
+| **Nhận biết** | Câu 1-24 | 30% | Câu hỏi ngắn gọn (10-15 từ), kiểm tra khả năng nhớ và nhận diện |
+| **Thông hiểu** | Câu 25-48| 30% | Kiểm tra khả năng giải thích, so sánh, phân loại |
+| **Vận dụng** | Câu 49-72| 30% | Kiểm tra khả năng áp dụng kiến thức vào tình huống thực tế |
+| **Vận dụng cao** | Câu 73-80 | 10% | Câu hỏi phức tạp, đòi hỏi tư duy phản biện và sáng tạo |
+
+### ⚠️ QUY TẮC VÀNG VỀ THỨ TỰ CÂU HỎI
+**TUYỆT ĐỐI KHÔNG ĐƯỢC VI PHẠM:**
+- Câu 1-24: PHẢI là mức độ Nhận biết
+- Câu 25-48: PHẢI là mức độ Thông hiểu  
+- Câu 49-72: PHẢI là mức độ Vận dụng
+- Câu 73-80: PHẢI là mức độ Vận dụng cao
+
+**Khi sinh câu hỏi, bạn PHẢI xác định rõ câu đó thuộc mức độ nào dựa trên số thứ tự và sinh theo đúng đặc điểm của mức độ đó!**
 
 ### 📚 Phân bố nội dung
 - **Nguyên tắc:** Chia đều câu hỏi cho các phần/chương chính trong PDF
@@ -104,22 +113,22 @@ TUYỆT ĐỐI KHÔNG được sử dụng các cụm từ:
 
 ### 🎯 Hướng dẫn tạo câu hỏi theo mức độ
 
-#### 🔍 Nhận biết (24 câu)
+#### 🔍 Nhận biết (24 câu đầu)
 - **Mục tiêu:** Kiểm tra khả năng nhớ và nhận diện
 - **Đặc điểm:** Câu hỏi ngắn gọn, trực tiếp
 - **Ví dụ:** "Thành phần nào của máy tính có chức năng xử lý dữ liệu?"
 
-#### 💡 Thông hiểu (24 câu)  
+#### 💡 Thông hiểu (24 câu tiếp theo)  
 - **Mục tiêu:** Kiểm tra khả năng giải thích và so sánh
 - **Đặc điểm:** Yêu cầu hiểu bản chất, mối quan hệ
 - **Ví dụ:** "Tại sao RAM có tốc độ truy cập nhanh hơn ổ cứng?"
 
-#### ⚙️ Vận dụng (24 câu)
+#### ⚙️ Vận dụng (24 câu tiếp theo)
 - **Mục tiêu:** Áp dụng kiến thức vào tình huống thực tế
 - **Đặc điểm:** Có tình huống cụ thể, yêu cầu giải quyết vấn đề
 - **Ví dụ:** "Trong tình huống máy tính chạy chậm, bạn sẽ kiểm tra thành phần nào trước?"
 
-#### 🚀 Vận dụng cao (8 câu)
+#### 🚀 Vận dụng cao (8 câu cuối cùng)
 - **Mục tiêu:** Tư duy phản biện, sáng tạo, phân tích phức tạp
 - **Đặc điểm:** Câu hỏi đa tầng, yêu cầu tổng hợp nhiều kiến thức
 - **Ví dụ:** "Phân tích ưu nhược điểm của việc sử dụng SSD thay thế HDD trong hệ thống máy tính văn phòng."
@@ -183,10 +192,10 @@ Lấy từ trang 15 của file PDF]
 
 ### 🎯 Mục tiêu của lời giải
 Giải thích phải làm rõ:
-- **Tại sao đáp án đúng là chính xác:** Cung cấp lý do khoa học cụ thể
-- **Tại sao các đáp án sai không chính xác:** Phân tích từng đáp án sai
+- **Tại sao đáp án đúng là chính xác:** Cung cấp lý do khoa học cụ thể, chi tiết và thuyết phục
 - **Dựa trên kiến thức từ PDF:** Mọi giải thích phải có nguồn gốc từ PDF
 - **Tính thuyết phục:** Lời giải phải có tính logic và dễ hiểu
+- **CHỈ GIẢI THÍCH ĐÁP ÁN ĐÚNG:** Không cần giải thích tại sao các đáp án sai
 
 ### 🚫 QUAN TRỌNG - CẤM TUYỆT ĐỐI
 Trong phần giải thích, **TUYỆT ĐỐI KHÔNG** được đề cập đến các ký tự của đáp án (A, B, C, D).
@@ -196,14 +205,12 @@ Trong phần giải thích, **TUYỆT ĐỐI KHÔNG** được đề cập đế
 ### 📝 Cấu trúc lời giải chuẩn
 1. **Mã đáp án:** Số thứ tự (1/2/3/4)
 2. **Dòng phân cách:** `####`
-3. **Giải thích đáp án đúng:** Tại sao đúng, với ví dụ cụ thể
-4. **Giải thích các đáp án sai:** Tại sao sai, với lý do rõ ràng
-5. **Kết luận:** Tóm tắt ngắn gọn
+3. **Giải thích đáp án đúng:** Tại sao đúng, với ví dụ cụ thể và lý do khoa học chi tiết
 
 ### 🎯 Nguyên tắc viết lời giải
 - **Không dùng ký tự:** Không nhắc đến A, B, C, D trong giải thích
-- **Dùng nội dung:** Diễn giải bằng nội dung của từng đáp án
-- **Chi tiết đủ:** Mỗi đáp án có giải thích ít nhất 2-3 dòng
+- **Chỉ giải thích đáp án đúng:** Tập trung vào lý do tại sao đáp án đúng là chính xác
+- **Chi tiết đủ:** Giải thích đáp án đúng **TỐI THIỂU** 3 dòng, đầy đủ và thuyết phục
 - **Dễ hiểu:** Ngôn ngữ trong sáng, phù hợp học sinh
 - **Chính xác:** Mọi thông tin phải được kiểm chứng từ PDF
 
@@ -233,22 +240,18 @@ Giải thích: Đáp án B đúng vì cầu chì ngắt mạch khi quá tải.
 ```
 2 
 ####
-Vai trò chính của cầu chì là bảo vệ mạch điện. Khi dòng điện tăng lên quá mức an toàn do quá tải hoặc ngắn mạch, dây chì sẽ nóng chảy và tự động ngắt mạch điện để bảo vệ các thiết bị. Do đó, nhận định cầu chì có chức năng tự động ngắt mạch khi có sự cố quá tải là chính xác.
-
-- Việc ổn định điện áp là chức năng của thiết bị ổn áp, không phải của cầu chì. Ổn áp hoạt động bằng cách điều chỉnh điện áp đầu vào để đảm bảo điện áp đầu ra ổn định trong một phạm vi nhất định.
-
-- Chức năng đo lường lượng điện năng tiêu thụ thuộc về công tơ điện. Công tơ điện sử dụng các cảm biến để đo dòng điện và điện áp, sau đó tính toán lượng điện năng tiêu thụ theo thời gian.
-
-- Cầu chì không tăng cường độ dòng điện, mà ngược lại, nó sẽ ngắt mạch nếu dòng điện tăng quá cao. Đây là cơ chế bảo vệ để tránh hư hỏng thiết bị và nguy hiểm cho người sử dụng.
+Vai trò chính của cầu chì là bảo vệ mạch điện khỏi các sự cố quá tải và ngắn mạch. Khi dòng điện tăng lên quá mức an toàn, dây chì bên trong cầu chì sẽ nóng chảy do hiệu ứng nhiệt của dòng điện cao. Quá trình này diễn ra rất nhanh, thường trong vài mili giây, giúp ngắt mạch điện ngay lập tức trước khi các thiết bị khác bị hư hỏng. 
+Cầu chì hoạt động dựa trên nguyên lý bảo vệ nhiệt: khi dòng điện vượt quá giá trị định mức, nhiệt lượng sinh ra sẽ làm nóng chảy dây chì có tiết diện nhỏ, tạo ra khe hở trong mạch và ngắt dòng điện. Đây là cơ chế bảo vệ thụ động, đơn giản nhưng rất hiệu quả trong việc bảo vệ hệ thống điện.
+Việc tự động ngắt mạch khi có sự cố quá tải là đặc điểm cốt lõi của cầu chì, giúp ngăn chặn hư hỏng thiết bị và đảm bảo an toàn cho người sử dụng. Do đó, nhận định cầu chì có chức năng tự động ngắt mạch khi có sự cố quá tải là hoàn toàn chính xác.
 ```
 
 ### 🎯 Điểm khác biệt quan trọng
 - **SAI:** Dùng ký tự A, B, C, D trong giải thích
-- **ĐÚNG:** Diễn giải bằng nội dung của từng đáp án
+- **ĐÚNG:** Diễn giải bằng nội dung của đáp án đúng
 - **SAI:** Giải thích ngắn gọn, thiếu chi tiết
-- **ĐÚNG:** Giải thích chi tiết, có ví dụ cụ thể
-- **SAI:** Không giải thích tại sao các đáp án sai
-- **ĐÚNG:** Phân tích rõ ràng từng đáp án sai
+- **ĐÚNG:** Giải thích chi tiết, có ví dụ cụ thể và lý do khoa học
+- **SAI:** Giải thích tất cả các đáp án (đúng và sai)
+- **ĐÚNG:** CHỈ giải thích đáp án đúng, tập trung vào lý do tại sao nó chính xác
 
 ## 📋 CẤU TRÚC ĐẦU RA CUỐI CÙNG (BẮT BUỘC TUÂN THEO)
 
@@ -273,11 +276,10 @@ A. [Nội dung đáp án 1]
 B. [Nội dung đáp án 2] 
 C. [Nội dung đáp án 3]
 D. [Nội dung đáp án 4]
-
 **Lời giải:**
 [X] 
 ####
-[Hướng dẫn giải chi tiết theo cách viết ĐÚNG đã được ví dụ ở trên]
+[Giải thích chi tiết tại sao đáp án đúng là chính xác, với lý do khoa học cụ thể và ví dụ minh họa]
 
 **Câu 2:**
 [Nội dung câu hỏi tiếp theo...]
@@ -287,7 +289,7 @@ D. [Nội dung đáp án 4]
 
 ### 🔍 Checklist kiểm tra cuối cùng
 - [ ] Đủ 80 câu hỏi
-- [ ] Phân bố đúng: 24 Nhận biết, 24 Thông hiểu, 24 Vận dụng, 8 Vận dụng cao
+- [ ] Phân bố đúng: 24 câu Nhận biết đầu, 24 câu Thông hiểu tiếp theo, 24 câu Vận dụng tiếp theo, 8 câu Vận dụng cao cuối
 - [ ] Ít nhất 24 câu có hình ảnh
 - [ ] Mỗi câu có đầy đủ: tiêu đề, nội dung, đáp án A-D, lời giải, mã đáp án, ####, giải thích
 - [ ] Không có từ ngữ cấm trong câu hỏi và lời giải

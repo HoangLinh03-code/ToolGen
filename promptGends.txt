@@ -122,29 +122,37 @@ Việc sử dụng xe đạp làm phương tiện đi lại giúp tăng cường
 - Tuyệt đối không sử dụng các cụm từ: "theo định nghĩa trong giáo trình", "dựa vào nội dung trong sách", "theo bảng trên", "như hình vẽ", "câu hỏi trước" hoặc các cụm tương đương trong đề và lời giải.
 - Trong phần giải thích KHÔNG được nhắc ký hiệu a), b), c), d) — chỉ nêu nguyên văn nội dung phát biểu trong ngoặc vuông rồi nói "là ĐÚNG" hoặc "là SAI", rồi giải thích.
 
-## 📊 PHÂN BỐ MỨC ĐỘ NHẬN THỨC (TỔNG 40 CÂU)
+## 📊 PHÂN BỐ MỨC ĐỘ NHẬN THỨC (TỔNG 40 CÂU) - TUYỆT ĐỐI PHẢI TUÂN THEO
 
 ### 🎯 Tổng quan phân bố
 
 | Mức độ | Số câu | Tỷ lệ | Đặc điểm |
 |--------|--------|-------|----------|
-| **Thông hiểu** | 20 câu | 50% | Kiểm tra khả năng giải thích, so sánh, phân loại |
-| **Vận dụng** | 12 câu | 30% | Kiểm tra khả năng áp dụng kiến thức vào tình huống thực tế |
-| **Vận dụng cao** | 8 câu | 20% | Câu hỏi phức tạp, đòi hỏi tư duy phản biện và sáng tạo |
+| **Thông hiểu** | Câu 1-20 | 50% | Kiểm tra khả năng giải thích, so sánh, phân loại |
+| **Vận dụng** | Câu 21-32 | 30% | Kiểm tra khả năng áp dụng kiến thức vào tình huống thực tế |
+| **Vận dụng cao** | Câu 33-40 | 20% | Câu hỏi phức tạp, đòi hỏi tư duy phản biện và sáng tạo |
+
+### ⚠️ QUY TẮC VÀNG VỀ THỨ TỰ CÂU HỎI
+**TUYỆT ĐỐI KHÔNG ĐƯỢC VI PHẠM:**
+- Câu 1-20: PHẢI là mức độ Thông hiểu
+- Câu 21-32: PHẢI là mức độ Vận dụng
+- Câu 33-40: PHẢI là mức độ Vận dụng cao
+
+**Khi sinh câu hỏi, bạn PHẢI xác định rõ câu đó thuộc mức độ nào dựa trên số thứ tự và sinh theo đúng đặc điểm của mức độ đó!**
 
 ### 🎯 Hướng dẫn tạo câu hỏi theo mức độ
 
-#### 💡 Thông hiểu (20 câu - 50%)
+#### 💡 Thông hiểu (20 câu đầu - 50%)
 - **Mục tiêu:** Kiểm tra khả năng giải thích và so sánh
 - **Đặc điểm:** Yêu cầu hiểu bản chất, mối quan hệ
 - **Ví dụ:** "Tại sao RAM có tốc độ truy cập nhanh hơn ổ cứng?"
 
-#### ⚙️ Vận dụng (12 câu - 30%)
+#### ⚙️ Vận dụng (12 câu tiếp theo - 30%)
 - **Mục tiêu:** Áp dụng kiến thức vào tình huống thực tế
 - **Đặc điểm:** Có tình huống cụ thể, yêu cầu giải quyết vấn đề
 - **Ví dụ:** "Trong tình huống máy tính chạy chậm, bạn sẽ kiểm tra thành phần nào trước?"
 
-#### 🚀 Vận dụng cao (8 câu - 20%)
+#### 🚀 Vận dụng cao (8 câu cuối - 20%)
 - **Mục tiêu:** Tư duy phản biện, sáng tạo, phân tích phức tạp
 - **Đặc điểm:** Câu hỏi đa tầng, yêu cầu tổng hợp nhiều kiến thức
 - **Ví dụ:** "Phân tích ưu nhược điểm của việc sử dụng SSD thay thế HDD trong hệ thống máy tính văn phòng."  
@@ -172,10 +180,11 @@ Mô tả phải bao gồm:
 ## 📚 HƯỚNG DẪN CHI TIẾT VỀ LỜI GIẢI
 
 ### 🎯 Yêu cầu về giải thích
-- **Mỗi đáp án:** Phải có giải thích chi tiết **ít nhất 3 dòng**
-- **Nội dung:** Giải thích phải làm rõ vì sao đáp án đó ĐÚNG hoặc SAI
+- **Mỗi phát biểu:** Phải có giải thích chi tiết **ít nhất 3 dòng** cho từng phát biểu a), b), c), d)
+- **Nội dung:** Giải thích phải làm rõ vì sao từng phát biểu đó ĐÚNG hoặc SAI
 - **Ví dụ:** Đưa ví dụ minh họa khi cần thiết
 - **Chất lượng:** Lời giải phải thuyết phục, chính xác về mặt kỹ thuật
+- **LƯU Ý:** Khác với câu hỏi trắc nghiệm, câu hỏi đúng/sai cần giải thích TẤT CẢ các phát biểu
 
 ### 🚫 QUAN TRỌNG - CẤM TUYỆT ĐỐI
 Khi viết lời giải, **KHÔNG** dùng chữ cái để tham chiếu (a), b), c), d))
@@ -208,7 +217,6 @@ a) Phát biểu kiểm tra ý thứ nhất.
 b) Phát biểu kiểm tra ý thứ hai.  
 c) Phát biểu kiểm tra ý thứ ba.  
 d) Phát biểu kiểm tra ý thứ tư.
-
 **Lời giải:**  
 1010  
 ####  

@@ -25,6 +25,13 @@ from process.response2docx import response2docx_improved
 
 load_dotenv()
 
+if getattr(sys, 'frozen', False):
+    base_path = sys._MEIPASS
+else:
+    base_path = os.path.dirname(__file__)
+ 
+dotenv_path = os.path.join(base_path, '.env')
+load_dotenv(dotenv_path)
 
 # ==================== CONSOLE REDIRECT ====================
 class ConsoleRedirect(QObject):
@@ -368,7 +375,7 @@ class MainWindow(QWidget):
             os.path.dirname(__file__), "prompt_Gen.txt"
         )
         self.default_prompt_dungsai = os.path.join(
-            os.path.dirname(__file__), "promptDSCongNghe10.txt"
+            os.path.dirname(__file__), "promptGends.txt"
         )
         
         self.setup_style()
@@ -641,7 +648,7 @@ class MainWindow(QWidget):
         process_layout = QVBoxLayout()
         
         batch_layout = QHBoxLayout()
-        batch_layout.addWidget(QLabel("Batch size:"))
+        batch_layout.addWidget(QLabel("Số bài xử lý cùng lúc:"))
         self.batch_spinbox = QSpinBox()
         self.batch_spinbox.setRange(1, 5)
         self.batch_spinbox.setValue(2)
@@ -1123,7 +1130,7 @@ class MainWindow(QWidget):
         self.log_text.append("="*60)
         self.log_text.append(f"📚 Môn học: {subject} - Lớp {grade}")
         self.log_text.append(f"📁 Folder: {self.root_folder}")
-        self.log_text.append(f"📦 Batch size: {self.batch_spinbox.value()}")
+        self.log_text.append(f"📦 Số bài xử lý cùng lúc: {self.batch_spinbox.value()}")
         self.log_text.append(f"📊 Giới hạn: {max_lessons if max_lessons else 'Không'}")
         self.log_text.append(f"🔄 Resume: {'Có' if resume else 'Không'}")
         self.log_text.append("="*60 + "\n")
