@@ -118,7 +118,7 @@ Liệt kê các khái niệm, thuật ngữ, định nghĩa quan trọng
                 content = self.client.send_data_to_AI(
                     prompt=scan_prompt,
                     file_paths=[pdf_path],
-                    temperature=0.3
+                    temperature=0.4
                 )
                 
                 content_summaries[pdf_type] = content
