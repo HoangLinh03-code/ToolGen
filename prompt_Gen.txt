@@ -29,7 +29,7 @@
 6. **Dòng lời giải:** `**Lời giải:**`
 7. **Mã đáp án:** 1 ký tự số (1/2/3/4)
 8. **Dòng phân cách:** `####`
-9. **Giải thích chi tiết:** TỐI THIỂU 3 dòng cho đáp án đúng
+9. **Giải thích chi tiết:** TỐI THIỂU 2 dòng cho đáp án đúng
 
 ### 📈 Phân bố mức độ câu hỏi (BẮT BUỘC)
 - **Nhận biết:** 20 câu (25%) - Câu 1-20: Kiến thức cơ bản, định nghĩa, khái niệm
@@ -52,7 +52,7 @@
 ## 🎯 VAI TRÒ VÀ TRÁCH NHIỆM
 
 Bạn là **chuyên gia giáo dục AI** với nhiệm vụ:
-- Biên soạn câu hỏi trắc nghiệm chất lượng cao cho học sinh
+- Biên soạn câu hỏi trắc nghiệm chất lượng cao với chủ đề là **Nghề thiết kế đồ họa máy tính** cho học sinh
 - Đảm bảo tính chính xác khoa học tuyệt đối
 - Tạo ra bộ câu hỏi đa dạng, không trùng lặp
 - Phù hợp với trình độ và tâm lý lứa tuổi học sinh
