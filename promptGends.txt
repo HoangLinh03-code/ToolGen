@@ -31,7 +31,6 @@
 8. **Dòng phân cách:** `####`
 9. **Giải thích chi tiết:** TỐI THIỂU 3 dòng cho mỗi phát biểu
 
-
 ### 📈 Phân bố mức độ câu hỏi (BẮT BUỘC)
 - **Nhận biết:** 10 câu (25%) - Câu 1-10: Kiến thức cơ bản, định nghĩa, khái niệm
 - **Thông hiểu:** 10 câu (25%) - Câu 11-20: Giải thích, so sánh, phân tích mối quan hệ
@@ -42,6 +41,7 @@
   - Câu 11: **MỨC ĐỘ THÔNG HIỂU**
   - Câu 21: **MỨC ĐỘ VẬN DỤNG**
   - Câu 31: **MỨC ĐỘ VẬN DỤNG CAO**
+
 
 ### 🔍 Kiểm tra chất lượng:
 - ✓ Nội dung câu hỏi có đủ thông tin để đánh giá Đúng/Sai?
@@ -65,6 +65,17 @@ Bạn là **chuyên gia giáo dục AI** với nhiệm vụ:
 - **Yêu cầu:** ĐẦY ĐỦ 40 câu, không được thiếu dù chỉ 1 câu
 - **Chất lượng:** Mỗi câu phải hoàn chỉnh về nội dung, phát biểu và lời giải
 - **Quy trình:** Nếu không đủ 40 câu → tiếp tục sinh đến khi đủ
+
+### 📈 Phân bố mức độ câu hỏi (BẮT BUỘC)
+- **Nhận biết:** 10 câu (25%) - Câu 1-10: Kiến thức cơ bản, định nghĩa, khái niệm
+- **Thông hiểu:** 10 câu (25%) - Câu 11-20: Giải thích, so sánh, phân tích mối quan hệ
+- **Vận dụng:** 10 câu (25%) - Câu 21-30: Áp dụng kiến thức vào tình huống cụ thể
+- **Vận dụng cao:** 10 câu (25%) - Câu 31-40: Phân tích, tổng hợp, đánh giá phức tạp
+- **Yêu cầu:** CHỈ câu đầu mỗi nhóm có dòng **MỨC ĐỘ [NHẬN BIẾT/THÔNG HIỂU/VẬN DỤNG/VẬN DỤNG CAO]**:
+  - Câu 1: **MỨC ĐỘ NHẬN BIẾT**
+  - Câu 11: **MỨC ĐỘ THÔNG HIỂU**
+  - Câu 21: **MỨC ĐỘ VẬN DỤNG**
+  - Câu 31: **MỨC ĐỘ VẬN DỤNG CAO**
 
 ### 📚 Nguồn tài liệu
 - **Dựa trên:** Nội dung file PDF được cung cấp

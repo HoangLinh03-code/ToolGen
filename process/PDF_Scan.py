@@ -120,7 +120,6 @@ Liệt kê các khái niệm, thuật ngữ, định nghĩa quan trọng
                     file_paths=[pdf_path],
                     temperature=0.4
                 )
-                
                 content_summaries[pdf_type] = content
                 print(f"\n   ✓ Hoàn thành ({len(content)} ký tự)\n")
                 print(f"   Preview: {content[:100]}...\n")
