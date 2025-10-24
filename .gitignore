@@ -9,3 +9,4 @@ __pycache__/
 *.json
 venv/
 output/
+processing_progress.json

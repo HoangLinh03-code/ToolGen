@@ -118,10 +118,8 @@ Liệt kê các khái niệm, thuật ngữ, định nghĩa quan trọng
                 content = self.client.send_data_to_AI(
                     prompt=scan_prompt,
                     file_paths=[pdf_path],
-
-                    temperature=0.45
-
-                
+                    temperature=0.4
+                )
                 content_summaries[pdf_type] = content
                 print(f"\n   ✓ Hoàn thành ({len(content)} ký tự)\n")
                 print(f"   Preview: {content[:100]}...\n")
@@ -315,7 +313,7 @@ class MissingQuestionFixer:
             "## YÊU CẦU TUYỆT ĐỐI",
             "1. **Không trùng lặp:** Nội dung phải HOÀN TOÀN KHÁC với các câu đã có",
             "2. **Đúng số thứ tự:** Mỗi câu phải có đúng số thứ tự trong danh sách trên",
-            "3. **Đầy đủ format:** Mỗi câu phải có: tiêu đề, nội dung, đáp án, lời giải, giải thích (ít nhất 3 dòng)",
+            "3. **Đầy đủ format:** Mỗi câu phải có: tiêu đề, nội dung, đáp án, lời giải, giải thích (ít nhất 2 dòng)",
             "4. **Không thêm gì khác:** Chỉ trả về nội dung câu hỏi, không lời mở đầu/kết",
             "",
             "## MỘT SỐ CÂU ĐÃ CÓ (ĐỂ TRÁNH TRÙNG LẶP)",

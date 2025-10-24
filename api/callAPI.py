@@ -54,7 +54,7 @@ class VertexClient:
             print(f"Traceback: {traceback.format_exc()}")
             return f"Lỗi xử lý response: {str(e)}"
 
-    def send_data_to_AI(self, prompt, file_paths=None, temperature=0.55, top_p=0.8):
+    def send_data_to_AI(self, prompt, file_paths=None, temperature=0.5, top_p=0.8):
         parts = []
         
         if file_paths:
@@ -81,7 +81,7 @@ class VertexClient:
         
         return self._safe_extract_text(response)
         
-    def send_data_to_check(self, prompt, temperature=0.55, top_p=0.8):
+    def send_data_to_check(self, prompt, temperature=0.5, top_p=0.8):
         parts = []
         # ThÃªm prompt dáº¡ng text
         parts.append(Part.from_text(prompt))
