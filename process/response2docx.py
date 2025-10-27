@@ -160,39 +160,109 @@ def process_bold_text(text, paragraph):
     if current_text:
         process_text(current_text, paragraph)
 
-
-def handle_image_generation(description, doc,attempt_generate=True):
-    """Xử lý sinh ảnh với kích thước và căn giữa"""
-    # Nếu không thử sinh ảnh, trả về placeholder luôn
+import os
+MAX_RETRIES = int(os.getenv("MAX_IMAGE_RETRIES", "5"))
+def handle_image_generation(description, doc, attempt_generate=True, tracker=None):
+    """
+    Xử lý sinh ảnh với tracking chi tiết và debug
+    
+    Args:
+        description: Mô tả ảnh
+        doc: Document object
+        attempt_generate: Có thử sinh ảnh không
+        tracker: ImageGenerationTracker object
+        
+    Returns:
+        (success, paragraph, is_placeholder)
+    """
+    from io import BytesIO
+    from docx.shared import Inches, Pt, RGBColor
+    from docx.enum.text import WD_ALIGN_PARAGRAPH
+    import time
+    
+    print(f"\n{'─'*70}")
+    print(f"🖼️  HANDLE IMAGE GENERATION")
+    print(f"{'─'*70}")
+    print(f"📝 Description: {description[:80]}...")
+    print(f"🎯 Attempt generate: {attempt_generate}")
+    
     img_paragraph = doc.add_paragraph()
     img_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+    
+    # Nếu không thử sinh ảnh, trả về placeholder luôn
     if not attempt_generate:
+        print(f"⏭️  Skipping generation (attempt_generate=False)")
         run = img_paragraph.add_run(f"[HÌNH ẢNH MINH HỌA: {description}]")
         run.font.color.rgb = RGBColor(128, 128, 128)
         run.italic = True
-        print(f"     → Thêm placeholder (không sinh ảnh)")
+        
+        if tracker:
+            tracker.record_placeholder()
+        
+        print(f"✅ Added placeholder")
+        print(f"{'─'*70}\n")
         return False, img_paragraph, True
     
-    # Thử sinh ảnh
+    # Thử sinh ảnh THẬT
+    print(f"🎨 Attempting to generate image...")
+    
     try:
-        print(f"   → Đang sinh ảnh: {description[:50]}...")
-        image_bytes = generate_image_from_text(description)
+        start_time = time.time()
+        
+        # GỌI HÀM SINH ẢNH
+        image_bytes = generate_image_from_text(description, max_retries=MAX_RETRIES)
+        
+        generation_time = time.time() - start_time
+        print(f"⏱️  Generation took {generation_time:.2f}s")
+        
+        # KIỂM TRA KẾT QUẢ
+        if image_bytes is None or len(image_bytes) == 0:
+            print(f"❌ Generation returned None or empty bytes")
+            print(f"   → Adding placeholder instead")
+            
+            run = img_paragraph.add_run(f"[HÌNH ẢNH MINH HỌA: {description}]")
+            run.font.color.rgb = RGBColor(255, 140, 0)  # Màu cam
+            run.italic = True
+            run.bold = True
+            
+            if tracker:
+                tracker.record_failed()
+                tracker.record_placeholder()
+            
+            print(f"{'─'*70}\n")
+            return False, img_paragraph, True
+        
+        # THÀNH CÔNG - THÊM ẢNH VÀO DOCUMENT
+        print(f"✅ Got image bytes: {len(image_bytes)} bytes")
+        print(f"📄 Adding to document...")
         
         run = img_paragraph.add_run()
         run.add_picture(BytesIO(image_bytes), width=Inches(3.5))
         
-        print("     ✓ Đã sinh ảnh thành công")
+        print(f"✅ Image added to document successfully")
+        
+        if tracker:
+            tracker.record_success(generation_time)
+        
+        print(f"{'─'*70}\n")
         return True, img_paragraph, False
     
     except Exception as e:
-        # Nếu sinh ảnh thất bại, thêm placeholder
-        print(f"     ✗ Không thể sinh ảnh: {e}")
-        print(f"     → Thêm placeholder thay thế")
+        print(f"❌ EXCEPTION during image generation:")
+        print(f"   Type: {type(e).__name__}")
+        print(f"   Message: {str(e)}")
+        print(f"   → Adding placeholder")
         
         run = img_paragraph.add_run(f"[HÌNH ẢNH MINH HỌA: {description}]")
-        run.font.color.rgb = RGBColor(128, 128, 128)
+        run.font.color.rgb = RGBColor(255, 0, 0)  # Màu đỏ
         run.italic = True
+        run.bold = True
         
+        if tracker:
+            tracker.record_failed()
+            tracker.record_placeholder()
+        
+        print(f"{'─'*70}\n")
         return False, img_paragraph, True
 
 # ============ DETECTION FUNCTIONS ============
@@ -299,8 +369,7 @@ class QuestionBuffer:
         Returns:
             bool - True nếu ghi thành công, False nếu câu không hợp lệ
         """
-        # VALIDATION NGHIÊM NGẶT
-        # Dedupe đáp án trước khi validate/ghi
+        # VALIDATION
         if self.answers:
             self._dedupe_answers()
 
@@ -322,13 +391,18 @@ class QuestionBuffer:
             print(f"\n   ❌ Câu {self.question_num} THIẾU: {', '.join(missing)} → KHÔNG GHI VÀO DOC\n")
             if skipped_log is not None and self.question_num:
                 skipped_log.append(self.question_num)
-            return False  # QUAN TRỌNG: Return False
+            return False
+        
+        print(f"\n{'='*70}")
+        print(f"📝 FLUSHING QUESTION {self.question_num} TO DOCUMENT")
+        print(f"{'='*70}")
         
         # 1. Thêm tiêu đề
         title_para = doc.add_paragraph()
         run = title_para.add_run(self.title)
         run.bold = True
         run.font.size = Pt(12)
+        print(f"✅ Added title")
         
         # 2. Thêm nội dung
         for line in self.content_lines:
@@ -338,28 +412,33 @@ class QuestionBuffer:
                     process_bold_text(line, para)
                 else:
                     process_text(line, para)
+        print(f"✅ Added content ({len(self.content_lines)} lines)")
         
-        # 3. Thêm hình ảnh (nếu có)
+        # 3. Thêm hình ảnh (NẾU CÓ) - CHỈ MỘT LẦN!
         if self.image_description:
+            print(f"\n🖼️  Processing image:")
+            print(f"   Description: {self.image_description[:60]}...")
+            print(f"   Should generate: {self.should_generate_image}")
+            
             success, img_para, is_placeholder = handle_image_generation(
                 self.image_description, 
                 doc,
-                attempt_generate=self.should_generate_image
+                attempt_generate=self.should_generate_image,
+                tracker=image_tracker
             )
             
-            # Tracking
-            if image_tracker:
-                if success:
-                    image_tracker.record_success()
-                elif is_placeholder:
-                    image_tracker.record_placeholder()
-                else:
-                    image_tracker.record_failed()
+            if success:
+                print(f"   ✅ Image generated successfully")
+            else:
+                print(f"   📝 Used placeholder")
+        else:
+            print(f"ℹ️  No image for this question")
         
         # 4. Thêm đáp án
         for answer in self.answers:
             answer_para = doc.add_paragraph()
             process_text(answer, answer_para)
+        print(f"✅ Added {len(self.answers)} answers")
         
         # 5. Thêm khoảng cách trước lời giải
         doc.add_paragraph()
@@ -380,12 +459,11 @@ class QuestionBuffer:
         run.bold = True
         
         # 9. Thêm giải thích
-        # - Trắc nghiệm: giới hạn 3-5 dòng, chỉ giải thích đáp án đúng
-        # - Đúng/sai: KHÔNG cắt cụt để tránh mất phần giải thích của mục d)
         if question_type == "dungsai":
             explanation_to_write = self.explanation_lines
         else:
             explanation_to_write = self.explanation_lines[:max(1, min(5, len(self.explanation_lines)))]
+        
         for line in explanation_to_write:
             if line.strip():
                 para = doc.add_paragraph()
@@ -393,10 +471,14 @@ class QuestionBuffer:
                     process_bold_text(line, para)
                 else:
                     process_text(line, para)
+        print(f"✅ Added explanation ({len(explanation_to_write)} lines)")
         
-        print(f"\n   ✅ Câu {self.question_num}: Đã ghi vào document\n")
+        print(f"\n✅ Câu {self.question_num}: ÄÃ£ ghi vào document thành công")
+        print(f"{'='*70}\n")
+        
         if written_log is not None and self.question_num:
             written_log.append(self.question_num)
+        
         return True
 
 from typing import List
