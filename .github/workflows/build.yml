@@ -58,12 +58,7 @@ jobs:
       - name: Build with PyInstaller
         shell: pwsh
         run: |
-          pyinstaller --onefile --clean --noconfirm --name ToolGen `
-            --add-data ".env;." ` # Giữ lại nếu ToolGen.py cần .env lúc runtime
-            --add-data "api;api" `
-            --add-data "process;process" `
-            GenQues.py
-
+          pyinstaller --onefile --clean --noconfirm --name ToolGen --add-data ".env;." --add-data "api;api" --add-data "process;process" GenQues.py
       # Step 7: Tạo thư mục để đóng gói
       - name: Create packaging directory
         run: |
