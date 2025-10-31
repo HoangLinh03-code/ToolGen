@@ -4,14 +4,25 @@ from dotenv import load_dotenv
 from google.oauth2 import service_account
 import sys
 import traceback
-load_dotenv()
+# ============ QUAN TRỌNG: Xử lý đường dẫn cho PyInstaller ============
 if getattr(sys, 'frozen', False):
-    base_path = sys._MEIPASS
+    # Chạy từ file .exe (PyInstaller)
+    base_path = sys._MEIPASS  # Thư mục tạm của PyInstaller
 else:
+    # Chạy từ Python script thường
     base_path = os.path.dirname(__file__)
- 
+
+# Đường dẫn đến file .env
 dotenv_path = os.path.join(base_path, '.env')
-load_dotenv(dotenv_path)
+
+# Load .env với explicit path
+if os.path.exists(dotenv_path):
+    load_dotenv(dotenv_path)
+    print(f"\nLoaded .env from: {dotenv_path}\n")
+else:
+    print(f"Warning: .env not found at {dotenv_path}\n")
+    print(f"Base path: {base_path}\n")
+    print(f"Files in base_path: {os.listdir(base_path) if os.path.exists(base_path) else 'N/A'}\n")
 class VertexClient:
     def __init__(self, project_id, creds, model, region="us-central1"):
         vertexai.init(
