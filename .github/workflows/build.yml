@@ -29,27 +29,20 @@ jobs:
         with:
           python-version: '3.11' # Bạn có thể thay đổi phiên bản Python nếu cần
 
-      # Step 3: Cài đặt uv (thay thế cho pip)
-      - name: Install uv
-        run: pip install uv
-        shell: pwsh
-
-      # Step 4: Cài đặt các gói PyQt một cách riêng biệt
+      # Step 3: Cài đặt các gói PyQt một cách riêng biệt
       # Điều này đảm bảo các gói nhị phân Qt cần thiết được cài đặt chính xác
       - name: Install PyQt dependencies
-        run: uv pip install PyQt5 PyQt5-Qt5 PyQt5_sip PyQtWebEngine PyQtWebEngine-Qt5
+        run: pip install PyQt5 PyQt5-Qt5 PyQt5_sip PyQtWebEngine PyQtWebEngine-Qt5
         shell: pwsh
 
-      # Step 5: Cài đặt các gói phụ thuộc khác từ requirements.txt
+      # Step 4: Cài đặt các gói phụ thuộc khác từ requirements.txt
       # (Giả sử PyInstaller và các thư viện khác nằm trong file này)
       - name: Install other dependencies from requirements.txt
-        run: uv pip install -r requirements.txt
+        run: pip install -r requirements.txt
         shell: pwsh
 
-      # Step 6: Tạo file .env từ GitHub Secret
+      # Step 5: Tạo file .env từ GitHub Secret
       # File .env này sẽ được PyInstaller đóng gói vào file .exe
-      # Lưu ý: Nếu ToolGen.py cần .env file khi chạy, bạn vẫn cần --add-data ".env;."
-      # Nếu không, bỏ nó đi để giảm kích thước exe.
       - name: Create .env file from ENV_KEY secret
         shell: pwsh
         run: |
@@ -59,19 +52,19 @@ jobs:
         env:
           ENV_KEY_CONTENT: ${{ secrets.ENV_KEY }}
 
-      # Step 7: Build file .exe bằng PyInstaller (qua uv)
+      # Step 6: Build file .exe bằng PyInstaller
       # Lưu ý: Các file promptGends.txt và prompt_Gen.txt sẽ KHÔNG được thêm vào .exe
       # Chúng ta sẽ thêm chúng vào file .zip sau.
       - name: Build with PyInstaller
         shell: pwsh
         run: |
-          uv run pyinstaller --onefile --clean --noconfirm --name ToolGen `
+          pyinstaller --onefile --clean --noconfirm --name ToolGen `
             --add-data ".env;." ` # Giữ lại nếu ToolGen.py cần .env lúc runtime
             --add-data "api;api" `
             --add-data "process;process" `
             GenQues.py
 
-      # Step 8: Tạo thư mục để đóng gói
+      # Step 7: Tạo thư mục để đóng gói
       - name: Create packaging directory
         run: |
           New-Item -ItemType Directory -Path "package"
@@ -80,12 +73,12 @@ jobs:
           Copy-Item -Path "prompt_Gen.txt" -Destination "package/"
         shell: pwsh
 
-      # Step 9: Nén thư mục thành file .zip
+      # Step 8: Nén thư mục thành file .zip
       - name: Zip executable and prompt files
         run: Compress-Archive -Path "package/*" -DestinationPath "ToolGen-Windows.zip"
         shell: pwsh
 
-      # Step 10: Tải file .zip lên làm artifact
+      # Step 9: Tải file .zip lên làm artifact
       - name: Upload zipped executable artifact
         uses: actions/upload-artifact@v4
         with:
