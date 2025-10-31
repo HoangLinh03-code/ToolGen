@@ -1,0 +1,94 @@
+# Tên của workflow, hiển thị trên tab Actions của GitHub
+name: Build Windows Executable
+
+# Các sự kiện kích hoạt workflow
+on:
+  # Kích hoạt khi có push lên nhánh 'main'
+  push:
+    branches: [ "develop" ]
+  # Kích hoạt khi một release mới được 'created'
+  release:
+    types: [ created ]
+  # Cho phép chạy workflow này thủ công từ tab Actions
+  workflow_dispatch:
+
+jobs:
+  # Tên của job, bạn có thể đặt bất kỳ tên gì
+  build-exe:
+    # Chỉ định hệ điều hành để chạy job
+    runs-on: windows-latest
+
+    steps:
+      # Step 1: Checkout code từ repository
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      # Step 2: Cài đặt Python
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.11' # Bạn có thể thay đổi phiên bản Python nếu cần
+
+      # Step 3: Cài đặt uv (thay thế cho pip)
+      - name: Install uv
+        run: pip install uv
+        shell: pwsh
+
+      # Step 4: Cài đặt các gói PyQt một cách riêng biệt
+      # Điều này đảm bảo các gói nhị phân Qt cần thiết được cài đặt chính xác
+      - name: Install PyQt dependencies
+        run: uv pip install PyQt5 PyQt5-Qt5 PyQt5_sip PyQtWebEngine PyQtWebEngine-Qt5
+        shell: pwsh
+
+      # Step 5: Cài đặt các gói phụ thuộc khác từ requirements.txt
+      # (Giả sử PyInstaller và các thư viện khác nằm trong file này)
+      - name: Install other dependencies from requirements.txt
+        run: uv pip install -r requirements.txt
+        shell: pwsh
+
+      # Step 6: Tạo file .env từ GitHub Secret
+      # File .env này sẽ được PyInstaller đóng gói vào file .exe
+      # Lưu ý: Nếu ToolGen.py cần .env file khi chạy, bạn vẫn cần --add-data ".env;."
+      # Nếu không, bỏ nó đi để giảm kích thước exe.
+      - name: Create .env file from ENV_KEY secret
+        shell: pwsh
+        run: |
+          Write-Host "Creating .env file from secret..."
+          Set-Content -Path ".env" -Value $env:ENV_KEY_CONTENT
+          Write-Host "File .env created successfully."
+        env:
+          ENV_KEY_CONTENT: ${{ secrets.ENV_KEY }}
+
+      # Step 7: Build file .exe bằng PyInstaller (qua uv)
+      # Lưu ý: Các file promptGends.txt và prompt_Gen.txt sẽ KHÔNG được thêm vào .exe
+      # Chúng ta sẽ thêm chúng vào file .zip sau.
+      - name: Build with PyInstaller
+        shell: pwsh
+        run: |
+          uv run pyinstaller --onefile --clean --noconfirm --name ToolGen `
+            --add-data ".env;." ` # Giữ lại nếu ToolGen.py cần .env lúc runtime
+            --add-data "api;api" `
+            --add-data "process;process" `
+            GenQues.py
+
+      # Step 8: Tạo thư mục để đóng gói
+      - name: Create packaging directory
+        run: |
+          New-Item -ItemType Directory -Path "package"
+          Copy-Item -Path "dist/ToolGen.exe" -Destination "package/"
+          Copy-Item -Path "promptGends.txt" -Destination "package/"
+          Copy-Item -Path "prompt_Gen.txt" -Destination "package/"
+        shell: pwsh
+
+      # Step 9: Nén thư mục thành file .zip
+      - name: Zip executable and prompt files
+        run: Compress-Archive -Path "package/*" -DestinationPath "ToolGen-Windows.zip"
+        shell: pwsh
+
+      # Step 10: Tải file .zip lên làm artifact
+      - name: Upload zipped executable artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: ToolGen-Windows-Release # Tên của artifact
+          path: ToolGen-Windows.zip     # Đường dẫn đến file .zip đã tạo
+          if-no-files-found: error
