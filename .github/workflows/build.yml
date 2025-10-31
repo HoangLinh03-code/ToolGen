@@ -53,12 +53,11 @@ jobs:
           ENV_KEY_CONTENT: ${{ secrets.ENV_KEY }}
 
       # Step 6: Build file .exe bằng PyInstaller
-      # Lưu ý: Các file promptGends.txt và prompt_Gen.txt sẽ KHÔNG được thêm vào .exe
-      # Chúng ta sẽ thêm chúng vào file .zip sau.
+      # Sửa lỗi: Gọi PyInstaller bằng 'python -m PyInstaller' để tránh lỗi PATH
       - name: Build with PyInstaller
         shell: pwsh
         run: |
-          pyinstaller --onefile --clean --noconfirm --name ToolGen --add-data ".env;." --add-data "api;api" --add-data "process;process" GenQues.py
+          python -m PyInstaller --onefile --clean --noconfirm --name ToolGen --add-data ".env;." --add-data "api;api" --add-data "process;process" GenQues.py
       # Step 7: Tạo thư mục để đóng gói
       - name: Create packaging directory
         run: |
