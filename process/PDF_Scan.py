@@ -118,7 +118,7 @@ Liệt kê các khái niệm, thuật ngữ, định nghĩa quan trọng
                 content = self.client.send_data_to_AI(
                     prompt=scan_prompt,
                     file_paths=[pdf_path],
-                    temperature=0.4
+                    temperature=0.55
                 )
                 content_summaries[pdf_type] = content
                 print(f"\n   ✓ Hoàn thành ({len(content)} ký tự)\n")
@@ -151,6 +151,7 @@ Liệt kê các khái niệm, thuật ngữ, định nghĩa quan trọng
             "- Câu hỏi PHẢI bám sát nội dung các file PDF đã quét",
             "- KHÔNG được lệch chủ đề hoặc thêm kiến thức ngoài phạm vi bài học",
             "- Tập trung vào các khái niệm, định nghĩa đã được đề cập trong tài liệu",
+            "- Sử dụng ngôn ngữ và thuật ngữ giống hệt trong sách nhưng không trích dẫn nguyên văn và không trích dẫn từ trong sách ra",
             ""
         ]
         

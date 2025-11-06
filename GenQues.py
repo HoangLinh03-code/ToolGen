@@ -150,7 +150,8 @@ class ProcessingThread(QThread):
     console_output = pyqtSignal(str)
     
     def __init__(self, root_folder, prompt_tracnghiem_content, prompt_dungsai_content, 
-                 project_id, creds, batch_size=2, max_lessons=None, resume=False, subject="Tin học", grade="10"):
+                 project_id, creds, batch_size=2, max_lessons=None, resume=False, 
+                 subject="Hoạt động trải nghiệm", grade="6"):
         super().__init__()
         self.root_folder = root_folder
         self.prompt_tracnghiem_content = prompt_tracnghiem_content
@@ -185,14 +186,13 @@ class ProcessingThread(QThread):
                 pending_folders = []
                 for bf in bai_folders:
                     bai_name = os.path.basename(bf)
-                    # Sử dụng cấu trúc thư mục mới
                     output_folder = os.path.join("output", self.subject, f"Lớp {self.grade}", bai_name)
                     self.progress.emit(f"🔍 Resume check: {output_folder}")
                     if not self.progress_manager.is_completed(bai_name, output_folder):
                         pending_folders.append(bf)
                         self.progress.emit(f"⏳ {bai_name} sẽ xử lý")
                     else:
-                        self.progress.emit(f"⏭️ Bỏ qua {bai_name} (đã hoàn thành)")
+                        self.progress.emit(f"⭐️ Bỏ qua {bai_name} (đã hoàn thành)")
                 bai_folders = pending_folders
             
             total_bai = len(bai_folders)
@@ -204,23 +204,9 @@ class ProcessingThread(QThread):
             
             self.progress.emit(f"📊 Tổng số bài cần xử lý: {total_bai}")
             
-            # Kiểm tra và thông báo về file cũ
-            old_output_exists = False
-            for bf in bai_folders:
-                bai_name = os.path.basename(bf)
-                old_output_folder = os.path.join("output", bai_name)
-                if os.path.exists(old_output_folder):
-                    old_output_exists = True
-                    break
-
-            if old_output_exists:
-                self.progress.emit("⚠️ Phát hiện file cũ trong cấu trúc output cũ")
-                self.progress.emit("💡 File mới sẽ được lưu theo cấu trúc: output/[Môn học]/Lớp [X]/[Bài]/")
-                self.progress.emit("🔄 Để sử dụng file cũ, hãy tắt Resume hoặc di chuyển file")
-            
             processed_count = 0
             
-            # Xử lý theo batch
+            # Xử lý theo batch (bài học)
             for batch_start in range(0, total_bai, self.batch_size):
                 if self.stop_requested:
                     self.progress.emit("⏸️ Đã dừng xử lý theo yêu cầu")
@@ -230,7 +216,7 @@ class ProcessingThread(QThread):
                 batch_folders = bai_folders[batch_start:batch_end]
                 
                 self.progress.emit(f"\n{'='*50}")
-                self.progress.emit(f"📦 BATCH {batch_start//self.batch_size + 1}")
+                self.progress.emit(f"📦 BATCH BÀI HỌC {batch_start//self.batch_size + 1}")
                 self.progress.emit(f"{'='*50}")
                 
                 for bai_folder in batch_folders:
@@ -250,9 +236,7 @@ class ProcessingThread(QThread):
                     self.progress.emit(f"📄 Tìm thấy {len(pdf_files)} file PDF")
                     
                     # Tạo output folder theo cấu trúc môn học/lớp
-                    subject = getattr(self, 'subject', 'Tin học')
-                    grade = getattr(self, 'grade', '10')
-                    output_folder = os.path.join("output", subject, f"Lớp {grade}", bai_name)
+                    output_folder = os.path.join("output", self.subject, f"Lớp {self.grade}", bai_name)
                     os.makedirs(output_folder, exist_ok=True)
                     
                     # Kiểm tra đã hoàn thành chưa
@@ -263,12 +247,21 @@ class ProcessingThread(QThread):
                         continue
                     else:
                         self.progress.emit(f"⏳ {bai_name} chưa hoàn thành, sẽ xử lý")
+                    
+                    # ============ SỬ DỤNG WORKFLOW MỚI V3 ============
+                    self.progress.emit(f"\n{'─'*50}")
+                    self.progress.emit(f"🔄 WORKFLOW MỚI: Storage → DOCX")
+                    self.progress.emit(f"{'─'*50}")
+                    
                     # 1. Xử lý trắc nghiệm
-                    self.progress.emit(f"📝 Đang sinh 80 câu trắc nghiệm...")
+                    self.progress.emit(f"🔹 Đang sinh 80 câu trắc nghiệm...")
                     self.image_progress.emit(f"[TracNghiem-{bai_name}] Bắt đầu xử lý")
                     
                     try:
-                        docx_tracnghiem = response2docx_improved(
+                        # Import workflow mới
+                        from process.response2docx_batch import response2docx_batch_v3
+                        
+                        docx_tracnghiem = response2docx_batch_v3(
                             pdf_files,
                             self.prompt_tracnghiem_content,
                             os.path.join(output_folder, f"{bai_name}_TracNghiem"),
@@ -277,6 +270,7 @@ class ProcessingThread(QThread):
                             "gemini-2.5-pro",
                             question_type="tracnghiem"
                         )
+                        
                         if docx_tracnghiem:
                             generated_files.append(docx_tracnghiem)
                             self.progress.emit(f"✅ Hoàn thành trắc nghiệm")
@@ -286,11 +280,11 @@ class ProcessingThread(QThread):
                         self.image_progress.emit(f"[TracNghiem-{bai_name}] Lỗi: {str(e)}")
                     
                     # 2. Xử lý đúng/sai
-                    self.progress.emit(f"📝 Đang sinh 40 câu đúng/sai...")
+                    self.progress.emit(f"🔹 Đang sinh 40 câu đúng/sai...")
                     self.image_progress.emit(f"[DungSai-{bai_name}] Bắt đầu xử lý")
                     
                     try:
-                        docx_dungsai = response2docx_improved(
+                        docx_dungsai = response2docx_batch_v3(
                             pdf_files,
                             self.prompt_dungsai_content,
                             os.path.join(output_folder, f"{bai_name}_DungSai"),
@@ -299,6 +293,7 @@ class ProcessingThread(QThread):
                             "gemini-2.5-pro",
                             question_type="dungsai"
                         )
+                        
                         if docx_dungsai:
                             generated_files.append(docx_dungsai)
                             self.progress.emit(f"✅ Hoàn thành đúng/sai")

@@ -1,6 +1,5 @@
 from docx import Document
 from api.callAPI import VertexClient
-from process.text2Image import generate_image_from_text
 from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from io import BytesIO
@@ -161,7 +160,7 @@ def process_bold_text(text, paragraph):
         process_text(current_text, paragraph)
 
 import os
-MAX_RETRIES = int(os.getenv("MAX_IMAGE_RETRIES", "5"))
+MAX_RETRIES = int(os.getenv("MAX_IMAGE_RETRIES", "3"))
 def handle_image_generation(description, doc, attempt_generate=True, tracker=None):
     """
     Xử lý sinh ảnh với tracking chi tiết và debug

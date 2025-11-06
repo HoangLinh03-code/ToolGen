@@ -6,7 +6,9 @@ from api.callAPI import get_vertex_ai_credentials
 import time
 from typing import Optional
 import traceback
-
+import re
+from io import BytesIO
+from PIL import Image
 # Init Vertex once
 print("🔧 Initializing Vertex AI...")
 _credentials = get_vertex_ai_credentials()
@@ -23,7 +25,7 @@ vertexai.init(
 print("✅ Vertex AI initialized")
 
 # Sử dụng model nhanh và ổn định nhất
-_MODEL_NAME = os.getenv("IMAGEN_MODEL", "imagen-3.0-fast-generate-001")
+_MODEL_NAME = os.getenv("IMAGEN_MODEL")
 print(f"🎨 Loading model: {_MODEL_NAME}")
 
 try:
@@ -38,8 +40,8 @@ except Exception as e:
 _IMAGE_CACHE = {}
 
 # Cấu hình retry
-MAX_RETRIES = int(os.getenv("MAX_IMAGE_RETRIES", "5"))
-RETRY_DELAY = int(os.getenv("RETRY_DELAY_SECONDS", "3"))
+MAX_RETRIES = int(os.getenv("MAX_IMAGE_RETRIES", "3"))
+RETRY_DELAY = int(os.getenv("RETRY_DELAY_SECONDS", "2"))
 GENERATION_TIMEOUT = int(os.getenv("IMAGE_GENERATION_TIMEOUT", "90"))
 
 print(f"⚙️  Config: MAX_RETRIES={MAX_RETRIES}, RETRY_DELAY={RETRY_DELAY}s, TIMEOUT={GENERATION_TIMEOUT}s")
@@ -50,33 +52,61 @@ def _key(prompt: str) -> str:
 
 def _optimize_prompt(prompt: str) -> str:
     """
-    Tối ưu prompt để tăng tỷ lệ sinh ảnh thành công
+    Tối ưu prompt để ngắn gọn nhưng vẫn đủ ý
+    Imagen 4 hoạt động tốt với prompt ngắn, cụ thể
     """
-    # Làm sạch prompt
     prompt = prompt.strip()
     
-    # Thêm prefix cho educational content
-    if not prompt.lower().startswith(("educational", "simple", "diagram", "chart", "illustration")):
-        optimized = f"Simple educational illustration: {prompt}"
-    else:
-        optimized = prompt
+    # 🔥 BƯỚC 1: Rút gọn prompt dài
+    # Loại bỏ các từ thừa, chỉ giữ keywords quan trọng
+    prompt = re.sub(r'\b(một|các|những|này|kia|đó)\b', '', prompt, flags=re.IGNORECASE)
+    prompt = re.sub(r'\s+', ' ', prompt).strip()
     
-    # Giới hạn độ dài (Imagen works better with concise prompts)
-    if len(optimized) > 250:
-        optimized = optimized[:247] + "..."
+    # 🔥 BƯỚC 2: Chuyển sang English (Imagen 4 hoạt động tốt hơn với tiếng Anh)
+    # Tạo mapping keywords tiếng Việt -> tiếng Anh
+    vn_to_en = {
+        'sơ đồ': 'diagram',
+        'biểu đồ': 'chart',
+        'hình vẽ': 'illustration',
+        'hình ảnh': 'image',
+        'máy tính': 'computer',
+        'mạch điện': 'circuit',
+        'công thức': 'formula',
+        'bảng': 'table',
+        'đồ thị': 'graph',
+        'minh họa': 'illustration',
+        'thiết kế': 'design',
+        'giao diện': 'interface',
+        'logo': 'logo',
+        'màu sắc': 'colors',
+        'hình chữ nhật': 'rectangle',
+        'hình tròn': 'circle',
+        'mũi tên': 'arrow',
+        'kết nối': 'connection',
+        'luồng': 'flow',
+        'quy trình': 'process',
+    }
     
-    return optimized
+    # Replace keywords
+    for vn, en in vn_to_en.items():
+        prompt = prompt.replace(vn, en)
+    
+    # 🔥 BƯỚC 3: Thêm prefix cho educational content
+    if not any(word in prompt.lower() for word in ['diagram', 'chart', 'illustration', 'simple']):
+        prompt = f"Simple educational {prompt}"
+    
+    # 🔥 BƯỚC 4: Giới hạn độ dài (Imagen 4 optimal: 50-80 chars)
+    if len(prompt) > 100:
+        # Lấy các từ khóa quan trọng nhất
+        words = prompt.split()
+        important_words = [w for w in words[:15]]  # Chỉ lấy 15 từ đầu
+        prompt = ' '.join(important_words)
+    
+    return prompt.strip()
 
 def generate_image_from_text(prompt: str, max_retries: int = None) -> Optional[bytes]:
     """
-    Sinh ảnh từ prompt với cache, retry và timeout
-    
-    Args:
-        prompt: Mô tả ảnh cần sinh
-        max_retries: Số lần retry tối đa (None = dùng global MAX_RETRIES)
-        
-    Returns:
-        bytes: Image data hoặc None nếu thất bại
+    Sinh ảnh từ prompt với kích thước tối ưu
     """
     if max_retries is None:
         max_retries = MAX_RETRIES
@@ -84,20 +114,21 @@ def generate_image_from_text(prompt: str, max_retries: int = None) -> Optional[b
     print(f"\n{'='*70}")
     print(f"🎨 GENERATE IMAGE REQUEST")
     print(f"{'='*70}")
-    print(f"📝 Prompt: {prompt[:100]}{'...' if len(prompt) > 100 else ''}")
+    print(f"📝 Original prompt: {prompt[:80]}...")
     
-    # Check cache trước
+    # Check cache
     k = _key(prompt)
     if k in _IMAGE_CACHE:
-        print(f"✅ Cache HIT - trả về ảnh từ cache")
+        print(f"✅ Cache HIT")
         print(f"{'='*70}\n")
         return _IMAGE_CACHE[k]
     
-    print(f"❌ Cache MISS - cần sinh ảnh mới")
+    print(f"❌ Cache MISS - generating new image")
     
-    # Tối ưu prompt
+    # Optimize prompt
     optimized_prompt = _optimize_prompt(prompt)
-    print(f"🔧 Optimized: {optimized_prompt[:100]}{'...' if len(optimized_prompt) > 100 else ''}")
+    print(f"🔧 Optimized prompt: {optimized_prompt}")
+    print(f"📏 Length: {len(prompt)} → {len(optimized_prompt)} chars")
     
     # Retry logic
     for attempt in range(1, max_retries + 1):
@@ -109,56 +140,98 @@ def generate_image_from_text(prompt: str, max_retries: int = None) -> Optional[b
             start_time = time.time()
             
             print(f"⏳ Calling Imagen API...")
+            
+            # 🔥 TỐI ƯU: Dùng aspect_ratio nhỏ hơn để giảm dung lượng
             result = _MODEL.generate_images(
                 prompt=optimized_prompt,
                 number_of_images=1,
-                aspect_ratio="1:1",
-                safety_filter_level="block_some",
-                person_generation="allow_adult"
+                aspect_ratio="1:1",  # Giữ 1:1 cho educational diagrams
+                # 🔥 THÊM OUTPUT FORMAT ĐỂ KIỂM SOÁT DUG LƯỢNG
+                # add_watermark=False,  # Bỏ watermark nếu có
             )
             
             generation_time = time.time() - start_time
             print(f"✅ API call completed in {generation_time:.2f}s")
             
-            # Kiểm tra timeout
+            # Check timeout
             if generation_time > GENERATION_TIMEOUT:
-                print(f"⏱️  WARNING: Timeout ({generation_time:.1f}s > {GENERATION_TIMEOUT}s)")
+                print(f"⏱️ WARNING: Timeout ({generation_time:.1f}s > {GENERATION_TIMEOUT}s)")
                 if attempt < max_retries:
-                    print(f"🔄 Retrying after {RETRY_DELAY}s...")
                     time.sleep(RETRY_DELAY)
                     continue
-                else:
-                    print(f"❌ Max retries reached, giving up")
-                    return None
             
-            # Lấy ảnh
-            if not result or not hasattr(result, 'images') or not result.images or len(result.images) == 0:
+            # Get images
+            if not result or not hasattr(result, 'images') or not result.images:
                 raise Exception("API returned empty result")
             
             image = result.images[0]
             
-            # Kiểm tra xem có _image_bytes không
-            if not hasattr(image, '_image_bytes'):
-                # Thử các thuộc tính khác
-                if hasattr(image, 'image_bytes'):
-                    image_bytes = image.image_bytes
-                elif hasattr(image, '_pil_image'):
-                    from io import BytesIO
-                    buffer = BytesIO()
-                    image._pil_image.save(buffer, format='PNG')
-                    image_bytes = buffer.getvalue()
-                else:
-                    raise Exception(f"Cannot extract image bytes. Available attributes: {dir(image)}")
-            else:
-                image_bytes = image._image_bytes
+            # Extract bytes
+            image_bytes = None
             
-            if not image_bytes or len(image_bytes) == 0:
-                raise Exception("Image bytes is empty")
+            # Try different attributes
+            for attr_name in ['_image_bytes', 'image_bytes', '_pil_image']:
+                if hasattr(image, attr_name):
+                    attr_value = getattr(image, attr_name)
+                    
+                    if attr_name == '_pil_image' and attr_value:
+                        
+                        
+                        buffer = BytesIO()
+                        
+                        # Resize nếu quá lớn
+                        if attr_value.size[0] > 1024 or attr_value.size[1] > 1024:
+                            attr_value = attr_value.resize((1024, 1024), Image.LANCZOS)
+                        
+                        # Save với optimize và quality thấp hơn
+                        attr_value.save(
+                            buffer, 
+                            format='PNG',
+                            optimize=True,  # Tối ưu dung lượng
+                            # quality=85  # Không dùng cho PNG
+                        )
+                        image_bytes = buffer.getvalue()
+                        print(f"   → Converted & optimized PIL to bytes: {len(image_bytes)} bytes")
+                        break
+                    
+                    elif isinstance(attr_value, bytes) and len(attr_value) > 0:
+                        # 🔥 TỐI ƯU: Nén ảnh bytes nếu quá lớn
+                        if len(attr_value) > 500_000:  # Lớn hơn 500KB
+                            print(f"   → Image too large ({len(attr_value)} bytes), compressing...")
+                            
+                            # Load từ bytes
+                            img = Image.open(BytesIO(attr_value))
+                            
+                            # Resize
+                            if img.size[0] > 1024 or img.size[1] > 1024:
+                                img = img.resize((1024, 1024), Image.LANCZOS)
+                            
+                            # Re-save với nén
+                            buffer = BytesIO()
+                            img.save(buffer, format='PNG', optimize=True)
+                            image_bytes = buffer.getvalue()
+                            
+                            print(f"   → Compressed: {len(attr_value)} → {len(image_bytes)} bytes")
+                        else:
+                            image_bytes = attr_value
+                            print(f"   → Got bytes directly: {len(image_bytes)} bytes")
+                        break
             
-            # Cache lại
+            if not image_bytes:
+                raise Exception("Cannot extract image bytes")
+            
+            # Validate
+            if len(image_bytes) < 100:
+                raise Exception(f"Image too small: {len(image_bytes)} bytes")
+            
+            # Cache
             _IMAGE_CACHE[k] = image_bytes
             
-            print(f"✅ SUCCESS - Generated {len(image_bytes)} bytes in {generation_time:.2f}s")
+            # Stats
+            size_kb = len(image_bytes) / 1024
+            print(f"\n✅ SUCCESS!")
+            print(f"   Size: {len(image_bytes)} bytes ({size_kb:.1f} KB)")
+            print(f"   Time: {generation_time:.2f}s")
             print(f"{'='*70}\n")
             
             return image_bytes
@@ -166,48 +239,42 @@ def generate_image_from_text(prompt: str, max_retries: int = None) -> Optional[b
         except Exception as e:
             error_msg = str(e)
             print(f"\n❌ ERROR on attempt {attempt}:")
-            print(f"   Type: {type(e).__name__}")
-            print(f"   Message: {error_msg}")
+            print(f"   {type(e).__name__}: {error_msg}")
             
-            # Debug: Print full traceback cho attempt đầu tiên
             if attempt == 1:
-                print(f"   Traceback:\n{traceback.format_exc()}")
+                print(f"\n   Full traceback:")
+                print(traceback.format_exc())
             
-            # Phân tích lỗi
-            if "safety" in error_msg.lower() or "blocked" in error_msg.lower():
-                print(f"⚠️  Safety filter blocked this image")
+            # Handle specific errors
+            if "empty" in error_msg.lower():
                 if attempt < max_retries:
-                    optimized_prompt = f"Simple diagram: {prompt[:80]}"
-                    print(f"🔧 Trying with simpler prompt...")
+                    # Try even simpler prompt
+                    optimized_prompt = "simple diagram"
+                    print(f"   🔧 Trying ultra-simple prompt: {optimized_prompt}")
                     time.sleep(RETRY_DELAY)
                     continue
             
-            elif "quota" in error_msg.lower() or "rate" in error_msg.lower() or "limit" in error_msg.lower():
-                print(f"⏳ Rate limit or quota exceeded")
+            elif "safety" in error_msg.lower():
                 if attempt < max_retries:
-                    wait_time = RETRY_DELAY * attempt  # Tăng dần thời gian chờ
-                    print(f"⏰ Waiting {wait_time}s before retry...")
+                    optimized_prompt = "educational geometric shapes"
+                    print(f"   🔧 Trying safe prompt: {optimized_prompt}")
+                    time.sleep(RETRY_DELAY)
+                    continue
+            
+            elif any(word in error_msg.lower() for word in ["quota", "rate", "limit"]):
+                if attempt < max_retries:
+                    wait_time = RETRY_DELAY * attempt * 2  # Tăng dần
+                    print(f"   ⏰ Rate limit - waiting {wait_time}s...")
                     time.sleep(wait_time)
                     continue
             
-            elif "timeout" in error_msg.lower():
-                print(f"⏱️  API timeout")
-                if attempt < max_retries:
-                    time.sleep(RETRY_DELAY)
-                    continue
-            
-            elif "permission" in error_msg.lower() or "auth" in error_msg.lower():
-                print(f"🔐 Authentication/Permission error - cannot retry")
-                return None
-            
-            # Lỗi khác
+            # Max retries reached
             if attempt >= max_retries:
-                print(f"💔 Failed after {max_retries} attempts")
+                print(f"   💔 Failed after {max_retries} attempts")
                 print(f"{'='*70}\n")
                 return None
             
-            # Retry
-            print(f"🔄 Retrying in {RETRY_DELAY}s...")
+            print(f"   🔄 Retrying in {RETRY_DELAY}s...")
             time.sleep(RETRY_DELAY)
     
     print(f"❌ FAILED - All retries exhausted")
