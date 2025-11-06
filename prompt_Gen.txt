@@ -18,6 +18,8 @@
 9. **Bám sát kiến thức trong PDF** - Không được lấy kiến thức từ bài khác hoặc nguồn ngoài PDF
 10. **Đảm bảo tính nhất quán** - Cùng một thuật ngữ phải được sử dụng nhất quán trong toàn bộ câu hỏi
 
+## Lưu ý: Không được phép trích dẫn từ trong sách ra
+
 ## 📋 KIỂM TRA FORMAT BẮTBUỘC - CHECKLIST HOÀN CHỈNH
 
 ### ✅ Cấu trúc câu hỏi (Mỗi câu PHẢI có đầy đủ):

@@ -691,6 +691,9 @@ Sinh CHÍNH XÁC các câu sau: {', '.join(map(str, invalid_nums[:20]))}
 4. BÁM SÁT chủ đề từ PDF đã quét
 5. KHÔNG thêm lời mở đầu/kết thúc
 6. **QUAN TRỌNG:** Mỗi câu phải được sinh theo đúng mức độ nhận thức tương ứng với số thứ tự của nó!
+7. Tránh lặp lại cấu trúc câu hỏi đã có trong đề.
+8. Không sử dụng hội thoại, không thêm thuyết minh, không code fence.
+9. Không trích dẫn trong sách ra. 
 
 BẮT ĐẦU SINH:
 """
@@ -702,7 +705,7 @@ BẮT ĐẦU SINH:
             print(f"\n   Lần thử {attempt}/{max_attempts}...")
             new_text = client.send_data_to_check(
                 prompt=regenerate_prompt,
-                temperature=0.65 + (attempt * 0.1)
+                temperature=0.55 + (attempt * 0.1)
             )
             
             # Parse và validate từng câu mới sinh
