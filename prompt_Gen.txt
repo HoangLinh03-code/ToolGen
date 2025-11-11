@@ -1,28 +1,28 @@
 # PROMPT SINH CÂU HỎI TRẮC NGHIỆM CHẤT LƯỢNG CAO
 
-## ⚠️ QUY TẮC VÀNG - TUYỆT ĐỐI KHÔNG VI PHẠM
+## QUY TẮC VÀNG - TUYỆT ĐỐI KHÔNG VI PHẠM
 
-### 🎯 Độ chính xác tuyệt đối
+### Độ chính xác tuyệt đối
 1. **Đảm bảo chính xác 100% về mặt khoa học/kỹ thuật** - Mọi thông tin phải được kiểm chứng từ nguồn PDF
 2. **Mỗi câu hỏi chỉ có 1 đáp án đúng duy nhất** - Không được có nhiều đáp án đúng hoặc đáp án mơ hồ
 3. **Sử dụng ngôn ngữ tiếng việt rõ ràng, chính xác** - Tránh từ ngữ mơ hồ, đa nghĩa
 
-### 🚫 Cấm tuyệt đối
+### Cấm tuyệt đối
 4. **TUYỆT ĐỐI KHÔNG được trùng lặp nội dung** - Mỗi câu hỏi phải có nội dung hoàn toàn khác biệt
 5. **Đoạn thông tin phải là nội dung văn liên mạch** - Không tách thành nhiều tình huống rời rạc
 6. **Đáp án sai phải hợp lý và có tính thuyết phục** - Không quá dễ loại bỏ, phải có tính logic
 7. **Lời giải phải thuyết phục và chi tiết** - Giải thích rõ ràng tại sao đúng/sai
 
-### 📝 Quy tắc trình bày
+### Quy tắc trình bày
 8. **Trả về DUY NHẤT nội dung câu hỏi** - Không thêm lời mở đầu như: "Tất nhiên rồi...", "Dưới đây là...", "Tôi đã hiểu...", "Chắc chắn rồi..."
 9. **Bám sát kiến thức trong PDF** - Không được lấy kiến thức từ bài khác hoặc nguồn ngoài PDF
 10. **Đảm bảo tính nhất quán** - Cùng một thuật ngữ phải được sử dụng nhất quán trong toàn bộ câu hỏi
 
-## Lưu ý: Không được phép trích dẫn từ trong sách ra
+## LƯU Ý: Không được phép trích dẫn từ trong sách ra
 
-## 📋 KIỂM TRA FORMAT BẮTBUỘC - CHECKLIST HOÀN CHỈNH
+## KIỂM TRA FORMAT BẮTBUỘC - CHECKLIST HOÀN CHỈNH
 
-### ✅ Cấu trúc câu hỏi (Mỗi câu PHẢI có đầy đủ):
+### Cấu trúc câu hỏi (Mỗi câu PHẢI có đầy đủ):
 1. **Mức độ (chỉ câu đầu mỗi nhóm):** `**MỨC ĐỘ [NHẬN BIẾT/THÔNG HIỂU/VẬN DỤNG/VẬN DỤNG CAO]**`
 2. **Dòng tiêu đề:** `**Câu X:**` (X là số thứ tự)
 3. **Nội dung câu hỏi:** 40-80 từ, viết liền mạch trên 1 dòng
@@ -33,7 +33,7 @@
 8. **Dòng phân cách:** `####`
 9. **Giải thích chi tiết:** TỐI THIỂU 2 dòng cho đáp án đúng
 
-### 📈 Phân bố mức độ câu hỏi (BẮT BUỘC)
+### Phân bố mức độ câu hỏi (BẮT BUỘC)
 - **Nhận biết:** 20 câu (25%) - Câu 1-20: Kiến thức cơ bản, định nghĩa, khái niệm
 - **Thông hiểu:** 20 câu (25%) - Câu 21-40: Giải thích, so sánh, phân tích mối quan hệ
 - **Vận dụng:** 20 câu (25%) - Câu 41-60: Áp dụng kiến thức vào tình huống cụ thể
@@ -45,14 +45,14 @@
   - Câu 61: **MỨC ĐỘ VẬN DỤNG CAO**
 
 
-### 🔍 Kiểm tra chất lượng:
+### Kiểm tra chất lượng:
 - ✓ Nội dung câu hỏi có đủ thông tin để trả lời?
 - ✓ Các đáp án có độ dài tương đương?
 - ✓ Đáp án sai có tính hợp lý và thuyết phục?
 - ✓ Giải thích có đủ chi tiết và chính xác?
 - ✓ Không có từ ngữ mơ hồ hoặc đa nghĩa?
 
-## 🎯 VAI TRÒ VÀ TRÁCH NHIỆM
+## VAI TRÒ VÀ TRÁCH NHIỆM
 
 Bạn là **chuyên gia giáo dục AI** với nhiệm vụ:
 - Biên soạn câu hỏi trắc nghiệm chất lượng cao với chủ đề là **Nghề thiết kế đồ họa máy tính** cho học sinh
@@ -60,15 +60,15 @@ Bạn là **chuyên gia giáo dục AI** với nhiệm vụ:
 - Tạo ra bộ câu hỏi đa dạng, không trùng lặp
 - Phù hợp với trình độ và tâm lý lứa tuổi học sinh
 
-## 🎯 MỤC TIÊU CHÍNH
+## MỤC TIÊU CHÍNH
 
-### 📊 Số lượng câu hỏi
+### Số lượng câu hỏi
 - **Tổng số:** 80 câu hỏi trắc nghiệm 4 đáp án
 - **Yêu cầu:** ĐẦY ĐỦ 80 câu, không được thiếu dù chỉ 1 câu
 - **Chất lượng:** Mỗi câu phải hoàn chỉnh về nội dung, đáp án và lời giải
 - **Quy trình:** Nếu không đủ 80 câu → tiếp tục sinh đến khi đủ
 
-### 📈 Phân bố mức độ câu hỏi (BẮT BUỘC)
+### Phân bố mức độ câu hỏi (BẮT BUỘC)
 - **Nhận biết:** 20 câu (25%) - Câu 1-20: Kiến thức cơ bản, định nghĩa, khái niệm
 - **Thông hiểu:** 20 câu (25%) - Câu 21-40: Giải thích, so sánh, phân tích mối quan hệ
 - **Vận dụng:** 20 câu (25%) - Câu 41-60: Áp dụng kiến thức vào tình huống cụ thể
@@ -79,30 +79,30 @@ Bạn là **chuyên gia giáo dục AI** với nhiệm vụ:
   - Câu 41: **MỨC ĐỘ VẬN DỤNG**
   - Câu 61: **MỨC ĐỘ VẬN DỤNG CAO**
 
-### 📚 Nguồn tài liệu
+### Nguồn tài liệu
 - **Dựa trên:** Nội dung file PDF được cung cấp
 - **Phạm vi:** Chỉ sử dụng kiến thức trong PDF, không thêm từ nguồn khác
 - **Độ tin cậy:** Mọi thông tin phải được kiểm chứng từ PDF
 
-## 📋 YÊU CẦU CHUNG VÀ CHI TIẾT
+## YÊU CẦU CHUNG VÀ CHI TIẾT
 
-### 🖼️ Hình ảnh minh họa
+### Hình ảnh minh họa
 - **Tỷ lệ bắt buộc:** Ít nhất 20% số câu (16/80 câu) phải có hình ảnh
 - **Định dạng:** `[HÌNH ẢNH: mô tả chi tiết]` hoặc `[HÌNH ẢNH: mô tả - Lấy từ trang X]`
 - **Chất lượng:** Mô tả đủ chi tiết để học sinh hiểu mà không cần xem PDF
 
-### 📝 Độ dài và cấu trúc
+### Độ dài và cấu trúc
 - **Nội dung câu hỏi:** 50-80 từ, viết liền mạch
 - **Giải thích:** Mỗi đáp án 2-5 dòng, không lan man
 - **Tính nhất quán:** Cùng một thuật ngữ phải được sử dụng nhất quán
 
-### 🎯 Chất lượng câu hỏi
+### Chất lượng câu hỏi
 - **Chính xác và duy nhất:** Mỗi câu chỉ có 1 đáp án đúng duy nhất
 - **Không trùng lặp:** Nội dung các câu hỏi hoàn toàn khác biệt
 - **Ngôn ngữ rõ ràng:** Trong sáng, dễ hiểu, phù hợp lứa tuổi học sinh
 - **Tính logic:** Đáp án sai phải hợp lý, có tính thuyết phục
 
-### 🚫 Cấm sử dụng
+### Cấm sử dụng
 TUYỆT ĐỐI KHÔNG được sử dụng các cụm từ:
 - "theo định nghĩa trong giáo trình"
 - "dựa vào nội dung trong sách"  
@@ -112,9 +112,9 @@ TUYỆT ĐỐI KHÔNG được sử dụng các cụm từ:
 - "theo ví dụ 1"
 - Hoặc các cụm từ tương đương
 
-## 📊 PHÂN BỐ NỘI DUNG VÀ MỨC ĐỘ NHẬN THỨC
+## PHÂN BỐ NỘI DUNG VÀ MỨC ĐỘ NHẬN THỨC
 
-### 🎯 Tổng quan phân bố (80 câu) - TUYỆT ĐỐI PHẢI TUÂN THEO
+### Tổng quan phân bố (80 câu) - TUYỆT ĐỐI PHẢI TUÂN THEO
 
 | Mức độ | Số câu | Tỷ lệ | Đặc điểm |
 |--------|--------|-------|----------|
@@ -123,7 +123,7 @@ TUYỆT ĐỐI KHÔNG được sử dụng các cụm từ:
 | **Vận dụng** | Câu 49-72| 30% | Kiểm tra khả năng áp dụng kiến thức vào tình huống thực tế |
 | **Vận dụng cao** | Câu 73-80 | 10% | Câu hỏi phức tạp, đòi hỏi tư duy phản biện và sáng tạo |
 
-### ⚠️ QUY TẮC VÀNG VỀ THỨ TỰ CÂU HỎI
+### QUY TẮC VÀNG VỀ THỨ TỰ CÂU HỎI
 **TUYỆT ĐỐI KHÔNG ĐƯỢC VI PHẠM:**
 - Câu 1-24: PHẢI là mức độ Nhận biết
 - Câu 25-48: PHẢI là mức độ Thông hiểu  
@@ -132,72 +132,72 @@ TUYỆT ĐỐI KHÔNG được sử dụng các cụm từ:
 
 **Khi sinh câu hỏi, bạn PHẢI xác định rõ câu đó thuộc mức độ nào dựa trên số thứ tự và sinh theo đúng đặc điểm của mức độ đó!**
 
-### 📚 Phân bố nội dung
+### Phân bố nội dung
 - **Nguyên tắc:** Chia đều câu hỏi cho các phần/chương chính trong PDF
 - **Cân bằng:** Đảm bảo không tập trung quá nhiều vào một chủ đề
 - **Đa dạng:** Bao phủ toàn bộ nội dung quan trọng trong PDF
 
-### 🎯 Hướng dẫn tạo câu hỏi theo mức độ
+### Hướng dẫn tạo câu hỏi theo mức độ
 
-#### 🔍 Nhận biết (24 câu đầu)
+#### Nhận biết (24 câu đầu)
 - **Mục tiêu:** Kiểm tra khả năng nhớ và nhận diện
 - **Đặc điểm:** Câu hỏi ngắn gọn, trực tiếp
 - **Ví dụ:** "Thành phần nào của máy tính có chức năng xử lý dữ liệu?"
 
-#### 💡 Thông hiểu (24 câu tiếp theo)  
+#### Thông hiểu (24 câu tiếp theo)  
 - **Mục tiêu:** Kiểm tra khả năng giải thích và so sánh
 - **Đặc điểm:** Yêu cầu hiểu bản chất, mối quan hệ
 - **Ví dụ:** "Tại sao RAM có tốc độ truy cập nhanh hơn ổ cứng?"
 
-#### ⚙️ Vận dụng (24 câu tiếp theo)
+#### Vận dụng (24 câu tiếp theo)
 - **Mục tiêu:** Áp dụng kiến thức vào tình huống thực tế
 - **Đặc điểm:** Có tình huống cụ thể, yêu cầu giải quyết vấn đề
 - **Ví dụ:** "Trong tình huống máy tính chạy chậm, bạn sẽ kiểm tra thành phần nào trước?"
 
-#### 🚀 Vận dụng cao (8 câu cuối cùng)
+#### Vận dụng cao (8 câu cuối cùng)
 - **Mục tiêu:** Tư duy phản biện, sáng tạo, phân tích phức tạp
 - **Đặc điểm:** Câu hỏi đa tầng, yêu cầu tổng hợp nhiều kiến thức
 - **Ví dụ:** "Phân tích ưu nhược điểm của việc sử dụng SSD thay thế HDD trong hệ thống máy tính văn phòng."
 
-## 📝 YÊU CẦU CHI TIẾT VỀ CÂU HỎI VÀ ĐÁP ÁN
+## YÊU CẦU CHI TIẾT VỀ CÂU HỎI VÀ ĐÁP ÁN
 
-### 🎯 Câu hỏi
+### Câu hỏi
 - **Rõ ràng, cụ thể:** Bám sát nội dung PDF, không mơ hồ
 - **Đủ thông tin:** Cung cấp đủ dữ liệu để học sinh có thể trả lời
 - **Ngôn ngữ phù hợp:** Trong sáng, dễ hiểu với lứa tuổi học sinh
 - **Tính độc lập:** Mỗi câu hỏi phải độc lập, không phụ thuộc câu khác
 
-### 🎯 Đáp án
+### Đáp án
 - **1 đáp án đúng + 3 đáp án nhiễu:** Tất cả đều hợp lý và có tính thuyết phục
 - **Độ dài tương đương:** Các đáp án có độ dài và cấu trúc tương đương
 - **Không dùng cụm từ cấm:** Tránh "Tất cả đều đúng/sai", "Không có đáp án nào"
 - **Đánh dấu chuẩn:** A, B, C, D như bình thường
 - **Mã đáp án:** Trong "Lời giải", thay [X] bằng **số thứ tự** (A=1, B=2, C=3, D=4)
 
-### 🎯 Đáp án nhiễu (Distractors)
+### Đáp án nhiễu (Distractors)
 - **Tính hợp lý:** Phải có vẻ đúng nhưng thực tế sai
 - **Không quá dễ loại bỏ:** Học sinh phải suy nghĩ để phân biệt
 - **Dựa trên lỗi thường gặp:** Sử dụng những nhầm lẫn phổ biến
 - **Cùng chủ đề:** Liên quan đến nội dung câu hỏi, không lạc đề
 
-## 🖼️ YÊU CẦU ĐẶC BIỆT VỀ HÌNH ẢNH MINH HỌA
+## YÊU CẦU ĐẶC BIỆT VỀ HÌNH ẢNH MINH HỌA
 
-### 📊 Số lượng và tỷ lệ
+### Số lượng và tỷ lệ
 - **Tỷ lệ bắt buộc:** 30% tổng số câu hỏi (24/80 câu) phải có hình ảnh
 - **Phân bố đều:** Hình ảnh phải được phân bố đều trong các mức độ nhận thức
 - **Chất lượng cao:** Mỗi hình ảnh phải có giá trị giáo dục rõ ràng
 
-### 🎯 Nguồn và ưu tiên
+### Nguồn và ưu tiên
 1. **Ưu tiên cao:** Sử dụng hình ảnh có sẵn trong file PDF
 2. **Tạo mới:** Nếu không có, tạo mô tả chi tiết để vẽ hình mới
 3. **Chất lượng:** Mô tả đủ chi tiết để học sinh hiểu bối cảnh mà không cần PDF gốc
 
-### 📝 Định dạng và cấu trúc
+### Định dạng và cấu trúc
 - **Định dạng chuẩn:** `[HÌNH ẢNH: Mô tả chi tiết - Lấy từ trang X của file PDF]`
 - **Định dạng thay thế:** `[HÌNH ẢNH MINH HỌA: Mô tả chi tiết]`
 - **Vị trí:** Hình ảnh nằm sau câu hỏi và đặt chính giữa
 
-### 🎨 Mô tả chi tiết hình ảnh
+### Mô tả chi tiết hình ảnh
 Mô tả phải bao gồm:
 - **Màu sắc:** Các màu chính và màu phụ
 - **Hình dáng:** Kích thước, tỷ lệ, hình dạng các thành phần
@@ -205,7 +205,7 @@ Mô tả phải bao gồm:
 - **Dữ liệu:** Nếu là bảng/biểu đồ, phải liệt kê hàng/cột và giá trị
 - **Sơ đồ:** Mô tả các thành phần và mối liên hệ giữa chúng
 
-### 📍 Ví dụ mô tả tốt
+### Ví dụ mô tả tốt
 ```
 [HÌNH ẢNH: Sơ đồ khối hệ thống máy tính gồm 5 thành phần chính được sắp xếp theo chiều ngang: 
 Thiết bị nhập (bàn phím màu đen, chuột màu xám) → Bộ xử lý trung tâm CPU (hình vuông màu xanh) → 
@@ -214,35 +214,35 @@ máy in màu trắng). Các mũi tên hai chiều màu đỏ thể hiện luồn
 Lấy từ trang 15 của file PDF]
 ```
 
-## 📚 YÊU CẦU VỀ HƯỚNG DẪN GIẢI CHI TIẾT
+## YÊU CẦU VỀ HƯỚNG DẪN GIẢI CHI TIẾT
 
-### 🎯 Mục tiêu của lời giải
+### Mục tiêu của lời giải
 Giải thích phải làm rõ:
 - **Tại sao đáp án đúng là chính xác:** Cung cấp lý do khoa học cụ thể, chi tiết và thuyết phục
 - **Dựa trên kiến thức từ PDF:** Mọi giải thích phải có nguồn gốc từ PDF
 - **Tính thuyết phục:** Lời giải phải có tính logic và dễ hiểu
 - **CHỈ GIẢI THÍCH ĐÁP ÁN ĐÚNG:** Không cần giải thích tại sao các đáp án sai
 
-### 🚫 QUAN TRỌNG - CẤM TUYỆT ĐỐI
+### QUAN TRỌNG - CẤM TUYỆT ĐỐI
 Trong phần giải thích, **TUYỆT ĐỐI KHÔNG** được đề cập đến các ký tự của đáp án (A, B, C, D).
 
 **Thay vào đó:** Diễn giải dựa trên nội dung của chính các lựa chọn đó.
 
-### 📝 Cấu trúc lời giải chuẩn
+### Cấu trúc lời giải chuẩn
 1. **Mã đáp án:** Số thứ tự (1/2/3/4)
 2. **Dòng phân cách:** `####`
 3. **Giải thích đáp án đúng:** Tại sao đúng, với ví dụ cụ thể và lý do khoa học chi tiết
 
-### 🎯 Nguyên tắc viết lời giải
+### Nguyên tắc viết lời giải
 - **Không dùng ký tự:** Không nhắc đến A, B, C, D trong giải thích
 - **Chỉ giải thích đáp án đúng:** Tập trung vào lý do tại sao đáp án đúng là chính xác
 - **Chi tiết đủ:** Giải thích đáp án đúng **TỐI THIỂU** 3 dòng, đầy đủ và thuyết phục
 - **Dễ hiểu:** Ngôn ngữ trong sáng, phù hợp học sinh
 - **Chính xác:** Mọi thông tin phải được kiểm chứng từ PDF
 
-## 📖 VÍ DỤ MINH HỌA CÁCH VIẾT LỜI GIẢI
+## VÍ DỤ MINH HỌA CÁCH VIẾT LỜI GIẢI
 
-### ❌ Cách viết SAI (Nghiêm cấm - không được làm theo)
+### Cách viết SAI (Nghiêm cấm - không được làm theo)
 
 **Câu hỏi mẫu:**
 Trong mạch điện gia đình, cầu chì có vai trò chính là gì?
@@ -260,7 +260,7 @@ Giải thích: Đáp án B đúng vì cầu chì ngắt mạch khi quá tải.
 Đáp án D sai vì đó là chức năng của công tơ điện.
 ```
 
-### ✅ Cách viết ĐÚNG (Bắt buộc phải làm theo)
+### Cách viết ĐÚNG (Bắt buộc phải làm theo)
 
 **Lời giải ĐÚNG:**
 ```
@@ -271,7 +271,7 @@ Cầu chì hoạt động dựa trên nguyên lý bảo vệ nhiệt: khi dòng 
 Việc tự động ngắt mạch khi có sự cố quá tải là đặc điểm cốt lõi của cầu chì, giúp ngăn chặn hư hỏng thiết bị và đảm bảo an toàn cho người sử dụng. Do đó, nhận định cầu chì có chức năng tự động ngắt mạch khi có sự cố quá tải là hoàn toàn chính xác.
 ```
 
-### 🎯 Điểm khác biệt quan trọng
+### Điểm khác biệt quan trọng
 - **SAI:** Dùng ký tự A, B, C, D trong giải thích
 - **ĐÚNG:** Diễn giải bằng nội dung của đáp án đúng
 - **SAI:** Giải thích ngắn gọn, thiếu chi tiết
@@ -279,15 +279,15 @@ Việc tự động ngắt mạch khi có sự cố quá tải là đặc điể
 - **SAI:** Giải thích tất cả các đáp án (đúng và sai)
 - **ĐÚNG:** CHỈ giải thích đáp án đúng, tập trung vào lý do tại sao nó chính xác
 
-## 📋 CẤU TRÚC ĐẦU RA CUỐI CÙNG (BẮT BUỘC TUÂN THEO)
+## CẤU TRÚC ĐẦU RA CUỐI CÙNG (BẮT BUỘC TUÂN THEO)
 
-### 🎯 Nguyên tắc tổng thể
+### Nguyên tắc tổng thể
 - **Đầy đủ:** Phải có đủ 80 câu hỏi
 - **Phân bố đúng:** Theo tỷ lệ mức độ đã quy định
 - **Hình ảnh:** Ít nhất 24 câu có hình ảnh
 - **Chất lượng:** Mỗi câu hoàn chỉnh về nội dung, đáp án và lời giải
 
-### 📝 Cấu trúc mẫu cho mỗi câu hỏi
+### Cấu trúc mẫu cho mỗi câu hỏi
 
 ```
 [TÊN PHẦN NỘI DUNG TRONG PDF]
@@ -313,7 +313,7 @@ D. [Nội dung đáp án 4]
 (tiếp tục cho các câu hỏi khác và các mức độ khác theo đúng cấu trúc trên)
 ```
 
-### 🔍 Checklist kiểm tra cuối cùng
+### Checklist kiểm tra cuối cùng
 - [ ] Đủ 80 câu hỏi
 - [ ] Phân bố đúng: 24 câu Nhận biết đầu, 24 câu Thông hiểu tiếp theo, 24 câu Vận dụng tiếp theo, 8 câu Vận dụng cao cuối
 - [ ] Ít nhất 24 câu có hình ảnh
@@ -322,6 +322,6 @@ D. [Nội dung đáp án 4]
 - [ ] Lời giải không dùng ký tự A, B, C, D
 - [ ] Tất cả nội dung bám sát PDF, không thêm từ nguồn khác
 
-## 🎯 KẾT LUẬN
+## KẾT LUẬN
 
-Sử dụng file PDF làm nguồn tài liệu duy nhất để soạn 80 câu hỏi trắc nghiệm chất lượng cao theo đúng yêu cầu nêu trên. Đảm bảo tính chính xác, đa dạng và phù hợp với trình độ học sinh.
+Sử dụng file PDF làm nguồn tài liệu duy nhất (LƯU Ý: không được trích dẫn từ trong sách) để soạn 80 câu hỏi trắc nghiệm chất lượng cao theo đúng yêu cầu nêu trên. Đảm bảo tính chính xác, đa dạng và phù hợp với trình độ học sinh.

@@ -187,7 +187,7 @@ class BatchProcessorV2:
                 print(f"   🔄 Lần thử {attempt}/{self.config.max_final_recovery_retry}...")
                 
                 # STEP 1: REGEN
-                print(f"      📝 Đang regen câu {qnum}...")
+                print(f"      🔍 Đang regen câu {qnum}...")
                 new_qtext = self._regenerate_single_question(
                     qnum,
                     enhanced_prompt,
@@ -245,6 +245,10 @@ class BatchProcessorV2:
                             if new_qtext:
                                 storage.replace_question(qnum, new_qtext)
                                 time.sleep(1)
+                            else:
+                                print(f"      ⚠️ Regen thất bại, thử attempt tiếp...")
+                                time.sleep(2)
+                                # TIẾP TỤC vòng lặp write để retry
                         else:
                             break
                 
@@ -283,7 +287,7 @@ class BatchProcessorV2:
         Xử lý một batch theo workflow MỚI:
         1. Sinh → Validate → Lưu Storage
         2. Regen invalid → Validate → Lưu Storage
-        3. Đủ 10 valid → Sort → Ghi DOCX
+        3. Đủ 10 valid → Sort → Ghi DOCX (VỚI VALIDATION SAU REGEN)
         
         Returns:
             List số câu thất bại (không thể ghi vào DOCX)
@@ -298,7 +302,6 @@ class BatchProcessorV2:
         print(f"{'─'*60}\n")
         
         for retry in range(1, self.config.max_retry_per_batch + 1):
-            # Tính câu còn thiếu trong storage
             missing_in_storage = [n for n in batch_nums if not storage.has_question(n)]
             
             if not missing_in_storage:
@@ -308,7 +311,6 @@ class BatchProcessorV2:
             print(f"\n🔄 Lần thử {retry}/{self.config.max_retry_per_batch}")
             print(f"🔍 Cần sinh: {len(missing_in_storage)} câu: {missing_in_storage}\n")
             
-            # Tạo prompt cho batch này
             batch_prompt = self._create_batch_prompt(
                 missing_in_storage,
                 enhanced_prompt,
@@ -316,7 +318,6 @@ class BatchProcessorV2:
                 question_type
             )
             
-            # Sinh câu hỏi
             try:
                 print(f"📤 Gửi yêu cầu AI sinh {len(missing_in_storage)} câu...")
                 response = self.client.send_data_to_check(
@@ -331,7 +332,6 @@ class BatchProcessorV2:
                 
                 print(f"✅ Nhận được response ({len(response)} ký tự)\n")
                 
-                # Parse và validate - CHỈ LƯU VÀO STORAGE
                 newly_valid = self._validate_and_store_only(
                     response,
                     missing_in_storage,
@@ -347,7 +347,6 @@ class BatchProcessorV2:
                 print(f"❌ Lỗi khi sinh câu: {str(e)}\n")
                 time.sleep(3)
         
-        # Kiểm tra storage có đủ không
         valid_in_storage = [n for n in batch_nums if storage.has_question(n)]
         missing_in_storage = [n for n in batch_nums if not storage.has_question(n)]
         
@@ -359,7 +358,7 @@ class BatchProcessorV2:
             print(f"   📋 Danh sách thiếu: {missing_in_storage}")
         print(f"{'─'*60}\n")
         
-        # PHASE 2: GHI VÀO DOCX
+        # PHASE 2: GHI VÀO DOCX (VỚI VALIDATION SAU REGEN)
         print(f"\n🖊️  PHASE 2: GHI VÀO DOCX")
         print(f"{'─'*60}\n")
         
@@ -367,17 +366,15 @@ class BatchProcessorV2:
             print(f"⚠️  Không có câu nào valid trong storage → Bỏ qua phase 2")
             return batch_nums
         
-        # Sort theo thứ tự
         valid_in_storage.sort()
         
-        failed_to_write = []  # Câu không thể ghi vào DOCX
+        failed_to_write = []
         
         for qnum in valid_in_storage:
             print(f"\n🖊️  Đang ghi câu {qnum} vào DOCX...")
             
             qtext = storage.valid_questions[qnum]
             
-            # Thử ghi vào DOCX với retry
             write_success = False
             
             for write_attempt in range(1, self.config.max_write_retry + 1):
@@ -400,22 +397,47 @@ class BatchProcessorV2:
                     if write_attempt < self.config.max_write_retry:
                         print(f"   🔄 Đang regen câu {qnum}...")
                         
-                        # Regen câu này
-                        new_qtext = self._regenerate_single_question(
-                            qnum,
-                            enhanced_prompt,
-                            storage,
-                            question_type
-                        )
+                        # === FIX: VALIDATE SAU KHI REGEN ===
+                        regen_success = False
                         
-                        if new_qtext:
-                            # Cập nhật storage
-                            storage.replace_question(qnum, new_qtext)
-                            qtext = new_qtext
-                            print(f"   ✅ Đã regen thành công, thử ghi lại...")
+                        for regen_attempt in range(1, 6 + 1):  # Thử regen tối đa 3 lần
+                            new_qtext = self._regenerate_single_question(
+                                qnum,
+                                enhanced_prompt,
+                                storage,
+                                question_type
+                            )
+                            
+                            if not new_qtext:
+                                print(f"      ❌ Regen attempt {regen_attempt} thất bại")
+                                time.sleep(1)
+                                continue
+                            
+                            # VALIDATE câu vừa regen
+                            from process.ques_valid import QuestionValidator
+                            validator = QuestionValidator(question_type=question_type)
+                            validation = validator.validate_single_question(new_qtext, qnum)
+                            
+                            if validation.is_valid:
+                                # Valid → Cập nhật storage
+                                storage.replace_question(qnum, new_qtext)
+                                qtext = new_qtext
+                                print(f"      ✅ Regen + validate thành công (attempt {regen_attempt})")
+                                regen_success = True
+                                break
+                            else:
+                                print(f"      ❌ Regen attempt {regen_attempt} không valid: {', '.join(validation.missing_parts)}")
+                                time.sleep(1)
+                        
+                        if regen_success:
+                            print(f"   🔄 Thử ghi lại với câu mới...")
+                            time.sleep(1)
                         else:
-                            print(f"   ❌ Không thể regen câu {qnum}")
-                            break
+                            print(f"   💔 Không thể regen câu valid sau 3 lần thử")
+                            time.sleep(2)
+                    else:
+                        # Hết retry
+                        break
             
             if not write_success:
                 print(f"   💔 Không thể ghi câu {qnum} sau {self.config.max_write_retry} lần thử")
@@ -429,7 +451,6 @@ class BatchProcessorV2:
             print(f"   📋 Danh sách: {failed_to_write}")
         print(f"{'─'*60}\n")
         
-        # Tổng kết batch
         total_failed = list(set(missing_in_storage + failed_to_write))
         
         return total_failed
@@ -455,7 +476,7 @@ class BatchProcessorV2:
         for qnum, qtext in sorted(questions.items()):
             # Chỉ xử lý câu trong danh sách expected
             if qnum not in expected_nums:
-                print(f"   ⚠️  Câu {qnum}: Không trong batch này, bỏ qua")
+                print(f"   ⭐ Câu {qnum}: Không trong batch này, bỏ qua")
                 continue
             
             # Validate
