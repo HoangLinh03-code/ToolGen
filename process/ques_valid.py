@@ -503,6 +503,7 @@ class QuestionValidator:
                 "2",
                 "####",
                 "[Giải thích chi tiết, tối thiểu 3 dòng, chỉ lý do đáp án 2 đúng]",
+                "**Vậy đáp án đúng là: [Nội dung đáp án đúng]**",
                 "```\n"
             ])
         else:  # dungsai
@@ -519,9 +520,9 @@ class QuestionValidator:
                 "**Lời giải:** (chỉ giải thích vì sao từng phát biểu đúng/sai, tránh hội thoại)",
                 "1010",
                 "####",
-                "- [Nội dung phát biểu a] là ĐÚNG. Giải thích 1-2 dòng.",
+                "- [Nội dung phát biểu a] - **ĐÚNG**. Giải thích 1-2 dòng.",
                 "",
-                "- [Nội dung phát biểu b] là SAI. Giải thích 1-2 dòng.",
+                "- [Nội dung phát biểu b] - **SAI**. Giải thích 1-2 dòng.",
                 "...",
                 "```\n"
             ])

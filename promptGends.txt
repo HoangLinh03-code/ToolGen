@@ -124,29 +124,29 @@ TUYỆT ĐỐI KHÔNG được sử dụng các cụm từ:
 1. **Dòng 1:** Mã đáp án dạng 4 ký tự `1010` (1=Đúng, 0=Sai)
 2. **Dòng 2:** `####`
 3. **Các dòng tiếp:** Liệt kê từng đáp án theo nội dung phát biểu (không dùng chữ cái a), b), c), d))
-4. **Mỗi đáp án:** Ghi trên một dòng ở dạng: `- [Nội dung phát biểu] là ĐÚNG/SAI.`
+4. **Mỗi đáp án:** Ghi trên một dòng ở dạng: `- [Nội dung phát biểu] - **ĐÚNG/SAI.**`
 5. **Giải thích:** Chi tiết (ít nhất 3 dòng) cho mỗi đáp án
 
 ### Ví dụ về cách ghi lời giải (mẫu)
 ```
 1010  
 ####  
-- Không thể thay đổi được độ căng của xích là SAI.  
+- Không thể thay đổi được độ căng của xích - **ĐÚNG.**  
 Việc điều chỉnh độ căng xích là một thao tác cơ bản trên xe đạp; người dùng có thể di chuyển trục bánh sau hoặc sử dụng bộ căng xích để điều chỉnh khi xích chùng. Thao tác này giúp đảm bảo hiệu suất truyền động và kéo dài tuổi thọ xích. Trên nhiều loại xe, hướng dẫn bảo trì cũng mô tả quy trình điều chỉnh xích.
 
-- Di chuyển dễ dàng nhờ động cơ điện là SAI.  
+- Di chuyển dễ dàng nhờ động cơ điện - **SAI.**  
 Mô tả cho biết đó là xe đạp thường, không có mô tơ điện; xe đạp thường hoạt động bằng lực đạp của người. Nếu xuất hiện động cơ điện thì đó là xe đạp điện, một loại phương tiện khác với đặc tính riêng.
 
-- Được làm từ nhiều vật liệu khác nhau là ĐÚNG.  
+- Được làm từ nhiều vật liệu khác nhau - **ĐÚNG.**  
 Các bộ phận khác nhau của một chiếc xe đạp có thể được làm từ thép, nhôm, cao su, da hoặc nhựa tùy theo chức năng; điều này đảm bảo kết hợp độ bền, trọng lượng và tính thẩm mỹ cho sản phẩm.
 
-- Giúp rèn luyện sức khỏe và bảo vệ môi trường là ĐÚNG.  
+- Giúp rèn luyện sức khỏe và bảo vệ môi trường - **ĐÚNG.**  
 Việc sử dụng xe đạp làm phương tiện đi lại giúp tăng cường vận động tim mạch và cơ, đồng thời không phát thải khí nhà kính trực tiếp, góp phần giảm ô nhiễm so với phương tiện sử dụng nhiên liệu hóa thạch.
 ```
 
 ### Những điểm **CẤM** trong nội dung và lời giải
 - Tuyệt đối không sử dụng các cụm từ: "theo định nghĩa trong giáo trình", "dựa vào nội dung trong sách", "theo bảng trên", "như hình vẽ", "câu hỏi trước" hoặc các cụm tương đương trong đề và lời giải.
-- Trong phần giải thích KHÔNG được nhắc ký hiệu a), b), c), d) — chỉ nêu nguyên văn nội dung phát biểu trong ngoặc vuông rồi nói "là ĐÚNG" hoặc "là SAI", rồi giải thích.
+- Trong phần giải thích KHÔNG được nhắc ký hiệu a), b), c), d) — chỉ nêu nguyên văn nội dung phát biểu trong ngoặc vuông rồi nói "**- ĐÚNG**" hoặc "**- ĐÚNG**", rồi giải thích.
 
 ## PHÂN BỐ MỨC ĐỘ NHẬN THỨC (TỔNG 40 CÂU) - TUYỆT ĐỐI PHẢI TUÂN THEO
 
@@ -215,7 +215,7 @@ Mô tả phải bao gồm:
 ### QUAN TRỌNG - CẤM TUYỆT ĐỐI
 Khi viết lời giải, **KHÔNG** dùng chữ cái để tham chiếu (a), b), c), d))
 
-**Thay vào đó:** Luôn ghi nguyên văn nội dung phát biểu trong ngoặc vuông rồi nói "là ĐÚNG" hoặc "là SAI", rồi giải thích.
+**Thay vào đó:** Luôn ghi nguyên văn nội dung phát biểu, sau đó thêm " - **ĐÚNG.**" hoặc " - **SAI.**", rồi giải thích.
 
 ### Nguyên tắc viết lời giải
 - **Không dùng ký tự:** Không nhắc đến a), b), c), d) trong giải thích
@@ -246,16 +246,16 @@ d) Phát biểu kiểm tra ý thứ tư.
 **Lời giải:**  
 1010  
 ####  
-- [Nội dung phát biểu a] là Đúng/SAI.  
+- [Nội dung phát biểu a] - **ĐÚNG**/**SAI**.  
 Giải thích chi tiết (ít nhất 3 dòng).
 
-- [Nội dung phát biểu b] là Đúng/SAI.  
+- [Nội dung phát biểu b] - **ĐÚNG**/**SAI**.  
 Giải thích chi tiết (ít nhất 3 dòng).
 
-- [Nội dung phát biểu c] là Đúng/SAI.  
+- [Nội dung phát biểu c] **- **ĐÚNG**/**SAI**.  
 Giải thích chi tiết (ít nhất 3 dòng).
 
-- [Nội dung phát biểu d] là Đúng/SAI.  
+- [Nội dung phát biểu d] - **ĐÚNG**/SAI**.  
 Giải thích chi tiết (ít nhất 3 dòng).
 ```
 

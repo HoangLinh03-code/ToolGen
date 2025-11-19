@@ -32,6 +32,7 @@
 7. **Mã đáp án:** 1 ký tự số (1/2/3/4)
 8. **Dòng phân cách:** `####`
 9. **Giải thích chi tiết:** TỐI THIỂU 2 dòng cho đáp án đúng
+10. **Kết luận cuối mỗi câu:** **Vậy đáp án đúng là: [Nội dung đáp án đúng].**
 
 ### Phân bố mức độ câu hỏi (BẮT BUỘC)
 - **Nhận biết:** 20 câu (25%) - Câu 1-20: Kiến thức cơ bản, định nghĩa, khái niệm
@@ -232,6 +233,7 @@ Trong phần giải thích, **TUYỆT ĐỐI KHÔNG** được đề cập đế
 1. **Mã đáp án:** Số thứ tự (1/2/3/4)
 2. **Dòng phân cách:** `####`
 3. **Giải thích đáp án đúng:** Tại sao đúng, với ví dụ cụ thể và lý do khoa học chi tiết
+4. **Dòng kết luận (BẮT BUỘC):** `**Vậy đáp án đúng là: [Nội dung đáp án đúng]**`
 
 ### Nguyên tắc viết lời giải
 - **Không dùng ký tự:** Không nhắc đến A, B, C, D trong giải thích
@@ -269,6 +271,7 @@ Giải thích: Đáp án B đúng vì cầu chì ngắt mạch khi quá tải.
 Vai trò chính của cầu chì là bảo vệ mạch điện khỏi các sự cố quá tải và ngắn mạch. Khi dòng điện tăng lên quá mức an toàn, dây chì bên trong cầu chì sẽ nóng chảy do hiệu ứng nhiệt của dòng điện cao. Quá trình này diễn ra rất nhanh, thường trong vài mili giây, giúp ngắt mạch điện ngay lập tức trước khi các thiết bị khác bị hư hỏng. 
 Cầu chì hoạt động dựa trên nguyên lý bảo vệ nhiệt: khi dòng điện vượt quá giá trị định mức, nhiệt lượng sinh ra sẽ làm nóng chảy dây chì có tiết diện nhỏ, tạo ra khe hở trong mạch và ngắt dòng điện. Đây là cơ chế bảo vệ thụ động, đơn giản nhưng rất hiệu quả trong việc bảo vệ hệ thống điện.
 Việc tự động ngắt mạch khi có sự cố quá tải là đặc điểm cốt lõi của cầu chì, giúp ngăn chặn hư hỏng thiết bị và đảm bảo an toàn cho người sử dụng. Do đó, nhận định cầu chì có chức năng tự động ngắt mạch khi có sự cố quá tải là hoàn toàn chính xác.
+**Vậy đáp án đúng là: Tự động ngắt mạch khi có sự cố quá tải.**
 ```
 
 ### Điểm khác biệt quan trọng
@@ -306,6 +309,7 @@ D. [Nội dung đáp án 4]
 [X] 
 ####
 [Giải thích chi tiết tại sao đáp án đúng là chính xác, với lý do khoa học cụ thể và ví dụ minh họa]
+**Vậy đáp án đúng là: [Nội dung đáp án đúng]**
 
 **Câu 2:**
 [Nội dung câu hỏi tiếp theo...]
