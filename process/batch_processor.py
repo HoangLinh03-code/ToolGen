@@ -6,7 +6,6 @@ from api.callAPI import VertexClient
 from process.ques_valid import QuestionValidator, ValidQuestionStorage
 from process.PDF_Scan import enhance_prompt_with_pdf_scan
 from docx import Document
-from concurrent.futures import ThreadPoolExecutor, as_completed
 
 @dataclass
 class OptimizedBatchConfig:
@@ -32,7 +31,7 @@ class BatchProcessorOptimized:
         self.config = OptimizedBatchConfig()
         self.image_tracker = None
         
-    def process_all_batches_fast(
+    def process_all_batches(
         self,
         prompt_content: str,
         pdf_files: List[str],
@@ -68,7 +67,7 @@ class BatchProcessorOptimized:
         
         # ============ PHASE 1: XỬ LÝ TỪNG BATCH - TỐI ƯU ============
         print(f"\n{'='*70}")
-        print("🔥 PHASE 1: XỬ LÝ CÁC BATCH (OPTIMIZED)")
+        print("PHASE 1: XỬ LÝ CÁC BATCH (OPTIMIZED)")
         print(f"{'='*70}\n")
         
         total_start_time = time.time()
@@ -81,7 +80,7 @@ class BatchProcessorOptimized:
             batch_nums = list(range(batch_start, batch_end + 1))
             
             print(f"\n{'='*70}")
-            print(f"📦 BATCH {batch_idx + 1}/{num_batches}: Câu {batch_start}-{batch_end}")
+            print(f"BATCH {batch_idx + 1}/{num_batches}: Câu {batch_start}-{batch_end}")
             print(f"{'='*70}\n")
             
             # XỬ LÝ BATCH TỐI ƯU
@@ -194,7 +193,7 @@ class BatchProcessorOptimized:
             print(f"📝 Cần sinh: {len(missing)} câu: {missing}\n")
             
             # TẠO PROMPT
-            batch_prompt = self._create_batch_prompt_fast(
+            batch_prompt = self._create_batch_prompt(
                 missing,
                 enhanced_prompt,
                 storage,
@@ -215,7 +214,7 @@ class BatchProcessorOptimized:
                 print(f"✅ Nhận response ({len(response)} ký tự, {api_time:.1f}s)\n")
                 
                 # VALIDATE VÀ LƯU NHANH
-                newly_valid = self._validate_and_store_fast(
+                newly_valid = self._validate_and_store(
                     response,
                     missing,
                     storage,
@@ -257,7 +256,7 @@ class BatchProcessorOptimized:
             
             for write_attempt in range(1, self.config.max_write_retry + 1):
                 try:
-                    self._write_question_to_doc_fast(
+                    self._write_question_to_doc(
                         qnum, qtext, doc, question_type,
                         image_tracker=self.image_tracker
                     )
@@ -271,7 +270,7 @@ class BatchProcessorOptimized:
                     
                     if write_attempt < self.config.max_write_retry:
                         # REGEN NHANH
-                        new_qtext = self._regenerate_single_fast(
+                        new_qtext = self._regenerate_single(
                             qnum, enhanced_prompt, storage, question_type
                         )
                         if new_qtext:
@@ -293,7 +292,7 @@ class BatchProcessorOptimized:
         total_failed = list(set(missing_in_storage + failed_to_write))
         return total_failed
     
-    def _validate_and_store_fast(
+    def _validate_and_store(
         self,
         response: str,
         expected_nums: List[int],
@@ -337,7 +336,7 @@ class BatchProcessorOptimized:
         
         return newly_valid
     
-    def _write_question_to_doc_fast(
+    def _write_question_to_doc(
         self,
         qnum: int,
         qtext: str,
@@ -471,7 +470,7 @@ class BatchProcessorOptimized:
                 else:
                     process_text(line, p)
     
-    def _regenerate_single_fast(
+    def _regenerate_single(
         self,
         qnum: int,
         enhanced_prompt: str,
@@ -479,7 +478,7 @@ class BatchProcessorOptimized:
         question_type: str
     ) -> str:
         """REGEN NHANH - 1 LẦN THỬ"""
-        regen_prompt = self._create_batch_prompt_fast(
+        regen_prompt = self._create_batch_prompt(
             [qnum], enhanced_prompt, storage, question_type
         )
         
@@ -511,7 +510,7 @@ class BatchProcessorOptimized:
             print(f"🔄 Recovery câu {qnum}...")
             
             for attempt in range(1, self.config.max_final_recovery_retry + 1):
-                new_qtext = self._regenerate_single_fast(
+                new_qtext = self._regenerate_single(
                     qnum, enhanced_prompt, storage, question_type
                 )
                 
@@ -521,7 +520,7 @@ class BatchProcessorOptimized:
                 storage.replace_question(qnum, new_qtext)
                 
                 try:
-                    self._write_question_to_doc_fast(
+                    self._write_question_to_doc(
                         qnum, new_qtext, doc, question_type,
                         image_tracker=self.image_tracker
                     )
@@ -539,7 +538,7 @@ class BatchProcessorOptimized:
         
         return final_failed
     
-    def _create_batch_prompt_fast(
+    def _create_batch_prompt(
         self,
         batch_nums: List[int],
         enhanced_prompt: str,

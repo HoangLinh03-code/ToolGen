@@ -21,8 +21,6 @@ import gc
 import io
 import re
 
-from process.response2docx_batch import response2docx_improved
-
 load_dotenv()
 
 if getattr(sys, 'frozen', False):
