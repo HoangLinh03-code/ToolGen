@@ -1,30 +1,25 @@
 import json
 from docx import Document
-from docx.shared import Inches, Pt
+from docx.shared import Inches, Pt, RGBColor
 from docx.enum.text import WD_ALIGN_PARAGRAPH
 from api.callAPI import VertexClient
-from process.text2Image import generate_image_from_text
+from process.text2Image import generate_image_from_text, get_image_size_for_aspect_ratio
 from io import BytesIO
 import os
 import sys
+
 def get_app_path():
     """Lấy đường dẫn chứa file .exe hoặc file script đang chạy"""
     if getattr(sys, 'frozen', False):
-        # Nếu đang chạy file .exe
         return os.path.dirname(sys.executable)
     else:
-        # Nếu đang chạy code python thường
         return os.path.dirname(os.path.abspath(__file__))
 
 def save_document_securely(doc, file_name):
-    """Hàm lưu file an toàn: tự tạo folder output và dùng đường dẫn tuyệt đối"""
-    # 1. Lấy đường dẫn gốc nơi đặt file exe
+    """Hàm lưu file an toàn"""
     base_path = get_app_path()
-    
-    # 2. Định nghĩa folder output
     output_dir = os.path.join(base_path, "output")
     
-    # 3. Tự động tạo folder nếu chưa có
     if not os.path.exists(output_dir):
         try:
             os.makedirs(output_dir)
@@ -33,10 +28,8 @@ def save_document_securely(doc, file_name):
             print(f"Lỗi không thể tạo thư mục output: {e}")
             return None
 
-    # 4. Tạo đường dẫn file đầy đủ
     output_path = os.path.join(output_dir, f"{file_name}.docx")
     
-    # 5. Lưu file
     try:
         doc.save(output_path)
         print(f"Đã lưu file tại: {output_path}")
@@ -48,7 +41,6 @@ def save_document_securely(doc, file_name):
 def clean_json_string(text):
     """Làm sạch chuỗi JSON trước khi parse"""
     text = text.strip()
-    # Loại bỏ markdown code block
     if text.startswith("```json"): text = text[7:]
     elif text.startswith("```"): text = text[3:]
     if text.endswith("```"): text = text[:-3]
@@ -67,23 +59,18 @@ def repair_json_with_ai(broken_json_str, client):
     2. TUYỆT ĐỐI KHÔNG thay đổi nội dung văn bản tiếng Việt.
     3. CHỈ TRẢ VỀ JSON ĐÃ SỬA (Không giải thích, không markdown).
     """
-    # Gọi AI để sửa (dùng hàm send_data_to_check hoặc send_data_to_AI đều được)
-    # Ở đây ta tận dụng hàm send_data_to_check cho nhanh
     repaired_text = client.send_data_to_check(prompt_fix)
     return clean_json_string(repaired_text)
 
 def parse_json_safely(json_str, client):
-    """Thử parse, nếu lỗi thì nhờ AI sửa, thử tối đa 2 lần"""
+    """Thử parse, nếu lỗi thì nhờ AI sửa"""
     cleaned_str = clean_json_string(json_str)
     
-    # Lần thử 1: Parse trực tiếp
     try:
-        # strict=False cho phép chấp nhận một số lỗi nhỏ như \n trong string
         return json.loads(cleaned_str, strict=False)
     except json.JSONDecodeError as e:
         print(f"Lỗi JSON lần 1: {e}")
         
-    # Lần thử 2: Nhờ AI sửa rồi parse lại
     try:
         repaired_str = repair_json_with_ai(cleaned_str, client)
         return json.loads(repaired_str, strict=False)
@@ -91,19 +78,86 @@ def parse_json_safely(json_str, client):
         print(f"Lỗi JSON lần 2 (AI bó tay): {e}")
         return None
 
+def generate_or_get_image(hinh_anh_data):
+    """
+    Xử lý sinh ảnh hoặc trả về placeholder
+    
+    Returns:
+        tuple: (image_bytes, placeholder_text)
+        - Nếu sinh ảnh thành công: (bytes, None)
+        - Nếu cần placeholder: (None, "text mô tả")
+    """
+    if not hinh_anh_data.get("co_hinh", False):
+        return None, None
+    
+    loai = hinh_anh_data.get("loai", "tu_mo_ta")
+    mo_ta = hinh_anh_data.get("mo_ta", "")
+    
+    # Trường hợp 1: Ảnh từ PDF - luôn dùng placeholder
+    if loai == "tu_pdf":
+        trang = hinh_anh_data.get("trang", "?")
+        so_hinh = hinh_anh_data.get("so_hinh", "?")
+        placeholder = f"📄 [Chèn hình {so_hinh} từ trang {trang} của file PDF gốc]"
+        return None, placeholder
+    
+    # Trường hợp 2: Sinh ảnh từ mô tả
+    if loai == "tu_mo_ta" and mo_ta:
+        try:
+            print(f"🎨 Đang sinh ảnh từ mô tả: {mo_ta[:50]}...")
+            image_bytes = generate_image_from_text(mo_ta)
+            if image_bytes:
+                print("✅ Sinh ảnh thành công!")
+                return image_bytes, None
+        except Exception as e:
+            print(f"❌ Lỗi khi sinh ảnh: {e}")
+    
+    # Trường hợp 3: Lỗi hoặc không có mô tả - dùng placeholder
+    placeholder = f"🖼️ [Cần chèn hình ảnh: {mo_ta if mo_ta else 'Không có mô tả'}]"
+    return None, placeholder
+
+def insert_image_or_placeholder(doc, hinh_anh_data):
+    """
+    Chèn ảnh hoặc placeholder vào document
+    """
+    image_bytes, placeholder = generate_or_get_image(hinh_anh_data)
+    
+    if image_bytes:
+        # Chèn ảnh thật
+        try:
+            image_stream = BytesIO(image_bytes)
+            doc.add_picture(image_stream, width=Inches(4))
+            last_paragraph = doc.paragraphs[-1]
+            last_paragraph.alignment = WD_ALIGN_PARAGRAPH.CENTER
+        except Exception as e:
+            print(f"❌ Lỗi khi chèn ảnh vào DOCX: {e}")
+            # Fallback về placeholder
+            p = doc.add_paragraph()
+            run = p.add_run(f"⚠️ [Lỗi chèn ảnh: {str(e)}]")
+            run.font.color.rgb = RGBColor(255, 0, 0)
+            run.italic = True
+    
+    elif placeholder:
+        # Chèn placeholder với format đẹp
+        p = doc.add_paragraph()
+        run = p.add_run(placeholder)
+        run.font.color.rgb = RGBColor(200, 0, 0)  # Màu đỏ nhạt
+        run.italic = True
+        run.bold = True
+        p.alignment = WD_ALIGN_PARAGRAPH.CENTER
+
 def response2docx_json(file_path, prompt, file_name, project_id, creds, model_name):
     """
     Phiên bản tối ưu sử dụng JSON thay vì text string
     """
     client = VertexClient(project_id, creds, model_name)
     
-    # Yêu cầu AI trả về JSON
     prompt_json = f"""{prompt}
 
 ## QUAN TRỌNG: ĐỊNH DẠNG ĐẦU RA
 1. Trả về ĐÚNG định dạng JSON hợp lệ.
 2. Nếu trong nội dung câu hỏi/đáp án có dấu ngoặc kép ("), hãy thay thế bằng dấu nháy đơn (') hoặc escape nó (\").
 3. Không thêm bất kỳ ký tự nào ngoài JSON.
+
 Trả về ĐÚNG định dạng JSON sau (không thêm markdown backticks):
 {{
   "loai_de": "trac_nghiem_4_dap_an",
@@ -133,10 +187,12 @@ Trả về ĐÚNG định dạng JSON sau (không thêm markdown backticks):
   ]
 }}
 
-LƯU Ý: "dap_an_dung" phải là Số (1/2/3/4) tương ứng A/B/C/D, KHÔNG phải chữ cái
-
-Nếu câu hỏi KHÔNG có hình ảnh:
-"hinh_anh": {{"co_hinh": false}}
+LƯU Ý: 
+- "dap_an_dung" phải là Số (1/2/3/4) tương ứng A/B/C/D, KHÔNG phải chữ cái
+- Với hình ảnh:
+  + Nếu lấy từ PDF: "loai": "tu_pdf", "trang": X, "so_hinh": Y
+  + Nếu cần sinh ảnh: "loai": "tu_mo_ta", "mo_ta": "Mô tả chi tiết để sinh ảnh"
+  + Nếu KHÔNG có hình ảnh: "hinh_anh": {{"co_hinh": false}}
 """
     
     print("Đang gửi request tới AI...")
@@ -146,21 +202,15 @@ Nếu câu hỏi KHÔNG có hình ảnh:
         print("❌ Không thể lấy dữ liệu JSON từ AI sau nhiều nỗ lực.")
         return None
     
-    # Kiểm tra và sửa lỗi nếu cần
     data = check_and_fix_questions(data, client)
-    
-    # Tạo DOCX từ JSON
     doc = create_docx_from_json(data)
     
     output_path = save_document_securely(doc, file_name)
     print(f"Đã lưu file: {output_path}")
     return output_path
 
-
 def check_and_fix_questions(data, client):
-    """
-    Kiểm tra và sửa lỗi các câu hỏi
-    """
+    """Kiểm tra và sửa lỗi các câu hỏi"""
     prompt_check = f'''Kiểm tra bộ câu hỏi JSON sau:
 ```json
 {json.dumps(data, ensure_ascii=False, indent=2)}
@@ -191,14 +241,10 @@ Trả về JSON đã được sửa (format giống input, không thêm markdown
         print("Không thể sửa lỗi, trả về data gốc")
         return data
 
-
 def create_docx_from_json(data):
-    """
-    Tạo file DOCX từ JSON data
-    """
+    """Tạo file DOCX từ JSON data"""
     doc = Document()
     
-    # Thêm tiêu đề
     title = doc.add_heading(f'ĐỀ {data.get("loai_de", "").upper()}', level=1)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     
@@ -210,7 +256,6 @@ def create_docx_from_json(data):
             cau_hoi_theo_muc[muc_do] = []
         cau_hoi_theo_muc[muc_do].append(cau)
     
-    # Render từng mức độ
     muc_do_mapping = {
         "nhan_biet": "I. CÂU HỎI NHẬN BIẾT",
         "thong_hieu": "II. CÂU HỎI THÔNG HIỂU",
@@ -222,32 +267,26 @@ def create_docx_from_json(data):
         if muc_do not in cau_hoi_theo_muc:
             continue
         
-        # Thêm heading mức độ
         doc.add_heading(muc_do_mapping.get(muc_do, muc_do.upper()), level=2)
         
-        # Render từng câu hỏi
         for cau in cau_hoi_theo_muc[muc_do]:
             render_question(doc, cau)
     
     return doc
 
-
 def render_question(doc, cau):
-    """
-    Render một câu hỏi vào document
-    """
+    """Render một câu hỏi vào document"""
     # Câu hỏi
     p = doc.add_paragraph()
     p.add_run(f"Câu {cau['stt']}: ").bold = True
     p.add_run(cau['noi_dung'])
     
-    # Hình ảnh (nếu có)
+    # Hình ảnh (nếu có) - GỌI HÀM XỬ LÝ HÌNH ẢNH
     hinh_anh = cau.get("hinh_anh", {})
     if hinh_anh.get("co_hinh"):
-        p_img = doc.add_paragraph()
-        p_img.add_run(f"[Hình ảnh: {hinh_anh.get('mo_ta', '')}]").italic = True
+        insert_image_or_placeholder(doc, hinh_anh)
     
-    # Đáp án (không dùng bullet để tránh gạch đầu dòng)
+    # Đáp án
     for dap_an in cau.get("dap_an", []):
         p_da = doc.add_paragraph()
         p_da.add_run(f"{dap_an['ky_hieu']}. {dap_an['noi_dung']}")
@@ -256,40 +295,29 @@ def render_question(doc, cau):
     p_lg = doc.add_paragraph()
     p_lg.add_run("Lời giải:").bold = True
     
-    # Đáp án đúng (dạng số: 1/2/3/4)
+    # Đáp án đúng
     if "dap_an_dung" in cau:
         p_dung = doc.add_paragraph()
         dap_an_num = cau['dap_an_dung']
-        # Chuyển số thành chữ cái để hiển thị (1->A, 2->B, 3->C, 4->D)
         p_dung.add_run(f"{dap_an_num}").bold = True
-        doc.add_paragraph("####")
-    elif "dap_an_dung_sai" in cau:
-        # Cho câu hỏi đúng/sai
-        p_dung = doc.add_paragraph()
-        p_dung.add_run(cau['dap_an_dung_sai']).bold = True
         doc.add_paragraph("####")
     
     # Giải thích
     giai_thich = cau.get("giai_thich", "")
-    # Split theo dấu xuống dòng để format đẹp hơn
     for line in giai_thich.split("\n"):
         if line.strip():
-            p_gt = doc.add_paragraph(line.strip())
+            doc.add_paragraph(line.strip())
     
-    # Kết luận - Đáp án đúng cuối cùng (IN ĐẬM)
+    # Kết luận
     if "dap_an_dung" in cau:
         dap_an_num = cau['dap_an_dung']
         noi_dung_dap_an = cau['dap_an'][dap_an_num-1]['noi_dung']
         p_ket_luan = doc.add_paragraph()
-        # Tạo run riêng và set bold=True
         run_ket_luan = p_ket_luan.add_run(f"Vậy đáp án đúng là: {noi_dung_dap_an}")
-        run_ket_luan.bold = True  # Đảm bảo in đậm
-
+        run_ket_luan.bold = True
 
 def response2docx_dung_sai_json(file_path, prompt, file_name, project_id, creds, model_name):
-    """
-    Phiên bản cho câu hỏi đúng/sai (40 câu) - ĐÃ FIX FORMAT
-    """
+    """Phiên bản cho câu hỏi đúng/sai (40 câu)"""
     client = VertexClient(project_id, creds, model_name)
     
     prompt_json = f"""{prompt}
@@ -309,7 +337,8 @@ def response2docx_dung_sai_json(file_path, prompt, file_name, project_id, creds,
       "doan_thong_tin": "Đoạn văn bản hoặc tình huống...",
       "hinh_anh": {{
         "co_hinh": true,
-        "mo_ta": "Mô tả hình ảnh..."
+        "loai": "tu_mo_ta",
+        "mo_ta": "Mô tả hình ảnh để sinh..."
       }},
       "cac_y": [
         {{"ky_hieu": "a", "noi_dung": "Phát biểu a", "dung": false}},
@@ -319,18 +348,18 @@ def response2docx_dung_sai_json(file_path, prompt, file_name, project_id, creds,
       ],
       "dap_an_dung_sai": "0101",
       "giai_thich": [
-        {{"y": "a", "noi_dung_y": "Phát biểu a", "giai_thich": "Giải thích chi tiết cho ý a...", "ket_luan": "SAI"}},
-        {{"y": "b", "noi_dung_y": "Phát biểu b", "giai_thich": "Giải thích chi tiết cho ý b...", "ket_luan": "ĐÚNG"}},
-        {{"y": "c", "noi_dung_y": "Phát biểu c", "giai_thich": "Giải thích chi tiết cho ý c...", "ket_luan": "SAI"}},
-        {{"y": "d", "noi_dung_y": "Phát biểu d", "giai_thích": "Giải thích chi tiết cho ý d...", "ket_luan": "ĐÚNG"}}
+        {{"y": "a", "noi_dung_y": "Phát biểu a", "giai_thich": "Giải thích chi tiết...", "ket_luan": "SAI"}},
+        {{"y": "b", "noi_dung_y": "Phát biểu b", "giai_thich": "Giải thích chi tiết...", "ket_luan": "ĐÚNG"}},
+        {{"y": "c", "noi_dung_y": "Phát biểu c", "giai_thich": "Giải thích chi tiết...", "ket_luan": "SAI"}},
+        {{"y": "d", "noi_dung_y": "Phát biểu d", "giai_thích": "Giải thích chi tiết...", "ket_luan": "ĐÚNG"}}
       ]
     }}
   ]
 }}
-- Nếu câu hỏi KHÔNG có hình ảnh:
-"hinh_anh": {{"co_hinh": false}}
-- Lưu ý: 
-Giải thích không trích trong đoạn văn, sử dụng các thông tin liên quan đến kiến thức của phát biểu và "doan_thong_tin" trong json. Tuyệt đối không được viết lan man, độ dài khoảng 3-4 dòng, không làm trích dẫn, sử dụng thông tin và kiến thức thực tế.
+
+Lưu ý: 
+- Nếu KHÔNG có hình ảnh: "hinh_anh": {{"co_hinh": false}}
+- Giải thích không trích trong đoạn văn, độ dài khoảng 3-4 dòng
 """
     
     print("Đang gửi request tới AI...")
@@ -341,16 +370,14 @@ Giải thích không trích trong đoạn văn, sử dụng các thông tin liê
     if not data:
         print("❌ Không thể lấy dữ liệu JSON từ AI.")
         return None
+    
     doc = create_docx_dung_sai(data)
     output_path = save_document_securely(doc, file_name)
     print(f"Đã lưu file: {output_path}")
     return output_path
 
-
 def create_docx_dung_sai(data):
-    """
-    Tạo DOCX cho câu hỏi đúng/sai - FORMAT THEO MẪU
-    """
+    """Tạo DOCX cho câu hỏi đúng/sai"""
     doc = Document()
     
     title = doc.add_heading('ĐỀ TRẮC NGHIỆM ĐÚNG/SAI', level=1)
@@ -364,11 +391,10 @@ def create_docx_dung_sai(data):
         # Đoạn thông tin
         doc.add_paragraph(cau.get("doan_thong_tin", ""))
         
-        # Hình ảnh
+        # Hình ảnh - GỌI HÀM XỬ LÝ
         hinh_anh = cau.get("hinh_anh", {})
         if hinh_anh.get("co_hinh"):
-            p_img = doc.add_paragraph()
-            p_img.add_run(f"[{hinh_anh.get('mo_ta', '')}]").italic = True
+            insert_image_or_placeholder(doc, hinh_anh)
         
         # Các ý a, b, c, d
         for y in cau.get("cac_y", []):
@@ -378,20 +404,18 @@ def create_docx_dung_sai(data):
         p_lg = doc.add_paragraph()
         p_lg.add_run("Lời giải:").bold = True
         
-        # Đáp án (dạng 0101)
+        # Đáp án
         p_da = doc.add_paragraph()
         p_da.add_run(cau.get("dap_an_dung_sai", "")).bold = True
         doc.add_paragraph("####")
         
-        # Giải thích từng ý theo đúng format mẫu
+        # Giải thích từng ý
         for gt in cau.get("giai_thich", []):
-            # Dòng 1: "- [Nội dung phát biểu] - KẾT LUẬN."
             p_gt = doc.add_paragraph()
             p_gt.add_run(f"- {gt.get('noi_dung_y', '')} - ")
             run_ket_luan = p_gt.add_run(f"{gt.get('ket_luan', 'SAI')}.")
             run_ket_luan.bold = True
             
-            # Dòng 2: Giải thích chi tiết (xuống dòng ngay sau)
             p_giai_thich = doc.add_paragraph(gt.get('giai_thich', ''))
             p_giai_thich.alignment = WD_ALIGN_PARAGRAPH.LEFT
     
