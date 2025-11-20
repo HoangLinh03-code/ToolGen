@@ -330,7 +330,7 @@ def response2docx_dung_sai_json(file_path, prompt, file_name, project_id, creds,
 - Nếu câu hỏi KHÔNG có hình ảnh:
 "hinh_anh": {{"co_hinh": false}}
 - Lưu ý: 
-Giải thích không trích trong đoạn văn, sử dụng các thông tin liên quan đến kiến thức của phát biểu và "doan_thong_tin" trong json. Tuyệt đối không được viết lan man, dài dòng, không làm trích dẫn, sử dụng thông tin và kiến thức thực tế.
+Giải thích không trích trong đoạn văn, sử dụng các thông tin liên quan đến kiến thức của phát biểu và "doan_thong_tin" trong json. Tuyệt đối không được viết lan man, độ dài khoảng 3-4 dòng, không làm trích dẫn, sử dụng thông tin và kiến thức thực tế.
 """
     
     print("Đang gửi request tới AI...")
