@@ -28,14 +28,12 @@ ToolGen/
 │   └── callAPI.py              # Xác thực API
 │
 ├── process/                    # Xử lý dữ liệu và sinh đề
-│   ├── PDF_Scan.py             # Quét PDF lấy nội dung
-│   ├── ques_valid.py           # Kiểm tra câu hỏi sau khi sinh
 │   ├── response2docx.py        # Sinh câu hỏi theo prompt và PDF
 │   └── text2image.py           # Sinh ảnh theo prompt hoặc lấy từ PDF
 │
 ├── GenQues.py                  # File chính (entry point)
-├── prompt_Gen.txt              # Prompt sinh 80 câu trắc nghiệm
-├── promptGends.txt             # Prompt sinh 40 câu đúng/sai
+├── testTn.txt              # Prompt sinh 80 câu trắc nghiệm
+├── testDS.txt             # Prompt sinh 40 câu đúng/sai
 ├── requirements.txt            # Danh sách thư viện yêu cầu
 ├── .env_example                # Mẫu cấu hình môi trường
 ├── .gitignore                  # File loại trừ git
