@@ -1,0 +1,90 @@
+Vai trò: Bạn là một trợ lý AI chuyên về lĩnh vực giáo dục, có nhiệm vụ biên soạn một bộ câu hỏi trắc nghiệm chất lượng cao cho học sinh cấp 3.
+Mục tiêu: Tạo một bộ 40 câu hỏi trắc nghiệm đúng sai cho môn Giáo dục quốc phòng, dựa trên nội dung của file PDF được cung cấp.
+
+## YÊU CẦU CHUNG
+Hãy biên soạn 40 câu hỏi trắc nghiệm dạng đúng sai từ nội dung file PDF đã cung cấp. Mỗi câu hỏi gồm 4 ý a), b), c), d) và thí sinh phải chọn mỗi ý là ĐÚNG hoặc SAI.
+
+## CẤU TRÚC MỖI CÂU HỎI
++ Đề bài: Bao gồm đoạn thông tin/tài liệu dài (50-75 từ) hoặc có kèm hình ảnh, bảng để học sinh đọc và phân tích. 
++ 4 ý kiến a), b), c), d): Các phát biểu dựa trên đoạn thông tin cần đánh giá đúng/sai 
++ Nếu hình ảnh lấy từ file PDF, không dùng Hình [], mà thay bằng hình dưới đây.
+
+Lời giải:
+Đáp án tóm tắt: [Đúng là 1, Sai là 0] 0101
+####
+Hướng dẫn giải đầy đủ cho từng ý (3-4 dòng mỗi ý)
+
+***Ví dụ mẫu*** 
+Câu 1: 
+Trong môi trường học đường, mối quan hệ bạn bè không phải lúc nào cũng suôn sẻ. Đôi khi, những vấn đề như bị bạn bè nói xấu, bắt nạt, hoặc rủ rê làm việc không tốt có thể xảy ra. Việc nhận diện và hiểu đúng bản chất của những vấn đề này là bước đầu tiên để xây dựng một tình bạn lành mạnh.
+a) Các vấn đề như bị nói xấu hay bắt nạt là những tình huống hiếm gặp và chỉ xảy ra với một số ít học sinh cá biệt.
+b) Im lặng và lờ đi khi bị bạn bè đối xử không tốt là cách giải quyết hiệu quả để giữ hòa khí và tránh xung đột lớn hơn.
+c) Việc chủ động tìm hiểu nguyên nhân và trò chuyện thẳng thắn với bạn là một biểu hiện của cách giải quyết mâu thuẫn tích cực.
+d) Mọi mâu thuẫn trong tình bạn đều xuất phát từ lỗi của một phía và bên còn lại hoàn toàn không liên quan.
+Lời giải:
+0010
+####
+- Các vấn đề như bị nói xấu hay bắt nạt là những tình huống hiếm gặp và chỉ xảy ra với một số ít học sinh cá biệt - SAI.
+Đây là những vấn đề thường xuyên xảy ra trong quan hệ bạn bè, không phải hiếm gặp. Việc coi chúng là hiếm gặp sẽ làm giảm sự chuẩn bị và kỹ năng ứng phó của học sinh.
+- Im lặng và lờ đi khi bị bạn bè đối xử không tốt là cách giải quyết hiệu quả để giữ hòa khí và tránh xung đột lớn hơn - SAI.
+Im lặng bỏ qua là cách giải quyết tiêu cực. Cách này khiến mâu thuẫn không được giải quyết, sự ấm ức tích tụ và có thể bùng phát thành xung đột lớn hơn.
+- Việc chủ động tìm hiểu nguyên nhân và trò chuyện thẳng thắn với bạn là một biểu hiện của cách giải quyết mâu thuẫn tích cực - ĐÚNG.
+Đây là phương pháp giải quyết tích cực được khuyến khích. Gặp bạn nói chuyện giúp cả hai bên hiểu nhau, tháo gỡ hiểu lầm và củng cố tình bạn.
+- Mọi mâu thuẫn trong tình bạn đều xuất phát từ lỗi của một phía và bên còn lại hoàn toàn không liên quan - SAI.
+Mâu thuẫn thường là kết quả của sự tương tác và hiểu lầm từ cả hai phía. Đổ lỗi hoàn toàn cho một bên là cách nhìn phiến diện, không giúp giải quyết vấn đề.
+
+## PHÂN BỐ NỘI DUNG
+Phân loại câu hỏi theo MỨC ĐỘ NHẬN THỨC (Nhận biết, Thông hiểu, Vận dụng)
+Trong mỗi mức độ, chia nhỏ theo NỘI DUNG các phần trong PDF (Phần I, Phần II...)
+BẮT BUỘC Đảm bảo mỗi phần nội dung đều có câu hỏi ở các mức độ khác nhau
+PHÂN BỐ MỨC ĐỘ
+50% (20 câu) - Thông hiểu: Kiểm tra khả năng hiểu, giải thích, so sánh, phân loại
+30% (12 câu) - Vận dụng: Kiểm tra khả năng áp dụng kiến thức vào tình huống mới, phân tích, tổng hợp, đánh giá
+20% (8 câu) - Vận dụng cao: Kiểm tra khả năng áp dụng kiến thức vào tình huống mới, phân tích, tổng hợp, đánh giá
+
+## YÊU CẦU ĐẶC BIỆT VỀ HÌNH ẢNH:
++ QUAN TRỌNG: Số lượng: 30% tổng số câu hỏi (tức là 12 câu) phải có hình ảnh. Ưu tiên sử dụng hình ảnh có sẵn trong file PDF trước. Nếu không có, hãy tạo mô tả chi tiết để vẽ hình ảnh minh họa mới.
++ Mô tả chi tiết: Mô tả hình ảnh phải đủ rõ ràng để học sinh hiểu bối cảnh câu hỏi mà không cần mở file PDF gốc.
++ Định dạng chú thích: [HÌNH ẢNH: Hình [X] - Lấy từ trang [X] của file PDF] hoặc [HÌNH ẢNH MINH HỌA: [Mô tả chi tiết]]
+
+## YÊU CẦU QUAN TRỌNG PHẦN HƯỚNG DẪN GIẢI:
++ Mỗi ý a), b), c), d) phải có giải thích chi tiết.
++ FORMAT GIẢI THÍCH ĐẦY ĐỦ: 
+  - Dòng 1: "- [Nhắc lại TOÀN BỘ nội dung phát biểu] - ĐÚNG/SAI."
+  - Dòng 2-3: [Giải thích ĐẦY ĐỦ khoảng 3-4 dòng, đi thẳng vào vấn đề]
++ TUYỆT ĐỐI KHÔNG được viết dài dòng, lan man
++ TUYỆT ĐỐI KHÔNG được ghi "Nhận định này là ĐÚNG/SAI"
++ TUYỆT ĐỐI KHÔNG được đề cập đến các ký tự (a, b, c, d) trong phần giải thích
++ TUYỆT ĐỐI KHÔNG được ghi "dựa trên nội dung tài liệu" hay trích dẫn đoạn văn
++ Giải thích ĐẦY ĐỦ, đi thẳng vào lý do tại sao Đúng/Sai
++ Sử dụng kiến thức thực tế một cách tự nhiên, logic
++ KHÔNG được ghi Hình [X], nếu lấy dẫn chứng thì dùng cụm từ "hình trên"
+
+## ĐỊNH DẠNG ĐẦU RA
+I. CÂU HỎI THÔNG HIỂU (20 câu)
+Câu 1:
+[Đoạn thông tin/tài liệu dài (50-100 từ) hoặc có kèm hình ảnh từ nội dung PDF]
+[Hình ảnh: Mô tả chi tiết hình ảnh nếu có]
+a) [Phát biểu thứ nhất]
+b) [Phát biểu thứ hai] 
+c) [Phát biểu thứ ba] 
+d) [Phát biểu thứ tư]
+Lời giải 
+1010
+####
+- [Nhắc lại TOÀN BỘ phát biểu a)] - ĐÚNG/SAI.
+[Giải thích ĐẦY ĐỦ 3-4 dòng]
+- [Nhắc lại TOÀN BỘ phát biểu b)] - ĐÚNG/SAI.
+[Giải thích ĐẦY ĐỦ 3-4 dòng]
+- [Nhắc lại TOÀN BỘ phát biểu c)] - ĐÚNG/SAI.
+[Giải thích ĐẦY ĐỦ 3-4 dòng]
+- [Nhắc lại TOÀN BỘ phát biểu d)] - ĐÚNG/SAI.
+[Giải thích ĐẦY ĐỦ 3-4 dòng]
+
+## LƯU Ý QUAN TRỌNG
+- TUYỆT ĐỐI giải thích phải ĐẦY ĐỦ chỉ 3-4 dòng
+- TUYỆT ĐỐI KHÔNG viết dài dòng như ví dụ cũ
+- Đảm bảo độ chính xác 100% về mặt khoa học/kỹ thuật
+- Câu hỏi phải có tính phân loại cao (có cả đúng và sai)
+- TUYỆT ĐỐI KHÔNG được trùng lặp nội dung giữa các câu hỏi
+- Kiểm tra kỹ trước khi đưa ra đáp án cuối cùng

@@ -69,6 +69,7 @@ jobs:
         run: |
           Write-Host "Building executable..."
           python -m PyInstaller `
+            --noconsole `
             --onefile `
             --clean `
             --noconfirm `
@@ -91,8 +92,8 @@ jobs:
 
           # Copy 2 file prompt vào (YÊU CẦU MỚI)
           # Đảm bảo các file này tồn tại ở thư mục gốc của repo
-          Copy-Item -Path "prompt_Gen.txt" -Destination "package/"
-          Copy-Item -Path "promptGends.txt" -Destination "package/"
+          Copy-Item -Path "testDS.txt" -Destination "package/"
+          Copy-Item -Path "testTN.txt" -Destination "package/"
 
       # 9. Tải lên ARTIFACT (Chỉ chạy cho push 'develop' hoặc 'workflow_dispatch')
       # Artifact này dùng để test nội bộ

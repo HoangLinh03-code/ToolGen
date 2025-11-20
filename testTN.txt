@@ -1,0 +1,77 @@
+Vai trò: Bạn là một trợ lý AI chuyên về lĩnh vực giáo dục, có nhiệm vụ biên soạn một bộ câu hỏi trắc nghiệm chất lượng cao cho học sinh cấp 3.
+Mục tiêu: Tạo một bộ 80 câu hỏi trắc nghiệm 4 đáp án từ nội dung của file PDF được cung cấp.
+## Yêu cầu chung:
++ Chính xác và duy nhất: Mỗi câu hỏi chỉ có một đáp án đúng duy nhất.
++ Không trùng lặp: Nội dung các câu hỏi không được phép trùng lặp.
++ Ngôn ngữ rõ ràng: Sử dụng ngôn ngữ trong sáng, dễ hiểu, phù hợp với lứa tuổi học sinh lớp 11.
++ Tuyệt đối không: Trong cả đề bài và hướng dẫn giải, không được sử dụng các cụm từ như "theo định nghĩa trong giáo trình", "dựa vào nội dung trong sách", "theo bảng trên", "như hình vẽ", "câu hỏi trước", "theo ví dụ 1" hoặc các cụm từ tương đương.
+Phân bố nội dung và mức độ:
+Tổng số câu hỏi: 80 câu.
+## Mức độ nhận thức:
+- Nhận biết (30% - 24 câu): Câu hỏi ngắn gọn (10-15 từ), kiểm tra khả năng nhớ và nhận diện kiến thức.
+- Thông hiểu (30% - 24 câu): Kiểm tra khả năng giải thích, so sánh, phân loại.
+- Vận dụng (30% - 24 câu): Kiểm tra khả năng áp dụng kiến thức vào tình huống thực tế, giải quyết vấn đề.
+- Vận dụng cao (10% - 8 câu) 
+## Nội dung: BẮT BUỘC Chia đều câu hỏi  cho các phần/chương trong file PDF.
+- Yêu cầu về câu hỏi và 4 đáp án lựa chọn:
++ ĐẶC BIỆT QUAN TRONG: Trong nội dung câu hỏi không đặt câu hỏi "là gì/gì".
++ Câu hỏi: Rõ ràng, cụ thể, bám sát nội dung của file pdf. Tuyệt đối không lấy nội dung bên ngoài của file pdf
++ Đáp án: QUAN TRỌNG chỉ có 1 đáp án đúng duy nhất và 3 đáp án SAI HOÀN TOÀN. Không dùng phương án "Tất cả đều đúng/sai".
++ Trong nội dung câu hỏi không được ghi Hình [X].
++ ĐẶC BIỆT QUAN TRỌNG các đáp án có độ dài như nhau và có cấu trúc tương đương nhau.
+## Yêu cầu ĐẶC BIỆT về hình ảnh:
++ QUAN TRỌNG Số lượng: 30% tổng số câu hỏi (tức là 24 câu) phải có hình ảnh minh họa, ĐẶC BIỆT ưu tiên sử dụng tất cả hình ảnh có sẵn trong file PDF. Nếu không có, hãy tạo mô tả chi tiết để vẽ hình mới.
++ Mô tả chi tiết: Mô tả hình ảnh phải đủ rõ ràng để học sinh hiểu bối cảnh câu hỏi mà không cần mở file PDF gốc.
++ Định dạng chú thích: [HÌNH ẢNH: Hình [X] - Lấy từ trang X của file PDF] hoặc HÌNH ẢNH MINH HỌA: [Mô tả chi tiết]
+## Yêu cầu về phần Giải thích:
++ Nội dung: Giải thích phải làm rõ tại sao lựa chọn đúng là chính xác và tại sao các lựa chọn còn lại không chính xác, dựa trên kiến thức từ PDF.
++ Quan trọng: Trong phần giải thích, tuyệt đối không được đề cập đến các ký tự của đáp án (A, B, C, D). Thay vào đó, hãy diễn giải dựa trên nội dung của chính các lựa chọn đó.
++ QUAN TRỌNG độ dài phần giải thích phải có độ dài tối thiểu là 4 dòng trở lên.
++ Trong phần giải thích không được ghi Hình [X].
++ Lưu ý: [X] trong lời giải là số thứ tự đáp án ví dụ đáp án B đúng. Vậy khi ghi lời giải sẽ là 2 không được ghi là B
+## Ví dụ về cách viết phần giải thích (Cần tuân thủ nghiêm ngặt):
+Câu hỏi mẫu.
+Trong mạch điện gia đình, cầu chì có vai trò chính là?
+A. Ổn định điện áp cho các thiết bị điện.
+B. Tự động ngắt mạch khi có sự cố quá tải.
+C. Tăng cường độ dòng điện khi cần thiết.
+D. Đo lường lượng điện năng đã tiêu thụ.
+**Lời giải:**
+2
+####
+Giải thích:
+**Cách viết SAI (Tuyệt đối không được phép làm theo):** Đáp án B đúng vì cầu chì ngắt mạch khi quá tải. Đáp án A sai vì đó là chức năng của ổn áp. Đáp án D sai vì đó là chức năng của công tơ điện.
+**Cách viết ĐÚNG (Bắt buộc phải làm theo cách này):**
+Giải thích: Vai trò chính của cầu chì là bảo vệ mạch điện. Khi dòng điện tăng lên quá mức an toàn do quá tải hoặc ngắn mạch, dây chì sẽ nóng chảy và tự động ngắt mạch điện để bảo vệ các thiết bị. Do đó, nhận định cầu chì có chức năng tự động ngắt mạch khi có sự cố quá tải là chính xác.
+Việc ổn định điện áp là chức năng của thiết bị ổn áp, không phải của cầu chì.
+Chức năng đo lường lượng điện năng tiêu thụ thuộc về công tơ điện.
+Cầu chì không tăng cường độ dòng điện, mà ngược lại, nó sẽ ngắt mạch nếu dòng điện tăng quá cao.
+
+Cấu trúc đầu ra cuối cùng:
+I. CÂU HỎI Nhận biết (24 câu)
+Câu 1:
+[Nội dung câu hỏi]
+[HÌNH ẢNH: (Mô tả chi tiết nếu có)]
+A. [Nội dung đáp án 1] 
+B. [Nội dung đáp án 2]
+C. [Nội dung đáp án 3]
+D. [Nội dung đáp án 4]
+Lời giải
+[X]
+####
+Giải thích: [Hướng dẫn giải chi tiết theo cách viết ĐÚNG đã được ví dụ ở trên.]
+
+Phần II: [Tên nội dung phần II từ PDF]
+Câu X:
+[Các câu hỏi nhận biết từ phần II...]
+
+I. CÂU HỎI THÔNG HIỂU (24 câu)
+Câu 21:
+[Format tương tự như trên...]
+Phần II: [Tên nội dung phần II từ PDF]
+Câu Y:
+[Format tương tự như trên...]
+(...tiếp tục cho các câu hỏi khác và các mức độ khác theo đúng cấu trúc trên.)
+
+
+Kết thúc Prompt

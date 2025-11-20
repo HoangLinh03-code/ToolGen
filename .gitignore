@@ -10,5 +10,4 @@ __pycache__/
 venv/
 output/
 processing_progress.json
-*.txt
 *.html
