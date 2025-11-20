@@ -1,73 +1,52 @@
 # @format
+name: Build & Release Windows App
 
-# Tên của workflow
-name: Build Windows Executable
-
-# Các trigger để chạy workflow
 on:
-  # 1. Khi push code lên nhánh "develop" (tạo artifact)
+  # 1. Trigger khi push TAG bắt đầu bằng 'v' (ví dụ: v1.0.0, v2.1-beta)
+  # Đây là cách chuyên nghiệp nhất để ra mắt phần mềm.
   push:
-    branches: ["develop"]
-  # 2. Khi một "Release" mới được tạo trên GitHub (build và đính kèm file vào release)
-  release:
-    types: [created]
-  # 3. Chạy thủ công
+    tags:
+      - "v*"
+  # 2. Vẫn giữ trigger manual để test
   workflow_dispatch:
 
 jobs:
-  build-exe:
-    # Luôn chạy trên Windows
+  build-and-release:
     runs-on: windows-latest
+    permissions:
+      contents: write # Cấp quyền ghi để Action có thể tạo Release
 
     steps:
-      # 1. Checkout code
+      # --- BƯỚC 1: CHUẨN BỊ MÔI TRƯỜNG ---
       - name: Check out repository
         uses: actions/checkout@v4
 
-      # 2. Cài đặt Python 3.11
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: "3.11"
 
-      # 3. Cài đặt các thư viện PyQt
-      - name: Install PyQt dependencies
-        run: pip install PyQt5 PyQt5-Qt5 PyQt5_sip PyQtWebEngine PyQtWebEngine-Qt5
-        shell: pwsh
-
-      # 4. Cài đặt các thư viện khác từ requirements.txt
-      - name: Install other dependencies
-        run: pip install -r requirements.txt
-        shell: pwsh
-
-      # 5. Tạo file .env từ GitHub Secret
-      - name: Create .env file from secret
+      - name: Install Dependencies
         shell: pwsh
         run: |
-          Write-Host "Creating .env file..."
-          # Ghi trực tiếp nội dung secret vào file .env
+          pip install PyQt5 PyQt5-Qt5 PyQt5_sip PyQtWebEngine PyQtWebEngine-Qt5
+          pip install -r requirements.txt
+          pip install pyinstaller
+
+      # --- BƯỚC 2: TẠO FILE .ENV TỪ SECRET ---
+      - name: Create .env file
+        shell: pwsh
+        run: |
           Set-Content -Path ".env" -Value $env:ENV_KEY_CONTENT -NoNewline
-          Write-Host ".env file created"
         env:
           ENV_KEY_CONTENT: ${{ secrets.ENV_KEY }}
 
-      # 6. Xác thực file .env đã được tạo
-      - name: Verify .env file
-        shell: pwsh
-        run: |
-          if (Test-Path ".env") {
-            Write-Host ".env file exists"
-            Write-Host "File size: $((Get-Item '.env').Length) bytes"
-          } else {
-            Write-Host ".env file NOT found!"
-            exit 1
-          }
-
-      # 7. Build file .exe bằng PyInstaller
+      # --- BƯỚC 3: BUILD EXE ---
       - name: Build with PyInstaller
         shell: pwsh
         run: |
-          Write-Host "Building executable..."
+          # --windowed: Ẩn cửa sổ cmd đen (nếu muốn hiện để debug thì bỏ cờ này đi)
+          # --icon: Nếu có icon thì thêm --icon=icon.ico
           python -m PyInstaller `
             --onefile `
             --clean `
@@ -77,44 +56,42 @@ jobs:
             --add-data "api;api" `
             --add-data "process;process" `
             GenQues.py
-          Write-Host "Build completed"
 
-      # 8. Tạo thư mục 'package' để chứa các file
-      - name: Create packaging directory
+      # --- BƯỚC 4: ĐÓNG GÓI (PACKAGING) ---
+      - name: Prepare Package
         shell: pwsh
         run: |
-          # Tạo thư mục 'package'
-          New-Item -ItemType Directory -Path "package" -Force
+          New-Item -ItemType Directory -Path "Supreme-GenQues" -Force
 
-          # Copy file .exe đã build vào
-          Copy-Item -Path "dist/ToolGen.exe" -Destination "package/"
+          # Copy file EXE
+          Copy-Item -Path "dist/ToolGen.exe" -Destination "Supreme-GenQues/"
 
-          # Copy 2 file prompt vào (YÊU CẦU MỚI)
-          # Đảm bảo các file này tồn tại ở thư mục gốc của repo
-          Copy-Item -Path "testDS.txt" -Destination "package/"
-          Copy-Item -Path "testTN.txt" -Destination "package/"
+          # Copy file Prompt (Bắt buộc có để chạy)
+          Copy-Item -Path "testDS.txt" -Destination "Supreme-GenQues/"
+          Copy-Item -Path "testTN.txt" -Destination "Supreme-GenQues/"
 
-      # 9. Tải lên ARTIFACT (Chỉ chạy cho push 'develop' hoặc 'workflow_dispatch')
-      # Artifact này dùng để test nội bộ
-      - name: Upload artifact (for dev/manual builds)
-        if: github.event_name != 'release'
-        uses: actions/upload-artifact@v4
+      # --- BƯỚC 5: NÉN FILE (QUAN TRỌNG CHO NGƯỜI DÙNG CUỐI) ---
+      - name: Zip Release
+        shell: pwsh
+        run: |
+          # Lấy tên Tag (ví dụ v1.0.0)
+          $tagName = "${{ github.ref_name }}"
+          $zipName = "Supreme-GenQues-$tagName.zip"
+
+          # Nén thư mục lại thành 1 file zip duy nhất
+          Compress-Archive -Path "Supreme-GenQues" -DestinationPath $zipName
+
+          # Lưu tên file vào biến môi trường để bước sau dùng
+          echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
+
+      # --- BƯỚC 6: TẠO RELEASE VÀ UPLOAD ---
+      - name: Create Release and Upload Asset
+        uses: softprops/action-gh-release@v1
+        if: startsWith(github.ref, 'refs/tags/')
         with:
-          name: ToolGen-Windows-Build
-          # Tải lên toàn bộ nội dung thư mục 'package'
-          path: package/
-          if-no-files-found: error
-
-      # 10. Tải file lên RELEASE (Chỉ chạy khi 'release' được tạo)
-      # Đây là các file chính thức cho người dùng
-      - name: Upload to Release (for release builds)
-        if: github.event_name == 'release'
+          files: ${{ env.ZIP_NAME }}
+          draft: false # false = Xuất bản ngay lập tức
+          prerelease: false # false = Bản chính thức
+          generate_release_notes: true # Tự động tạo ghi chú dựa trên commit
         env:
-          # Token này là bắt buộc để cho phép workflow upload file lên release
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        shell: pwsh
-        run: |
-          Write-Host "Uploading assets to release ${{ github.event.release.tag_name }}..."
-          # Sử dụng GitHub CLI (có sẵn trên runner) để upload
-          # Lấy tất cả các file trong thư mục 'package' và upload lên
-          gh release upload ${{ github.event.release.tag_name }} package/* --clobber
