@@ -69,7 +69,6 @@ jobs:
         run: |
           Write-Host "Building executable..."
           python -m PyInstaller `
-            --noconsole `
             --onefile `
             --clean `
             --noconfirm `

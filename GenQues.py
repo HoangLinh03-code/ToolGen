@@ -18,11 +18,17 @@ from process.response2docx import response2docx_json, response2docx_dung_sai_jso
 load_dotenv()
 
 if getattr(sys, 'frozen', False):
-    base_path = sys._MEIPASS
+    # Chạy từ .exe
+    # _MEIPASS dùng cho các file được đóng gói bằng --add-data (như .env, icon...)
+    internal_path = sys._MEIPASS
+    # sys.executable dùng cho các file nằm cạnh file exe (như output, prompt mặc định)
+    external_path = os.path.dirname(sys.executable)
 else:
-    base_path = os.path.dirname(__file__)
+    # Chạy local
+    internal_path = os.path.dirname(__file__)
+    external_path = os.path.dirname(__file__)
 
-dotenv_path = os.path.join(base_path, '.env')
+dotenv_path = os.path.join(internal_path, '.env')
 load_dotenv(dotenv_path)
 
 class ProcessingThread(QThread):
@@ -141,8 +147,13 @@ class MainWindow(QWidget):
         self.generated_files = []
         
         # Prompt files mặc định
-        self.default_prompt_tn = os.path.join(os.path.dirname(__file__), "testTN.txt")
-        self.default_prompt_ds = os.path.join(os.path.dirname(__file__), "testDS.txt")
+        self.default_prompt_tn = os.path.join(external_path, "testTN.txt")
+        self.default_prompt_ds = os.path.join(external_path, "testDS.txt")
+        
+        if not os.path.exists(self.default_prompt_tn):
+             self.default_prompt_tn = os.path.join(internal_path, "testTN.txt")
+        if not os.path.exists(self.default_prompt_ds):
+             self.default_prompt_ds = os.path.join(internal_path, "testDS.txt")
         
         self.init_ui()
         self.setup_credentials()

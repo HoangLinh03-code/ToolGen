@@ -5,6 +5,45 @@ from docx.enum.text import WD_ALIGN_PARAGRAPH
 from api.callAPI import VertexClient
 from process.text2Image import generate_image_from_text
 from io import BytesIO
+import os
+import sys
+def get_app_path():
+    """Lấy đường dẫn chứa file .exe hoặc file script đang chạy"""
+    if getattr(sys, 'frozen', False):
+        # Nếu đang chạy file .exe
+        return os.path.dirname(sys.executable)
+    else:
+        # Nếu đang chạy code python thường
+        return os.path.dirname(os.path.abspath(__file__))
+
+def save_document_securely(doc, file_name):
+    """Hàm lưu file an toàn: tự tạo folder output và dùng đường dẫn tuyệt đối"""
+    # 1. Lấy đường dẫn gốc nơi đặt file exe
+    base_path = get_app_path()
+    
+    # 2. Định nghĩa folder output
+    output_dir = os.path.join(base_path, "output")
+    
+    # 3. Tự động tạo folder nếu chưa có
+    if not os.path.exists(output_dir):
+        try:
+            os.makedirs(output_dir)
+            print(f"Đã tạo thư mục: {output_dir}")
+        except OSError as e:
+            print(f"Lỗi không thể tạo thư mục output: {e}")
+            return None
+
+    # 4. Tạo đường dẫn file đầy đủ
+    output_path = os.path.join(output_dir, f"{file_name}.docx")
+    
+    # 5. Lưu file
+    try:
+        doc.save(output_path)
+        print(f"Đã lưu file tại: {output_path}")
+        return output_path
+    except Exception as e:
+        print(f"Lỗi khi lưu file docx: {e}")
+        return None
 
 def response2docx_json(file_path, prompt, file_name, project_id, creds, model_name):
     """
@@ -77,8 +116,7 @@ Nếu câu hỏi KHÔNG có hình ảnh:
     # Tạo DOCX từ JSON
     doc = create_docx_from_json(data)
     
-    output_path = f"output/{file_name}.docx"
-    doc.save(output_path)
+    output_path = save_document_securely(doc, file_name)
     print(f"Đã lưu file: {output_path}")
     return output_path
 
@@ -274,8 +312,7 @@ Giải thích không trích trong đoạn văn, sử dụng các thông tin liê
         data = check_and_fix_questions(data, client)
         doc = create_docx_dung_sai(data)
         
-        output_path = f"output/{file_name}.docx"
-        doc.save(output_path)
+        output_path = save_document_securely(doc, file_name)
         print(f"Đã lưu file: {output_path}")
         return output_path
     except Exception as e:
