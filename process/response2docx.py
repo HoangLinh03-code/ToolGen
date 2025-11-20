@@ -45,6 +45,52 @@ def save_document_securely(doc, file_name):
         print(f"Lỗi khi lưu file docx: {e}")
         return None
 
+def clean_json_string(text):
+    """Làm sạch chuỗi JSON trước khi parse"""
+    text = text.strip()
+    # Loại bỏ markdown code block
+    if text.startswith("```json"): text = text[7:]
+    elif text.startswith("```"): text = text[3:]
+    if text.endswith("```"): text = text[:-3]
+    return text.strip()
+
+def repair_json_with_ai(broken_json_str, client):
+    """Gửi chuỗi JSON lỗi cho AI nhờ sửa"""
+    print("⚠️ Phát hiện lỗi cú pháp JSON. Đang yêu cầu AI sửa lại...")
+    prompt_fix = f"""
+    Đoạn JSON sau đây bị lỗi cú pháp (thường do dấu ngoặc kép chưa được escape hoặc thiếu dấu phẩy):
+    
+    {broken_json_str}
+    
+    NHIỆM VỤ:
+    1. Tìm và sửa lỗi cú pháp JSON (escape quotes, thêm phẩy, đóng ngoặc...).
+    2. TUYỆT ĐỐI KHÔNG thay đổi nội dung văn bản tiếng Việt.
+    3. CHỈ TRẢ VỀ JSON ĐÃ SỬA (Không giải thích, không markdown).
+    """
+    # Gọi AI để sửa (dùng hàm send_data_to_check hoặc send_data_to_AI đều được)
+    # Ở đây ta tận dụng hàm send_data_to_check cho nhanh
+    repaired_text = client.send_data_to_check(prompt_fix)
+    return clean_json_string(repaired_text)
+
+def parse_json_safely(json_str, client):
+    """Thử parse, nếu lỗi thì nhờ AI sửa, thử tối đa 2 lần"""
+    cleaned_str = clean_json_string(json_str)
+    
+    # Lần thử 1: Parse trực tiếp
+    try:
+        # strict=False cho phép chấp nhận một số lỗi nhỏ như \n trong string
+        return json.loads(cleaned_str, strict=False)
+    except json.JSONDecodeError as e:
+        print(f"Lỗi JSON lần 1: {e}")
+        
+    # Lần thử 2: Nhờ AI sửa rồi parse lại
+    try:
+        repaired_str = repair_json_with_ai(cleaned_str, client)
+        return json.loads(repaired_str, strict=False)
+    except json.JSONDecodeError as e:
+        print(f"Lỗi JSON lần 2 (AI bó tay): {e}")
+        return None
+
 def response2docx_json(file_path, prompt, file_name, project_id, creds, model_name):
     """
     Phiên bản tối ưu sử dụng JSON thay vì text string
@@ -55,6 +101,9 @@ def response2docx_json(file_path, prompt, file_name, project_id, creds, model_na
     prompt_json = f"""{prompt}
 
 ## QUAN TRỌNG: ĐỊNH DẠNG ĐẦU RA
+1. Trả về ĐÚNG định dạng JSON hợp lệ.
+2. Nếu trong nội dung câu hỏi/đáp án có dấu ngoặc kép ("), hãy thay thế bằng dấu nháy đơn (') hoặc escape nó (\").
+3. Không thêm bất kỳ ký tự nào ngoài JSON.
 Trả về ĐÚNG định dạng JSON sau (không thêm markdown backticks):
 {{
   "loai_de": "trac_nghiem_4_dap_an",
@@ -92,22 +141,9 @@ Nếu câu hỏi KHÔNG có hình ảnh:
     
     print("Đang gửi request tới AI...")
     ai_response = client.send_data_to_AI(prompt_json, file_path)
-    
-    # Parse JSON
-    try:
-        # Loại bỏ markdown code fence nếu AI trả về
-        clean_response = ai_response.strip()
-        if clean_response.startswith("```json"):
-            clean_response = clean_response[7:]
-        if clean_response.startswith("```"):
-            clean_response = clean_response[3:]
-        if clean_response.endswith("```"):
-            clean_response = clean_response[:-3]
-        
-        data = json.loads(clean_response.strip())
-    except json.JSONDecodeError as e:
-        print(f"Lỗi parse JSON: {e}")
-        print(f"Response: {ai_response[:500]}")
+    data = parse_json_safely(ai_response, client)
+    if not data:
+        print("❌ Không thể lấy dữ liệu JSON từ AI sau nhiều nỗ lực.")
         return None
     
     # Kiểm tra và sửa lỗi nếu cần
@@ -259,7 +295,9 @@ def response2docx_dung_sai_json(file_path, prompt, file_name, project_id, creds,
     prompt_json = f"""{prompt}
 
 ## QUAN TRỌNG: ĐỊNH DẠNG ĐẦU RA JSON
-Trả về JSON format sau (không thêm markdown backticks):
+1. Nếu trong nội dung có dấu ngoặc kép ("), BẮT BUỘC đổi thành dấu nháy đơn (').
+2. Đảm bảo cấu trúc JSON hợp lệ tuyệt đối.
+3. Trả về JSON format sau (không thêm markdown backticks):
 {{
   "loai_de": "dung_sai",
   "tong_so_cau": 40,
@@ -298,26 +336,15 @@ Giải thích không trích trong đoạn văn, sử dụng các thông tin liê
     print("Đang gửi request tới AI...")
     ai_response = client.send_data_to_AI(prompt_json, file_path)
     
-    # Parse và xử lý tương tự
-    try:
-        clean_response = ai_response.strip()
-        if clean_response.startswith("```json"):
-            clean_response = clean_response[7:]
-        if clean_response.startswith("```"):
-            clean_response = clean_response[3:]
-        if clean_response.endswith("```"):
-            clean_response = clean_response[:-3]
-        
-        data = json.loads(clean_response.strip())
-        data = check_and_fix_questions(data, client)
-        doc = create_docx_dung_sai(data)
-        
-        output_path = save_document_securely(doc, file_name)
-        print(f"Đã lưu file: {output_path}")
-        return output_path
-    except Exception as e:
-        print(f"Lỗi: {e}")
+    data = parse_json_safely(ai_response, client)
+    
+    if not data:
+        print("❌ Không thể lấy dữ liệu JSON từ AI.")
         return None
+    doc = create_docx_dung_sai(data)
+    output_path = save_document_securely(doc, file_name)
+    print(f"Đã lưu file: {output_path}")
+    return output_path
 
 
 def create_docx_dung_sai(data):

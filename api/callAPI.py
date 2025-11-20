@@ -14,7 +14,7 @@ else:
     base_path = os.path.dirname(__file__)
 
 # Đường dẫn đến file .env
-dotenv_path = os.path.join(base_path, '.env')
+dotenv_path = os.path.join('.env')
 
 # Load .env với explicit path
 if os.path.exists(dotenv_path):
