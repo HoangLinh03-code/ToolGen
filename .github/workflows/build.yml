@@ -61,14 +61,14 @@ jobs:
       - name: Prepare Package
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path "Supreme-GenQues" -Force
+          New-Item -ItemType Directory -Path "GenQues" -Force
 
           # Copy file EXE
-          Copy-Item -Path "dist/ToolGen.exe" -Destination "Supreme-GenQues/"
+          Copy-Item -Path "dist/ToolGen.exe" -Destination "GenQues/"
 
           # Copy file Prompt (Bắt buộc có để chạy)
-          Copy-Item -Path "testDS.txt" -Destination "Supreme-GenQues/"
-          Copy-Item -Path "testTN.txt" -Destination "Supreme-GenQues/"
+          Copy-Item -Path "testDS.txt" -Destination "GenQues/"
+          Copy-Item -Path "testTN.txt" -Destination "GenQues/"
 
       # --- BƯỚC 5: NÉN FILE (QUAN TRỌNG CHO NGƯỜI DÙNG CUỐI) ---
       - name: Zip Release
@@ -76,10 +76,10 @@ jobs:
         run: |
           # Lấy tên Tag (ví dụ v1.0.0)
           $tagName = "${{ github.ref_name }}"
-          $zipName = "Supreme-GenQues-$tagName.zip"
+          $zipName = "GenQues-$tagName.zip"
 
           # Nén thư mục lại thành 1 file zip duy nhất
-          Compress-Archive -Path "Supreme-GenQues" -DestinationPath $zipName
+          Compress-Archive -Path "GenQues" -DestinationPath $zipName
 
           # Lưu tên file vào biến môi trường để bước sau dùng
           echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV

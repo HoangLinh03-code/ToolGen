@@ -109,7 +109,7 @@ class ProcessingThread(QThread):
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Supreme Gen Ques v2.1 - Pro Edition")
+        self.setWindowTitle("Gen Ques v2.1")
         self.resize(1400, 850) # Tăng kích thước một chút cho thoáng
         self.generated_files = []
         
