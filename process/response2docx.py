@@ -93,12 +93,12 @@ def generate_or_get_image(hinh_anh_data):
     loai = hinh_anh_data.get("loai", "tu_mo_ta")
     mo_ta = hinh_anh_data.get("mo_ta", "")
     
-    # Trường hợp 1: Ảnh từ PDF - luôn dùng placeholder
-    if loai == "tu_pdf":
-        trang = hinh_anh_data.get("trang", "?")
-        so_hinh = hinh_anh_data.get("so_hinh", "?")
-        placeholder = f"📄 [Chèn hình {so_hinh} từ trang {trang} của file PDF gốc]"
-        return None, placeholder
+    # # Trường hợp 1: Ảnh từ PDF - luôn dùng placeholder
+    # if loai == "tu_pdf":
+    #     trang = hinh_anh_data.get("trang", "?")
+    #     so_hinh = hinh_anh_data.get("so_hinh", "?")
+    #     placeholder = f"📄 [Chèn hình {so_hinh} từ trang {trang} của file PDF gốc]"
+    #     return None, placeholder
     
     # Trường hợp 2: Sinh ảnh từ mô tả
     if loai == "tu_mo_ta" and mo_ta:

@@ -22,8 +22,8 @@ if os.path.exists(dotenv_path):
     print(f"\nLoaded .env from: {dotenv_path}\n")
 else:
     print(f"Warning: .env not found at {dotenv_path}\n")
-    print(f"Base path: {base_path}\n")
-    print(f"Files in base_path: {os.listdir(base_path) if os.path.exists(base_path) else 'N/A'}\n")
+    # print(f"Base path: {base_path}\n")
+    # print(f"Files in base_path: {os.listdir(base_path) if os.path.exists(base_path) else 'N/A'}\n")
 class VertexClient:
     def __init__(self, project_id, creds, model, region="us-central1"):
         vertexai.init(
