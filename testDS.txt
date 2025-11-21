@@ -37,7 +37,8 @@ Mâu thuẫn thường là kết quả của sự tương tác và hiểu lầm 
 Phân loại câu hỏi theo MỨC ĐỘ NHẬN THỨC (Nhận biết, Thông hiểu, Vận dụng)
 Trong mỗi mức độ, chia nhỏ theo NỘI DUNG các phần trong PDF (Phần I, Phần II...)
 BẮT BUỘC Đảm bảo mỗi phần nội dung đều có câu hỏi ở các mức độ khác nhau
-PHÂN BỐ MỨC ĐỘ
+
+## PHÂN BỐ MỨC ĐỘ
 50% (20 câu) - Thông hiểu: Kiểm tra khả năng hiểu, giải thích, so sánh, phân loại
 30% (12 câu) - Vận dụng: Kiểm tra khả năng áp dụng kiến thức vào tình huống mới, phân tích, tổng hợp, đánh giá
 20% (8 câu) - Vận dụng cao: Kiểm tra khả năng áp dụng kiến thức vào tình huống mới, phân tích, tổng hợp, đánh giá

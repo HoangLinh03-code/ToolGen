@@ -180,7 +180,7 @@ Trả về ĐÚNG định dạng JSON sau (không thêm markdown backticks):
         {{"ky_hieu": "D", "noi_dung": "Đáp án D"}}
       ],
       "dap_an_dung": 2,
-      "giai_thich": "Giải thích chi tiết..."
+      "giai_thich": "Giải thích chi tiết đáp án đúng TUYỆT ĐỐI KHÔNG giải thích các đáp án sai khác..."
     }}
   ]
 }}
