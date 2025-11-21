@@ -82,9 +82,11 @@ Lời giải
 [Giải thích ĐẦY ĐỦ 3-4 dòng]
 
 ## LƯU Ý QUAN TRỌNG
-- TUYỆT ĐỐI giải thích phải ĐẦY ĐỦ chỉ 3-4 dòng
-- TUYỆT ĐỐI KHÔNG viết dài dòng như ví dụ cũ
-- Đảm bảo độ chính xác 100% về mặt khoa học/kỹ thuật
-- Câu hỏi phải có tính phân loại cao (có cả đúng và sai)
-- TUYỆT ĐỐI KHÔNG được trùng lặp nội dung giữa các câu hỏi
-- Kiểm tra kỹ trước khi đưa ra đáp án cuối cùng
+- TUYỆT ĐỐI phải giải thích phải ĐẦY ĐỦ chỉ 3-4 dòng.
+- TUYỆT ĐỐI KHÔNG viết dài dòng, lan man như ví dụ cũ.
+- Đảm bảo độ chính xác 100% về mặt khoa học/kỹ thuật.
+- Câu hỏi phải có tính phân loại cao (có cả đúng và sai).
+- TUYỆT ĐỐI KHÔNG được trùng lặp nội dung giữa các câu hỏi.
+- Kiểm tra kỹ trước khi đưa ra đáp án cuối cùng.
+
+Kết thúc Prompt

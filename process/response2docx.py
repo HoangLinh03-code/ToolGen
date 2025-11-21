@@ -170,10 +170,8 @@ Trả về ĐÚNG định dạng JSON sau (không thêm markdown backticks):
       "noi_dung": "Nội dung câu hỏi",
       "hinh_anh": {{
         "co_hinh": true,
-        "loai": "tu_pdf",
-        "mo_ta": "Hình 5 - Lấy từ trang 10 của file PDF",
-        "trang": 10,
-        "so_hinh": 5
+        "loai": "tu_mo_ta",
+        "mo_ta": "Mô tả hình ảnh để sinh..."
       }},
       "dap_an": [
         {{"ky_hieu": "A", "noi_dung": "Đáp án A"}},
@@ -190,7 +188,6 @@ Trả về ĐÚNG định dạng JSON sau (không thêm markdown backticks):
 LƯU Ý: 
 - "dap_an_dung" phải là Số (1/2/3/4) tương ứng A/B/C/D, KHÔNG phải chữ cái
 - Với hình ảnh:
-  + Nếu lấy từ PDF: "loai": "tu_pdf", "trang": X, "so_hinh": Y
   + Nếu cần sinh ảnh: "loai": "tu_mo_ta", "mo_ta": "Mô tả chi tiết để sinh ảnh"
   + Nếu KHÔNG có hình ảnh: "hinh_anh": {{"co_hinh": false}}
 """
@@ -316,6 +313,50 @@ def render_question(doc, cau):
         run_ket_luan = p_ket_luan.add_run(f"Vậy đáp án đúng là: {noi_dung_dap_an}")
         run_ket_luan.bold = True
 
+def render_question_dung_sai(doc, cau):
+    """Render chi tiết một câu hỏi đúng/sai"""
+    # Số câu
+    p = doc.add_paragraph()
+    p.add_run(f"Câu {cau['stt']}:").bold = True
+    
+    # Đoạn thông tin
+    if cau.get("doan_thong_tin"):
+        doc.add_paragraph(cau.get("doan_thong_tin", ""))
+    
+    # Hình ảnh - Xử lý hình ảnh nếu có
+    hinh_anh = cau.get("hinh_anh", {})
+    if hinh_anh.get("co_hinh"):
+        insert_image_or_placeholder(doc, hinh_anh)
+    
+    # Các ý a, b, c, d
+    for y in cau.get("cac_y", []):
+        doc.add_paragraph(f"{y['ky_hieu']}) {y['noi_dung']}")
+    
+    # Lời giải
+    p_lg = doc.add_paragraph()
+    p_lg.add_run("Lời giải:").bold = True
+    
+    # Đáp án chuỗi nhị phân (ví dụ: 0101)
+    p_da = doc.add_paragraph()
+    p_da.add_run(cau.get("dap_an_dung_sai", "")).bold = True
+    
+    # Dòng phân cách
+    doc.add_paragraph("####")
+    
+    # Giải thích chi tiết từng ý
+    for gt in cau.get("giai_thich", []):
+        p_gt = doc.add_paragraph()
+        
+        # Format: "- Nội dung ý - KẾT LUẬN."
+        p_gt.add_run(f"- {gt.get('noi_dung_y', '')} - ")
+        run_ket_luan = p_gt.add_run(f"{gt.get('ket_luan', 'SAI')}.")
+        run_ket_luan.bold = True
+        
+        # Nội dung giải thích
+        if gt.get('giai_thich'):
+            p_giai_thich = doc.add_paragraph(gt.get('giai_thich', ''))
+            p_giai_thich.alignment = WD_ALIGN_PARAGRAPH.LEFT
+
 def response2docx_dung_sai_json(file_path, prompt, file_name, project_id, creds, model_name):
     """Phiên bản cho câu hỏi đúng/sai (40 câu)"""
     client = VertexClient(project_id, creds, model_name)
@@ -358,7 +399,9 @@ def response2docx_dung_sai_json(file_path, prompt, file_name, project_id, creds,
 }}
 
 Lưu ý: 
-- Nếu KHÔNG có hình ảnh: "hinh_anh": {{"co_hinh": false}}
+- Với hình ảnh:
+  + Nếu cần sinh ảnh: "loai": "tu_mo_ta", "mo_ta": "Mô tả chi tiết để sinh ảnh"
+  + Nếu KHÔNG có hình ảnh: "hinh_anh": {{"co_hinh": false}}
 - Giải thích không trích trong đoạn văn, độ dài khoảng 3-4 dòng
 """
     
@@ -377,46 +420,66 @@ Lưu ý:
     return output_path
 
 def create_docx_dung_sai(data):
-    """Tạo DOCX cho câu hỏi đúng/sai"""
+    """
+    Tạo DOCX cho câu hỏi đúng/sai có phân chia mức độ (Header)
+    Logic mapping:
+    - 1-19: Thông hiểu
+    - 20-32: Vận dụng
+    - 33-40: Vận dụng cao
+    """
     doc = Document()
     
     title = doc.add_heading('ĐỀ TRẮC NGHIỆM ĐÚNG/SAI', level=1)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     
-    for cau in data.get("cau_hoi", []):
-        # Số câu
-        p = doc.add_paragraph()
-        p.add_run(f"Câu {cau['stt']}:").bold = True
-        
-        # Đoạn thông tin
-        doc.add_paragraph(cau.get("doan_thong_tin", ""))
-        
-        # Hình ảnh - GỌI HÀM XỬ LÝ
-        hinh_anh = cau.get("hinh_anh", {})
-        if hinh_anh.get("co_hinh"):
-            insert_image_or_placeholder(doc, hinh_anh)
-        
-        # Các ý a, b, c, d
-        for y in cau.get("cac_y", []):
-            doc.add_paragraph(f"{y['ky_hieu']}) {y['noi_dung']}")
-        
-        # Lời giải
-        p_lg = doc.add_paragraph()
-        p_lg.add_run("Lời giải:").bold = True
-        
-        # Đáp án
-        p_da = doc.add_paragraph()
-        p_da.add_run(cau.get("dap_an_dung_sai", "")).bold = True
-        doc.add_paragraph("####")
-        
-        # Giải thích từng ý
-        for gt in cau.get("giai_thich", []):
-            p_gt = doc.add_paragraph()
-            p_gt.add_run(f"- {gt.get('noi_dung_y', '')} - ")
-            run_ket_luan = p_gt.add_run(f"{gt.get('ket_luan', 'SAI')}.")
-            run_ket_luan.bold = True
-            
-            p_giai_thich = doc.add_paragraph(gt.get('giai_thich', ''))
-            p_giai_thich.alignment = WD_ALIGN_PARAGRAPH.LEFT
+    # 1. Định nghĩa Mapping hiển thị
+    muc_do_display = {
+        "thong_hieu": "I. CÂU HỎI THÔNG HIỂU",
+        "van_dung": "II. CÂU HỎI VẬN DỤNG",
+        "van_dung_cao": "III. CÂU HỎI VẬN DỤNG CAO"
+    }
     
+    # 2. Khởi tạo các nhóm chứa câu hỏi
+    cau_hoi_theo_muc = {
+        "thong_hieu": [],
+        "van_dung": [],
+        "van_dung_cao": []
+    }
+    
+    # 3. Phân loại câu hỏi vào nhóm dựa trên STT
+    # Sắp xếp danh sách câu hỏi theo STT để đảm bảo thứ tự đúng
+    list_cau_hoi = sorted(data.get("cau_hoi", []), key=lambda x: x.get("stt", 0))
+    
+    for cau in list_cau_hoi:
+        stt = cau.get("stt", 0)
+        
+        # Logic mapping STT -> Mức độ
+        if 1 <= stt <= 19:
+            key = "thong_hieu"
+        elif 20 <= stt <= 32:
+            key = "van_dung"
+        elif 33 <= stt <= 40:
+            key = "van_dung_cao"
+        else:
+            # Fallback cho các câu nằm ngoài range (ví dụ > 40)
+            key = "van_dung_cao"
+            
+        cau_hoi_theo_muc[key].append(cau)
+        
+    # 4. Render tuần tự theo thứ tự mức độ mong muốn
+    render_order = ["thong_hieu", "van_dung", "van_dung_cao"]
+    
+    for muc_do in render_order:
+        ds_cau_hoi = cau_hoi_theo_muc.get(muc_do, [])
+        
+        # Chỉ render nếu nhóm đó có câu hỏi
+        if ds_cau_hoi:
+            # Thêm Heading Mức độ
+            header_text = muc_do_display.get(muc_do, muc_do.upper())
+            doc.add_heading(header_text, level=2)
+            
+            # Render từng câu hỏi trong nhóm
+            for cau in ds_cau_hoi:
+                render_question_dung_sai(doc, cau)
+                
     return doc
