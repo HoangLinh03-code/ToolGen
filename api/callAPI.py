@@ -5,51 +5,79 @@ from dotenv import load_dotenv
 from google.oauth2 import service_account
 
 # ============================================================
-# CẤU HÌNH LOAD .ENV (SỬA LỖI KHÔNG NHẬN BIẾN MỚI)
+# CẤU HÌNH LOAD .ENV (SỬA LỖI PYINSTALLER _MEIPASS)
 # ============================================================
 
-# 1. Xác định đường dẫn gốc (nơi chứa file .py này hoặc file exe)
-if getattr(sys, 'frozen', False):
-    # Nếu chạy từ file .exe (PyInstaller)
-    base_path = os.path.dirname(sys.executable)
-else:
-    # Nếu chạy từ code Python thường (lấy thư mục chứa file hiện tại)
-    base_path = os.path.dirname(os.path.abspath(__file__))
+def get_base_path():
+    """
+    Hàm xác định đường dẫn gốc chứa file .env
+    - Nếu chạy EXE: Trả về thư mục tạm sys._MEIPASS
+    - Nếu chạy Code: Trả về thư mục gốc của project (lùi ra khỏi folder api)
+    """
+    if getattr(sys, 'frozen', False):
+        # 1. TRƯỜNG HỢP CHẠY FILE EXE (PyInstaller)
+        # File .env được bundle vào root của thư mục tạm thông qua --add-data ".env;."
+        # Nên ta lấy đường dẫn từ sys._MEIPASS
+        return sys._MEIPASS
+    else:
+        # 2. TRƯỜNG HỢP CHẠY CODE PYTHON THƯỜNG
+        # File này đang nằm ở: Project/api/callAPI.py
+        # File .env nằm ở:     Project/.env
+        # Nên cần lấy thư mục cha của thư mục chứa file này
+        current_file_path = os.path.abspath(__file__) # .../api/callAPI.py
+        current_dir = os.path.dirname(current_file_path) # .../api
+        return os.path.dirname(current_dir) # .../Project (Thư mục gốc)
 
-# Lưu ý: Nếu file này nằm trong thư mục con (ví dụ /api/), 
-# mà file .env nằm ở thư mục gốc project, bạn cần lùi lại 1 cấp:
-# base_path = os.path.dirname(base_path) # Bỏ comment dòng này nếu file .py nằm trong thư mục con
+# 1. Lấy đường dẫn gốc chuẩn
+base_path = get_base_path()
 
 # 2. Đường dẫn tuyệt đối đến .env
 dotenv_path = os.path.join(base_path, '.env')
 
-# 3. Load .env với quyền GHI ĐÈ (override=True)
+# 3. Load .env với quyền GHI ĐÈ
+print(f"📂 Đang tìm .env tại: {dotenv_path}") # In ra để debug xem đúng đường dẫn chưa
+
 if os.path.exists(dotenv_path):
-    # override=True: Bắt buộc lấy giá trị mới trong file, bỏ qua cache cũ
     load_dotenv(dotenv_path, override=True) 
-    print(f"✅ Đã load (và ghi đè) cấu hình từ: {dotenv_path}")
+    print(f"✅ Đã load cấu hình từ: {dotenv_path}")
 else:
-    # Thử tìm ở thư mục làm việc hiện tại (Current Working Directory) nếu không thấy ở base_path
-    cwd_env = os.path.join(os.getcwd(), '.env')
-    if os.path.exists(cwd_env):
-        load_dotenv(cwd_env, override=True)
-        print(f"✅ Đã load (và ghi đè) cấu hình từ CWD: {cwd_env}")
+    # Fallback: Nếu không thấy trong _MEIPASS (hiếm khi xảy ra nếu build đúng), 
+    # thử tìm cạnh file exe (sys.executable) phòng trường hợp user để file .env bên ngoài
+    if getattr(sys, 'frozen', False):
+        exe_path = os.path.dirname(sys.executable)
+        external_env = os.path.join(exe_path, '.env')
+        if os.path.exists(external_env):
+            load_dotenv(external_env, override=True)
+            print(f"✅ Đã load cấu hình từ file bên ngoài EXE: {external_env}")
+        else:
+            print(f"⚠️ CẢNH BÁO: Không tìm thấy file .env ở trong Temp lẫn cạnh file EXE!")
     else:
-        print(f"⚠️ CẢNH BÁO: Không tìm thấy file .env tại {dotenv_path} hoặc {cwd_env}")
+        print(f"⚠️ CẢNH BÁO: Không tìm thấy file .env tại {dotenv_path}")
 
 # ============================================================
 
 class VertexClient:
-    # ... (Giữ nguyên code class VertexClient của bạn ở đây) ...
     def __init__(self, project_id, creds, model, region="us-central1"):
-        vertexai.init(
-            project=project_id,
-            location=region,
-            credentials=creds
-        )
-        self.model = GenerativeModel(model)
+        # Xử lý trường hợp creds bị None để tránh crash app ngay lập tức
+        if not creds:
+            print("❌ Lỗi: Credentials bị None, không thể init Vertex AI.")
+            return
+
+        try:
+            vertexai.init(
+                project=project_id,
+                location=region,
+                credentials=creds
+            )
+            self.model = GenerativeModel(model)
+        except Exception as e:
+            print(f"❌ Lỗi init Vertex AI: {e}")
 
     def send_data_to_AI(self, prompt, file_paths=None, temperature=0.5, top_p=0.8):
+        # Nếu model chưa được khởi tạo (do lỗi creds), trả về lỗi giả lập hoặc raise
+        if not hasattr(self, 'model'):
+            return "❌ Lỗi: Kết nối AI chưa được khởi tạo (Thiếu Credentials)."
+
         parts = []
 
         # Nếu có nhiều file PDF
@@ -71,26 +99,35 @@ class VertexClient:
             top_p=top_p
         )
 
-        response = self.model.generate_content(
-            parts, generation_config=generation_config
-        )
-        return response.text
+        try:
+            response = self.model.generate_content(
+                parts, generation_config=generation_config
+            )
+            return response.text
+        except Exception as e:
+            print(f"❌ Lỗi khi gọi AI generate_content: {e}")
+            raise e # Ném lỗi ra để bên ngoài bắt được
     
     def send_data_to_check(self, prompt, temperature=0.5, top_p=0.8):
+        if not hasattr(self, 'model'):
+             return "ERROR_NO_CREDS"
+
         parts = []
-        # Thêm prompt dạng text
         parts.append(Part.from_text(prompt))
 
-        # Config sinh nội dung
         generation_config = GenerationConfig(
             temperature=temperature,
             top_p=top_p
         )
 
-        response = self.model.generate_content(
-            parts, generation_config=generation_config
-        )
-        return response.text
+        try:
+            response = self.model.generate_content(
+                parts, generation_config=generation_config
+            )
+            return response.text
+        except Exception as e:
+            print(f"❌ Lỗi khi check data: {e}")
+            return str(e)
 
 def get_vertex_ai_credentials():
     """Lấy đối tượng credentials cho Vertex AI từ .env."""
@@ -98,7 +135,7 @@ def get_vertex_ai_credentials():
         # Kiểm tra xem biến môi trường có giá trị không
         private_key = os.getenv("PRIVATE_KEY")
         if not private_key:
-            print("❌ Lỗi: Không tìm thấy PRIVATE_KEY trong biến môi trường")
+            print("❌ Lỗi: Không tìm thấy PRIVATE_KEY trong biến môi trường (File .env có thể chưa load đúng)")
             return None
 
         service_account_data = {
