@@ -32,8 +32,8 @@ ToolGen/
 │   └── text2image.py           # Sinh ảnh theo prompt hoặc lấy từ PDF
 │
 ├── GenQues.py                  # File chính (entry point)
-├── testTn.txt              # Prompt sinh 80 câu trắc nghiệm
-├── testDS.txt             # Prompt sinh 40 câu đúng/sai
+├── testTn.txt                  # Prompt sinh 80 câu trắc nghiệm
+├── testDS.txt                  # Prompt sinh 40 câu đúng/sai
 ├── requirements.txt            # Danh sách thư viện yêu cầu
 ├── .env_example                # Mẫu cấu hình môi trường
 ├── .gitignore                  # File loại trừ git
