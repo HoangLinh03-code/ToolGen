@@ -1,12 +1,15 @@
+# File: GenQues_MultiThread_Optimized.py
+# Phiên bản cải thiện xử lý đa luồng
+
 import sys
 import os
 from PyQt5.QtWidgets import (
     QApplication, QWidget, QHBoxLayout, QVBoxLayout, QPushButton,
     QLabel, QListWidget, QFileDialog, QMessageBox, QSplitter, QProgressBar,
     QCheckBox, QGroupBox, QTreeWidget, QTreeWidgetItem, QHeaderView,
-    QTabWidget, QTextEdit, QTreeWidgetItemIterator
+    QTabWidget, QTextEdit, QTreeWidgetItemIterator, QSpinBox, QDialog
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal
+from PyQt5.QtCore import Qt, QThread, pyqtSignal, QObject, pyqtSlot
 from PyQt5.QtWebEngineWidgets import QWebEngineView
 from PyQt5.QtGui import QFont, QIcon
 import mammoth
@@ -14,6 +17,9 @@ from dotenv import load_dotenv
 from google.oauth2 import service_account
 import glob
 import difflib
+import threading
+import time
+import concurrent.futures
 from process.response2docx import response2docx_json, response2docx_dung_sai_json
 
 load_dotenv()
@@ -28,90 +34,198 @@ else:
 dotenv_path = os.path.join(internal_path, '.env')
 load_dotenv(dotenv_path)
 
+# ============================================================
+# PHẦN ĐA LUỒNG (MULTITHREADING) - TỐI ƯU
+# ============================================================
+class TaskInfo:
+    """Class lưu thông tin cho từng nhiệm vụ nhỏ"""
+    def __init__(self, output_name, pdf_files, task_type, prompt_content):
+        self.output_name = output_name
+        self.pdf_files = pdf_files
+        self.task_type = task_type  # "TN" hoặc "DS"
+        self.prompt_content = prompt_content
+
 class ProcessingThread(QThread):
     progress = pyqtSignal(str)
-    error = pyqtSignal(str)
     finished = pyqtSignal(list)
+    error_signal = pyqtSignal(str)
+    progress_update = pyqtSignal(int, int)
 
-    def __init__(self, selected_items, prompt_paths, app_key, app_id, project_id, creds):
+    def __init__(self, selected_items, prompt_paths, project_id, creds, max_workers=3):
         super().__init__()
-        self.selected_items = selected_items  # Dict với key là tên output, value là list PDF files
-        self.prompt_paths = prompt_paths  # Dict với đường dẫn file prompt
-        self.app_key = app_key
-        self.app_id = app_id
+        self.selected_items = selected_items
+        self.prompt_paths = prompt_paths
         self.project_id = project_id
         self.creds = creds
+        self.max_workers = max_workers
+        self.generated_files = []
+        self.is_running = True
+        self.lock = threading.Lock()
 
     def run(self):
-        generated_files = []
-        try:
-            for output_name, pdf_files in self.selected_items.items():
-                if pdf_files:
-                    self.process_pdf_set(pdf_files, output_name, generated_files)
-        except Exception as e:
-            self.error.emit(f"Lỗi trong quá trình xử lý: {str(e)}")
+        """Logic chạy chính: Tách nhỏ tác vụ để chạy song song thực sự"""
+        import time
+        import concurrent.futures
+
+        self.progress.emit("⚙️ Đang chuẩn bị dữ liệu và đọc Prompt...")
+
+        # 1. Đọc Prompt một lần duy nhất để tối ưu I/O
+        prompt_content_tn = ""
+        prompt_content_ds = ""
+
+        if "trac_nghiem" in self.prompt_paths and self.prompt_paths["trac_nghiem"]:
+            try:
+                with open(self.prompt_paths["trac_nghiem"], "r", encoding="utf-8") as f:
+                    prompt_content_tn = f.read()
+            except Exception as e:
+                self.error_signal.emit(f"Lỗi đọc prompt TN: {e}")
+                return
+
+        if "dung_sai" in self.prompt_paths and self.prompt_paths["dung_sai"]:
+            try:
+                with open(self.prompt_paths["dung_sai"], "r", encoding="utf-8") as f:
+                    prompt_content_ds = f.read()
+            except Exception as e:
+                self.error_signal.emit(f"Lỗi đọc prompt DS: {e}")
+                return
+
+        # 2. Tạo danh sách công việc (Flattened List)
+        # Tách riêng TN và DS thành các task độc lập
+        all_tasks = []
+        
+        for output_name, pdf_files in self.selected_items.items():
+            # Nếu user chọn TN, tạo task TN
+            if prompt_content_tn:
+                all_tasks.append(TaskInfo(output_name, pdf_files, "TN", prompt_content_tn))
+            
+            # Nếu user chọn DS, tạo task DS (độc lập hoàn toàn với TN)
+            if prompt_content_ds:
+                all_tasks.append(TaskInfo(output_name, pdf_files, "DS", prompt_content_ds))
+
+        total_tasks = len(all_tasks)
+        if total_tasks == 0:
+            self.finished.emit([])
             return
 
-        self.finished.emit(generated_files)
+        self.progress.emit(f"🚀 Bắt đầu xử lý {total_tasks} tác vụ (TN & DS tách biệt)...")
+        self.progress_update.emit(0, total_tasks)
 
-    def process_pdf_set(self, pdf_files, base_filename, generated_files):
-        """Xử lý một bộ PDF với các dạng đề đã chọn"""
-        
-        # Xử lý đề trắc nghiệm 4 đáp án
-        if "trac_nghiem" in self.prompt_paths and self.prompt_paths["trac_nghiem"]:
-            self.progress.emit(f"Đang tạo đề trắc nghiệm 4 đáp án cho {base_filename}...")
-            try:
-                # Đọc nội dung từ file prompt
-                with open(self.prompt_paths["trac_nghiem"], "r", encoding="utf-8") as f:
-                    prompt_tn = f.read()
+        completed_count = 0
+        failed_count = 0
+
+        # 3. Thực thi song song
+        with concurrent.futures.ThreadPoolExecutor(max_workers=self.max_workers) as executor:
+            # Map future -> task để theo dõi
+            future_to_task = {}
+            
+            for task in all_tasks:
+                if not self.is_running: break
                 
-                output_filename = f"{base_filename}_TN"
+                # Submit task vào pool
+                future = executor.submit(self._process_worker, task, self.project_id, self.creds)
+                future_to_task[future] = task
+                
+                # Nghỉ cực ngắn để tránh spam API cùng 1 mili-giây gây lỗi 429
+                time.sleep(0.1)
+
+            # Thu thập kết quả khi từng task hoàn thành
+            for future in concurrent.futures.as_completed(future_to_task):
+                if not self.is_running: break
+                
+                task = future_to_task[future]
+                try:
+                    result_path, error_msg = future.result()
+                    
+                    with self.lock:
+                        completed_count += 1
+                        if result_path:
+                            self.generated_files.append(result_path)
+                            status_icon = "✅"
+                            msg = f"Xong {task.output_name} ({task.task_type})"
+                        else:
+                            failed_count += 1
+                            status_icon = "⚠️"
+                            msg = f"Lỗi {task.output_name} ({task.task_type}): {error_msg}"
+                    
+                    self.progress.emit(f"{status_icon} [{completed_count}/{total_tasks}] {msg}")
+                    self.progress_update.emit(completed_count, total_tasks)
+
+                except Exception as e:
+                    with self.lock:
+                        failed_count += 1
+                        completed_count += 1
+                    self.progress.emit(f"❌ Lỗi ngoại lệ tại {task.output_name}: {str(e)}")
+                    self.progress_update.emit(completed_count, total_tasks)
+
+        # 4. Tổng kết
+        summary = (
+            f"🏁 Đã xử lý xong!\n"
+            f"✅ Thành công: {completed_count - failed_count}\n"
+            f"❌ Thất bại: {failed_count}\n"
+            f"📄 Tổng file: {len(self.generated_files)}"
+        )
+        self.progress.emit(summary)
+        self.finished.emit(self.generated_files)
+
+    def stop(self):
+        self.is_running = False
+
+    @staticmethod
+    def _process_worker(task, project_id, creds):
+        """
+        Hàm xử lý chạy trong từng luồng con.
+        Đảm bảo không crash luồng chính.
+        """
+        import os
+        # Import local để tránh circular import và đảm bảo luồng sạch
+        from process.response2docx import response2docx_json, response2docx_dung_sai_json
+
+        try:
+            # Xác định tên file đầu ra
+            if task.task_type == "TN":
+                output_filename = f"{task.output_name}_TN"
+                # Gọi hàm sinh trắc nghiệm
                 docx_path = response2docx_json(
-                    pdf_files,
-                    prompt_tn,
+                    task.pdf_files,
+                    task.prompt_content,
                     output_filename,
-                    self.project_id,
-                    self.creds,
-                    "gemini-2.5-pro"
+                    project_id,
+                    creds,
+                    "gemini-2.5-pro",
+                    batch_name=task.output_name
                 )
-                
-                if docx_path:
-                    generated_files.append(docx_path)
-                    self.progress.emit(f"✓ Hoàn tất đề trắc nghiệm: {base_filename}")
-            except Exception as e:
-                self.error.emit(f"Lỗi khi tạo đề trắc nghiệm cho {base_filename}: {str(e)}")
-        
-        # Xử lý đề đúng/sai
-        if "dung_sai" in self.prompt_paths and self.prompt_paths["dung_sai"]:
-            self.progress.emit(f"Đang tạo đề đúng/sai cho {base_filename}...")
-            try:
-                # Đọc nội dung từ file prompt
-                with open(self.prompt_paths["dung_sai"], "r", encoding="utf-8") as f:
-                    prompt_ds = f.read()
-                
-                output_filename = f"{base_filename}_DS"
+            else: # task_type == "DS"
+                output_filename = f"{task.output_name}_DS"
+                # Gọi hàm sinh đúng sai
                 docx_path = response2docx_dung_sai_json(
-                    pdf_files,
-                    prompt_ds,
+                    task.pdf_files,
+                    task.prompt_content,
                     output_filename,
-                    self.project_id,
-                    self.creds,
-                    "gemini-2.5-pro"
+                    project_id,
+                    creds,
+                    "gemini-2.5-pro",
+                    batch_name=task.output_name
                 )
-                
-                if docx_path:
-                    generated_files.append(docx_path)
-                    self.progress.emit(f"✓ Hoàn tất đề đúng/sai: {base_filename}")
-            except Exception as e:
-                self.error.emit(f"Lỗi khi tạo đề đúng/sai cho {base_filename}: {str(e)}")
 
+            if docx_path and os.path.exists(docx_path):
+                return docx_path, None
+            else:
+                return None, "Hàm trả về None hoặc file không tồn tại"
+
+        except Exception as e:
+            return None, str(e)
+
+# ============================================================
+# PHẦN GIAO DIỆN CHÍNH (MainWindow) - GIỮ NGUYÊN
+# ============================================================
 
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Gen Ques v2.1")
-        self.resize(1400, 850) # Tăng kích thước một chút cho thoáng
+        self.setWindowTitle("Gen Ques v2.3 - Đa Luồng Tối Ưu")
+        self.resize(1400, 850)
         self.generated_files = []
+        self.processing_thread = None
         
         # Prompt files mặc định
         self.default_prompt_tn = os.path.join(external_path, "testTN.txt")
@@ -122,16 +236,13 @@ class MainWindow(QWidget):
         if not os.path.exists(self.default_prompt_ds):
              self.default_prompt_ds = os.path.join(internal_path, "testDS.txt")
         
-        # Load prompt content
         self.load_default_prompts()
-        
-        # [NEW] Thiết lập giao diện hiện đại
         self.setup_modern_theme()
         self.init_ui()
         self.setup_credentials()
 
     def setup_modern_theme(self):
-        """Thiết lập CSS toàn cục cho ứng dụng đẹp hơn (Đã fix lỗi mất chữ ở Tab)"""
+        """Thiết lập CSS toàn cục"""
         self.setStyleSheet("""
             QWidget {
                 font-family: 'Segoe UI', Arial, sans-serif;
@@ -140,41 +251,33 @@ class MainWindow(QWidget):
                 background-color: #f5f7fa;
             }
             
-            /* --- TABS FIX --- */
             QTabWidget::pane { 
                 border: 1px solid #dcdcdc; 
                 background: white; 
                 border-radius: 5px;
-                top: -1px; /* Kết nối liền mạch với tab */
+                top: -1px;
             }
             
             QTabBar::tab {
                 background: #e1e4e8;
                 color: #555;
-                /* Fix lỗi mất chữ: Giảm padding dọc, tăng min-width */
                 padding: 10px 20px; 
-                min-width: 180px; /* Đảm bảo tab đủ rộng để chứa text dài */
+                min-width: 180px;
                 margin-right: 4px;
                 border-top-left-radius: 4px;
                 border-top-right-radius: 4px;
                 font-weight: bold;
-                border: 1px solid transparent; /* Placeholder cho border */
+                border: 1px solid transparent;
             }
             
             QTabBar::tab:selected {
                 background: white;
-                color: #1976D2; /* Blue highlight */
+                color: #1976D2;
                 border: 1px solid #dcdcdc;
-                border-bottom: 2px solid white; /* Che border của pane để tạo cảm giác liền mạch */
-                margin-bottom: -1px; /* Đẩy tab xuống đè lên border pane */
+                border-bottom: 2px solid white;
+                margin-bottom: -1px;
             }
             
-            QTabBar::tab:!selected:hover {
-                background: #d0d4d8;
-                color: #333;
-            }
-            
-            /* --- GROUP BOX (CARD STYLE) --- */
             QGroupBox {
                 background-color: white;
                 border: 1px solid #e0e0e0;
@@ -191,7 +294,6 @@ class MainWindow(QWidget):
                 font-size: 15px;
             }
             
-            /* --- BUTTONS --- */
             QPushButton {
                 background-color: #fff;
                 border: 1px solid #ccc;
@@ -205,13 +307,9 @@ class MainWindow(QWidget):
                 border-color: #2196F3;
                 color: #1565C0;
             }
-            QPushButton:pressed {
-                background-color: #e3f2fd;
-            }
             
-            /* Primary Button (Start Process) */
             QPushButton#ProcessBtn {
-                background-color: #2e7d32; /* Green */
+                background-color: #2e7d32;
                 color: white;
                 border: none;
                 font-size: 16px;
@@ -224,7 +322,6 @@ class MainWindow(QWidget):
                 background-color: #a5d6a7;
             }
 
-            /* --- TREE & LIST --- */
             QTreeWidget, QListWidget {
                 border: 1px solid #ddd;
                 border-radius: 4px;
@@ -244,7 +341,6 @@ class MainWindow(QWidget):
                 font-weight: bold;
             }
 
-            /* --- PROGRESS BAR --- */
             QProgressBar {
                 border: none;
                 background-color: #e0e0e0;
@@ -260,33 +356,27 @@ class MainWindow(QWidget):
 
     def init_ui(self):
         main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(15, 15, 15, 15) # Lề ngoài
+        main_layout.setContentsMargins(15, 15, 15, 15)
         main_layout.setSpacing(15)
 
-        # Tạo TabWidget
         self.tab_widget = QTabWidget()
         
         # ================= TAB 1: PROCESSING =================
         processing_tab = QWidget()
-        # Dùng GridLayout hoặc VBox nhưng chia tỉ lệ
         processing_layout = QVBoxLayout()
         processing_layout.setSpacing(20)
         processing_layout.setContentsMargins(15, 15, 15, 15)
         
-        # --- SECTION 1: NGUỒN TÀI LIỆU (Chiếm không gian lớn nhất) ---
+        # --- SECTION 1: NGUỒN TÀI LIỆU ---
         pdf_group = QGroupBox("1. Nguồn Tài Liệu PDF")
         pdf_layout = QVBoxLayout()
         
-        # Toolbar cho file
         file_toolbar = QHBoxLayout()
         
         self.add_files_button = QPushButton("📄 Thêm File")
-        self.add_files_button.setIcon(QIcon()) # Có thể thêm icon thật ở đây
-        self.add_files_button.setCursor(Qt.PointingHandCursor)
         self.add_files_button.clicked.connect(self.add_pdf_files)
         
         self.add_folder_button = QPushButton("📁 Thêm Folder")
-        self.add_folder_button.setCursor(Qt.PointingHandCursor)
         self.add_folder_button.clicked.connect(self.add_folder)
         
         self.select_all_button = QPushButton("☑️ Chọn hết")
@@ -297,7 +387,6 @@ class MainWindow(QWidget):
         
         self.btn_remove_selected = QPushButton("❌ Xóa mục chọn")
         self.btn_remove_selected.setStyleSheet("color: #c62828; border-color: #ffcdd2;")
-        self.btn_remove_selected.setToolTip("Xóa các dòng đang được bôi đen (Phím tắt: Delete)")
         self.btn_remove_selected.clicked.connect(self.remove_selected_items)
         
         self.clear_all_button = QPushButton("🗑️ Xóa list")
@@ -312,24 +401,18 @@ class MainWindow(QWidget):
         file_toolbar.addStretch()
         file_toolbar.addWidget(self.clear_all_button)
         
-        # TreeView
         self.file_tree = QTreeWidget()
         self.file_tree.setHeaderLabels(["Tên Tài Liệu", "Đường Dẫn Chi Tiết"])
         self.file_tree.setAlternatingRowColors(True)
-        self.file_tree.setAnimated(True)
         self.file_tree.setIndentation(20)
         self.file_tree.itemChanged.connect(self.handle_item_check_changed)
         
-        # Header config
         header = self.file_tree.header()
-        header.setSectionResizeMode(0, QHeaderView.ResizeToContents) # Cột tên tự co giãn
-        header.setSectionResizeMode(1, QHeaderView.Stretch) # Cột đường dẫn giãn hết cỡ
-        header.setStretchLastSection(False) 
+        header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
+        header.setSectionResizeMode(1, QHeaderView.Stretch)
         self.file_tree.setColumnWidth(0, 400)
 
-        # Status label
         self.file_count_label = QLabel("<i>Chưa có tài liệu nào được chọn</i>")
-        self.file_count_label.setStyleSheet("color: #666; margin-top: 5px;")
         self.file_count_label.setAlignment(Qt.AlignRight)
         
         pdf_layout.addLayout(file_toolbar)
@@ -337,26 +420,21 @@ class MainWindow(QWidget):
         pdf_layout.addWidget(self.file_count_label)
         pdf_group.setLayout(pdf_layout)
         
-        # --- SECTION 2: CẤU HÌNH (Dạng Đề & Prompt) ---
-        # Sử dụng QHBoxLayout để chia đôi màn hình nếu màn hình rộng, hoặc giữ QVBoxLayout
+        # --- SECTION 2: CẤU HÌNH ---
         config_group = QGroupBox("2. Cấu Hình Tạo Đề")
         config_layout = QVBoxLayout()
         config_layout.setSpacing(15)
         
-        # Dòng 1: Trắc nghiệm
         tn_container = QWidget()
-        tn_container.setStyleSheet("background: #f9f9f9; border-radius: 6px; padding: 5px;")
         tn_layout = QHBoxLayout(tn_container)
         
         self.checkbox_tn = QCheckBox("Trắc nghiệm 4 đáp án (80 câu)")
         self.checkbox_tn.setChecked(True)
-        self.checkbox_tn.setFont(QFont("Segoe UI", 10, QFont.Bold))
         self.checkbox_tn.stateChanged.connect(self.update_process_button_state)
         
         self.prompt_tn_label = QLabel(os.path.basename(self.default_prompt_tn))
-        self.prompt_tn_label.setStyleSheet("color: #1565C0; font-style: italic;")
         
-        self.btn_select_prompt_tn = QPushButton("📁 Chọn Prompt")
+        self.btn_select_prompt_tn = QPushButton("📂 Chọn Prompt")
         self.btn_select_prompt_tn.clicked.connect(lambda: self.select_prompt_file("trac_nghiem"))
         
         self.btn_edit_prompt_tn = QPushButton("✏️ Sửa")
@@ -368,20 +446,16 @@ class MainWindow(QWidget):
         tn_layout.addWidget(self.btn_select_prompt_tn)
         tn_layout.addWidget(self.btn_edit_prompt_tn)
         
-        # Dòng 2: Đúng/Sai
         ds_container = QWidget()
-        ds_container.setStyleSheet("background: #f9f9f9; border-radius: 6px; padding: 5px;")
         ds_layout = QHBoxLayout(ds_container)
         
         self.checkbox_ds = QCheckBox("Đúng/Sai (40 câu)")
         self.checkbox_ds.setChecked(True)
-        self.checkbox_ds.setFont(QFont("Segoe UI", 10, QFont.Bold))
         self.checkbox_ds.stateChanged.connect(self.update_process_button_state)
         
         self.prompt_ds_label = QLabel(os.path.basename(self.default_prompt_ds))
-        self.prompt_ds_label.setStyleSheet("color: #1565C0; font-style: italic;")
         
-        self.btn_select_prompt_ds = QPushButton("📁 Chọn Prompt")
+        self.btn_select_prompt_ds = QPushButton("📂 Chọn Prompt")
         self.btn_select_prompt_ds.clicked.connect(lambda: self.select_prompt_file("dung_sai"))
         
         self.btn_edit_prompt_ds = QPushButton("✏️ Sửa")
@@ -397,48 +471,53 @@ class MainWindow(QWidget):
         config_layout.addWidget(ds_container)
         config_group.setLayout(config_layout)
 
-        # --- SECTION 3: ACTION ---
+        # --- SECTION 3: ACTION & THREADING ---
         action_layout = QVBoxLayout()
         action_layout.setContentsMargins(0, 10, 0, 0)
         
-        self.process_button = QPushButton("🚀 BẮT ĐẦU XỬ LÝ NGAY")
-        self.process_button.setObjectName("ProcessBtn") # Dùng ID để style riêng
-        self.process_button.setCursor(Qt.PointingHandCursor)
+        # Thread count control
+        thread_layout = QHBoxLayout()
+        thread_layout.addWidget(QLabel("Số luồng xử lí:"))
+        self.thread_spinbox = QSpinBox()
+        self.thread_spinbox.setRange(1, 50)
+        self.thread_spinbox.setValue(3)
+        self.thread_spinbox.setFixedWidth(60)
+        thread_layout.addWidget(self.thread_spinbox)
+        thread_layout.addWidget(QLabel("(Dựa trên số bài xử lí, ví dụ: xử lí 2 bài thì tăng x2 số luồng)"))
+        thread_layout.addStretch()
+        
+        self.process_button = QPushButton("BẮT ĐẦU XỬ LÝ ĐA LUỒNG")
+        self.process_button.setObjectName("ProcessBtn")
         self.process_button.setMinimumHeight(50)
         self.process_button.clicked.connect(self.process_files)
         
-        # Progress info
-        status_layout = QHBoxLayout()
         self.progress_bar = QProgressBar()
         self.progress_bar.setVisible(False)
         self.progress_bar.setTextVisible(True)
-        self.progress_bar.setFormat("%p% - %v")
+        self.progress_bar.setFormat("%v/%m (%p%)")
         
         self.status_label = QLabel("Sẵn sàng")
         self.status_label.setAlignment(Qt.AlignCenter)
-        self.status_label.setStyleSheet("font-weight: bold; color: #555;")
+        self.status_label.setStyleSheet("font-weight: bold; color: #555; min-height: 40px;")
         
+        action_layout.addLayout(thread_layout)
         action_layout.addWidget(self.process_button)
-        action_layout.addWidget(self.status_label)
         action_layout.addWidget(self.progress_bar)
+        action_layout.addWidget(self.status_label)
 
-        # Add to Main Tab Layout
-        processing_layout.addWidget(pdf_group, 6) # Chiếm 6 phần
-        processing_layout.addWidget(config_group, 3) # Chiếm 3 phần
-        processing_layout.addLayout(action_layout, 1) # Chiếm 1 phần
+        processing_layout.addWidget(pdf_group, 6)
+        processing_layout.addWidget(config_group, 3)
+        processing_layout.addLayout(action_layout, 1)
         
         processing_tab.setLayout(processing_layout)
         
         # ================= TAB 2: KẾT QUẢ =================
         result_tab = QWidget()
-        result_layout = QHBoxLayout() # Đổi thành HBox để full màn hình
+        result_layout = QHBoxLayout()
         result_layout.setContentsMargins(10, 10, 10, 10)
         
         splitter = QSplitter(Qt.Horizontal)
-        splitter.setHandleWidth(8)
-        splitter.setStyleSheet("QSplitter::handle { background-color: #e0e0e0; }")
         
-        # -- LEFT: LIST FILE --
         left_widget = QWidget()
         left_layout = QVBoxLayout(left_widget)
         left_layout.setContentsMargins(0, 0, 5, 0)
@@ -447,26 +526,21 @@ class MainWindow(QWidget):
         lbl_result.setStyleSheet("font-weight: bold; color: #2E7D32; padding: 5px;")
         
         self.docx_list = QListWidget()
-        self.docx_list.setCursor(Qt.PointingHandCursor)
         self.docx_list.itemClicked.connect(self.show_selected_docx)
         
         left_layout.addWidget(lbl_result)
         left_layout.addWidget(self.docx_list)
         
-        # -- RIGHT: PREVIEW --
         right_widget = QWidget()
         right_layout = QVBoxLayout(right_widget)
         right_layout.setContentsMargins(5, 0, 0, 0)
         
-        # Header preview
         preview_header = QHBoxLayout()
         lbl_preview = QLabel("📋 Xem trước tài liệu")
         lbl_preview.setStyleSheet("font-weight: bold; color: #1565C0; padding: 5px;")
         
         self.btn_open_external = QPushButton("↗️ Mở bằng Word/WPS")
-        self.btn_open_external.setIcon(QIcon())
         self.btn_open_external.setFixedSize(180, 35)
-        self.btn_open_external.setCursor(Qt.PointingHandCursor)
         self.btn_open_external.setStyleSheet("""
             QPushButton {
                 background-color: #2196F3; color: white; border: none;
@@ -482,12 +556,10 @@ class MainWindow(QWidget):
         preview_header.addWidget(self.btn_open_external)
         
         self.docx_viewer = QWebEngineView()
-        self.docx_viewer.setStyleSheet("border: 1px solid #ccc;")
         
         right_layout.addLayout(preview_header)
         right_layout.addWidget(self.docx_viewer)
         
-        # Add to splitter
         splitter.addWidget(left_widget)
         splitter.addWidget(right_widget)
         splitter.setStretchFactor(0, 3)
@@ -496,7 +568,7 @@ class MainWindow(QWidget):
         result_layout.addWidget(splitter)
         result_tab.setLayout(result_layout)
         
-        # Add Tabs
+        # Add tabs
         self.tab_widget.addTab(processing_tab, "⚙️ CẤU HÌNH & XỬ LÝ")
         self.tab_widget.addTab(result_tab, "📄 KẾT QUẢ ĐẦU RA")
         
@@ -504,65 +576,7 @@ class MainWindow(QWidget):
         self.setLayout(main_layout)
         self.update_process_button_state()
 
-    # ============================================================
-    # PHẦN LOGIC BÊN DƯỚI GIỮ NGUYÊN 100% NHƯ CŨ
-    # (Copy toàn bộ logic từ code cũ của bạn vào đây)
-    # ============================================================
-
-    def remove_selected_items(self):
-        """
-        Phiên bản sửa lỗi: Xóa tất cả các mục ĐÃ ĐƯỢC TICK (CHECKED).
-        Khắc phục lỗi chỉ xóa file đang bôi đen.
-        """
-        # 1. Tìm tất cả các item đang được TICK (Checked)
-        checked_items = []
-        iterator = QTreeWidgetItemIterator(self.file_tree)
-        while iterator.value():
-            item = iterator.value()
-            # Chỉ lấy item nào có trạng thái là Checked (V)
-            if item.checkState(0) == Qt.Checked:
-                checked_items.append(item)
-            iterator += 1
-            
-        if not checked_items:
-            QMessageBox.information(self, "Thông báo", "Vui lòng tick chọn (V) vào các mục cần xóa!")
-            return
-
-        # Xác nhận
-        confirm = QMessageBox.question(
-            self, "Xác nhận", 
-            f"Bạn có chắc muốn xóa {len(checked_items)} mục đã chọn?",
-            QMessageBox.Yes | QMessageBox.No
-        )
-        
-        if confirm != QMessageBox.Yes:
-            return
-
-        # 2. LOGIC XÓA AN TOÀN (Lọc danh sách)
-        # Nguyên tắc: Nếu Folder cha đã nằm trong danh sách xóa, thì KHÔNG cần lệnh xóa Folder con nữa.
-        # (Vì xóa cha là con tự mất. Cố xóa con sẽ gây lỗi).
-        
-        items_to_delete = []
-        for item in checked_items:
-            parent = item.parent()
-            
-            # Logic: Item này sẽ được xóa NẾU:
-            # - Nó không có cha (nằm ngay root)
-            # - HOẶC Cha của nó KHÔNG nằm trong trạng thái Checked (tức là chỉ muốn xóa con, giữ lại cha)
-            if parent is None or parent.checkState(0) != Qt.Checked:
-                items_to_delete.append(item)
-
-        # 3. Thực hiện xóa
-        root = self.file_tree.invisibleRootItem()
-        for item in items_to_delete:
-            # Lấy cha của item đó để ra lệnh xóa con
-            (item.parent() or root).removeChild(item)
-
-        # 4. Cập nhật lại số lượng
-        self.update_file_count()
-    
     def setup_credentials(self):
-        
         try:
             service_account_data = {
                 "type": os.getenv("TYPE"),
@@ -589,7 +603,6 @@ class MainWindow(QWidget):
             self.process_button.setEnabled(False)
 
     def load_default_prompts(self):
-        
         self.prompt_tn_content = ""
         self.prompt_ds_content = ""
         if os.path.isfile(self.default_prompt_tn):
@@ -603,21 +616,7 @@ class MainWindow(QWidget):
                     self.prompt_ds_content = f.read()
             except: pass
 
-    def open_current_docx(self):
-        
-        current_item = self.docx_list.currentItem()
-        if not current_item:
-            return
-        file_name = current_item.text()
-        full_path = next((f for f in self.generated_files if os.path.basename(f) == file_name), None)
-        if full_path and os.path.exists(full_path):
-            try:
-                os.startfile(full_path)
-            except Exception as e:
-                QMessageBox.warning(self, "Lỗi", f"Không thể mở file: {str(e)}")
-    
     def add_pdf_files(self):
-        
         file_paths, _ = QFileDialog.getOpenFileNames(
             self, "Chọn file PDF", "", "PDF Files (*.pdf)"
         )
@@ -632,14 +631,12 @@ class MainWindow(QWidget):
             self.update_file_count()
 
     def add_folder(self):
-        
         folder_path = QFileDialog.getExistingDirectory(self, "Chọn thư mục PDF", "")
         if folder_path:
             self.add_folder_to_tree(folder_path, self.file_tree)
             self.update_file_count()
 
     def add_folder_to_tree(self, folder_path, parent_item, is_root=True):
-        
         folder_item = QTreeWidgetItem(parent_item)
         folder_item.setText(0, f"📁 {os.path.basename(folder_path)}")
         folder_item.setText(1, folder_path)
@@ -663,36 +660,23 @@ class MainWindow(QWidget):
         else: folder_item.setExpanded(False)
 
     def handle_item_check_changed(self, item, column):
-        """
-        Xử lý sự kiện khi user tick vào checkbox.
-        Sử dụng cơ chế blockSignals + try/finally để đảm bảo an toàn tuyệt đối, 
-        tránh trường hợp giao diện bị đơ không bấm được.
-        """
+        """Xử lý sự kiện khi user tick vào checkbox"""
         if column != 0: return
 
-        # 1. Chặn tín hiệu tạm thời để code xử lý không kích hoạt lại sự kiện này (tránh vòng lặp vô tận)
         self.file_tree.blockSignals(True)
         
         try:
-            # 2. Lấy trạng thái mới
             check_state = item.checkState(0)
-            
-            # 3. Cập nhật đồng bộ cho con và cha
             self.update_children_check_state(item, check_state)
             self.update_parent_check_state(item)
-            
-            # 4. Cập nhật số lượng file
             self.update_file_count()
-            
         except Exception as e:
-            # Nếu có lỗi ngầm, in ra console để debug chứ không làm crash giao diện
             print(f"Error in handle_item_check_changed: {e}")
-            
         finally:
-            # 5. QUAN TRỌNG NHẤT: Luôn luôn mở lại tín hiệu dù có lỗi hay không
             self.file_tree.blockSignals(False)
 
     def update_children_check_state(self, parent_item, check_state):
+        """Cập nhật trạng thái con"""
         for i in range(parent_item.childCount()):
             child = parent_item.child(i)
             child.setCheckState(0, check_state)
@@ -700,6 +684,7 @@ class MainWindow(QWidget):
                 self.update_children_check_state(child, check_state)
 
     def update_parent_check_state(self, item):
+        """Cập nhật trạng thái cha"""
         parent = item.parent()
         if parent is None: return
         checked_count = 0
@@ -717,6 +702,7 @@ class MainWindow(QWidget):
         self.update_parent_check_state(parent)
 
     def is_file_in_tree(self, file_path):
+        """Kiểm tra file đã tồn tại trong tree"""
         iterator = QTreeWidgetItemIterator(self.file_tree)
         while iterator.value():
             item = iterator.value()
@@ -724,11 +710,48 @@ class MainWindow(QWidget):
             iterator += 1
         return False
 
+    def remove_selected_items(self):
+        """Xóa các mục được tick"""
+        checked_items = []
+        iterator = QTreeWidgetItemIterator(self.file_tree)
+        while iterator.value():
+            item = iterator.value()
+            if item.checkState(0) == Qt.Checked:
+                checked_items.append(item)
+            iterator += 1
+            
+        if not checked_items:
+            QMessageBox.information(self, "Thông báo", "Vui lòng tick chọn (V) vào các mục cần xóa!")
+            return
+
+        confirm = QMessageBox.question(
+            self, "Xác nhận", 
+            f"Bạn có chắc muốn xóa {len(checked_items)} mục đã chọn?",
+            QMessageBox.Yes | QMessageBox.No
+        )
+        
+        if confirm != QMessageBox.Yes:
+            return
+
+        items_to_delete = []
+        for item in checked_items:
+            parent = item.parent()
+            if parent is None or parent.checkState(0) != Qt.Checked:
+                items_to_delete.append(item)
+
+        root = self.file_tree.invisibleRootItem()
+        for item in items_to_delete:
+            (item.parent() or root).removeChild(item)
+
+        self.update_file_count()
+
     def clear_all_items(self):
+        """Xóa tất cả items"""
         self.file_tree.clear()
         self.update_file_count()
 
     def select_all_items(self):
+        """Chọn tất cả items"""
         iterator = QTreeWidgetItemIterator(self.file_tree)
         while iterator.value():
             item = iterator.value()
@@ -736,7 +759,7 @@ class MainWindow(QWidget):
             iterator += 1
 
     def deselect_all_items(self):
-        
+        """Bỏ chọn tất cả items"""
         iterator = QTreeWidgetItemIterator(self.file_tree)
         while iterator.value():
             item = iterator.value()
@@ -744,7 +767,7 @@ class MainWindow(QWidget):
             iterator += 1
 
     def update_file_count(self):
-        
+        """Cập nhật số lượng file"""
         total_files = 0
         total_folders = 0
         iterator = QTreeWidgetItemIterator(self.file_tree)
@@ -761,7 +784,7 @@ class MainWindow(QWidget):
             self.file_count_label.setText(text)
 
     def select_prompt_file(self, prompt_type):
-        
+        """Chọn file prompt"""
         file_path, _ = QFileDialog.getOpenFileName(
             self, f"Chọn file prompt cho {prompt_type}", "", "Text Files (*.txt)"
         )
@@ -779,45 +802,48 @@ class MainWindow(QWidget):
                 QMessageBox.warning(self, "Lỗi", f"Không thể đọc file: {str(e)}")
 
     def edit_prompt(self, prompt_type):
+        """Sửa prompt"""
+        edit_dialog = QDialog(self)
+        edit_dialog.setWindowTitle(f"Sửa Prompt - {'Trắc nghiệm' if prompt_type == 'trac_nghiem' else 'Đúng/Sai'}")
+        edit_dialog.setModal(True)
+        edit_dialog.resize(750, 600)
         
-        dialog = QMessageBox()
-        dialog.setWindowTitle(f"Sửa Prompt - {'Trắc nghiệm' if prompt_type == 'trac_nghiem' else 'Đúng/Sai'}")
-        dialog.setIcon(QMessageBox.NoIcon)
-        widget = QWidget()
-        layout = QVBoxLayout()
+        dialog_layout = QVBoxLayout()
+        
         label = QLabel("📝 Chỉnh sửa nội dung prompt:")
         label.setFont(QFont("Arial", 10, QFont.Bold))
-        layout.addWidget(label)
+        dialog_layout.addWidget(label)
+        
         text_edit = QTextEdit()
         text_edit.setFont(QFont("Consolas", 10))
-        text_edit.setMinimumSize(700, 500)
-        if prompt_type == "trac_nghiem": text_edit.setPlainText(self.prompt_tn_content)
-        else: text_edit.setPlainText(self.prompt_ds_content)
-        layout.addWidget(text_edit)
+        if prompt_type == "trac_nghiem": 
+            text_edit.setPlainText(self.prompt_tn_content)
+        else: 
+            text_edit.setPlainText(self.prompt_ds_content)
+        dialog_layout.addWidget(text_edit)
+        
         btn_layout = QHBoxLayout()
+        
         btn_save = QPushButton("💾 Lưu")
         btn_save.setFixedSize(100, 35)
         btn_save.setStyleSheet("background-color: #4CAF50; color: white; border-radius: 5px; font-weight: bold;")
+        
         btn_cancel = QPushButton("❌ Hủy")
         btn_cancel.setFixedSize(100, 35)
         btn_cancel.setStyleSheet("background-color: #f44336; color: white; border-radius: 5px; font-weight: bold;")
+        
         btn_reset = QPushButton("🔄 Reset về mặc định")
         btn_reset.setFixedSize(150, 35)
         btn_reset.setStyleSheet("background-color: #ff9800; color: white; border-radius: 5px; font-weight: bold;")
+        
         btn_layout.addWidget(btn_reset)
         btn_layout.addStretch()
         btn_layout.addWidget(btn_save)
         btn_layout.addWidget(btn_cancel)
-        layout.addLayout(btn_layout)
-        widget.setLayout(layout)
-        from PyQt5.QtWidgets import QDialog, QVBoxLayout as QVBox
-        edit_dialog = QDialog(self)
-        edit_dialog.setWindowTitle(f"Sửa Prompt - {'Trắc nghiệm' if prompt_type == 'trac_nghiem' else 'Đúng/Sai'}")
-        edit_dialog.setModal(True)
-        dialog_layout = QVBox()
-        dialog_layout.addWidget(widget)
+        dialog_layout.addLayout(btn_layout)
+        
         edit_dialog.setLayout(dialog_layout)
-        edit_dialog.resize(750, 600)
+        
         def save_prompt():
             new_content = text_edit.toPlainText()
             if prompt_type == "trac_nghiem":
@@ -827,6 +853,7 @@ class MainWindow(QWidget):
                 self.prompt_ds_content = new_content
                 self.prompt_ds_label.setText("✏️ Prompt đã chỉnh sửa")
             edit_dialog.accept()
+        
         def reset_prompt():
             default_file = self.default_prompt_tn if prompt_type == "trac_nghiem" else self.default_prompt_ds
             if os.path.isfile(default_file):
@@ -837,143 +864,105 @@ class MainWindow(QWidget):
                     QMessageBox.information(edit_dialog, "Thành công", "Đã reset về prompt mặc định!")
                 except Exception as e:
                     QMessageBox.warning(edit_dialog, "Lỗi", f"Không thể load prompt mặc định: {str(e)}")
+        
         btn_save.clicked.connect(save_prompt)
         btn_cancel.clicked.connect(edit_dialog.reject)
         btn_reset.clicked.connect(reset_prompt)
+        
         edit_dialog.exec_()
 
     def update_process_button_state(self):
-        
+        """Cập nhật trạng thái button"""
         has_selection = self.checkbox_tn.isChecked() or self.checkbox_ds.isChecked()
         self.process_button.setEnabled(has_selection)
-        if not has_selection: self.process_button.setText("⚠️ Vui lòng chọn ít nhất 1 dạng đề")
-        else: self.process_button.setText("🚀 BẮT ĐẦU XỬ LÝ NGAY")
+        if not has_selection: 
+            self.process_button.setText("⚠️ Vui lòng chọn ít nhất 1 dạng đề")
+        else: 
+            self.process_button.setText("🚀 BẮT ĐẦU XỬ LÝ ĐA LUỒNG")
 
     def get_selected_items(self):
-        """
-        Xử lý thông minh v7.0:
-        1. Folder: Quét file -> Phân cụm bằng thuật toán Tỷ lệ tương đồng.
-           - Nếu tất cả file có tỷ lệ giống nhau cao -> Gộp thành 1 file (Tên Folder/Tên Chung).
-           - Nếu khác nhau -> Tách nhóm.
-        2. File lẻ: Gom nhóm bằng thuật toán tương tự.
-        """
+        """Lấy danh sách items được chọn - Lấy tên folder từ đường dẫn PDF"""
         selected_items = {}
-        loose_files_paths = [] 
 
         def traverse(item):
             if item.checkState(0) == Qt.Unchecked: return
 
             item_type = item.data(0, Qt.UserRole)
 
-            # --- XỬ LÝ FOLDER ---
             if item_type == "folder" and item.checkState(0) == Qt.Checked:
-                folder_name = item.text(0).replace("📁 ", "").strip()
                 pdf_list = []
                 self._collect_checked_pdfs_recursive(item, pdf_list)
                 
                 if not pdf_list: return
 
-                # CHẠY CLUSTERING
-                clustered_groups = self._smart_group_files(pdf_list)
+                # Lấy tên folder từ đường dẫn PDF, không dùng smart grouping
+                # Vì mỗi folder PDF sẽ có output cùng tên
+                for pdf_file in pdf_list:
+                    folder_name = os.path.basename(os.path.dirname(pdf_file))
+                    if folder_name not in selected_items:
+                        selected_items[folder_name] = []
+                    selected_items[folder_name].append(pdf_file)
                 
-                # LOGIC QUYẾT ĐỊNH
-                if len(clustered_groups) == 1:
-                    # Nếu chỉ ra 1 nhóm -> Folder này đồng nhất
-                    # Ưu tiên lấy tên Folder làm key cho đẹp
-                    final_list = list(clustered_groups.values())[0]
-                    final_list.sort()
-                    selected_items[folder_name] = final_list
-                else:
-                    # Folder lộn xộn -> Dùng kết quả phân tách
-                    print(f"ℹ️ Folder '{folder_name}' được tách thành {len(clustered_groups)} nhóm.")
-                    selected_items.update(clustered_groups)
                 return 
 
-            # --- DUYỆT TIẾP ---
             if item_type == "folder": 
                 for i in range(item.childCount()):
                     traverse(item.child(i))
                 return
 
-            # --- FILE LẺ ---
             if item_type == "file" and item.checkState(0) == Qt.Checked:
-                loose_files_paths.append(item.text(1))
+                # Lấy tên folder chứa file PDF
+                pdf_file_path = item.text(1)
+                folder_name = os.path.basename(os.path.dirname(pdf_file_path))
+                if folder_name not in selected_items:
+                    selected_items[folder_name] = []
+                selected_items[folder_name].append(pdf_file_path)
 
         root = self.file_tree.invisibleRootItem()
         for i in range(root.childCount()):
             traverse(root.child(i))
 
-        # Xử lý file lẻ
-        if loose_files_paths:
-            smart_groups = self._smart_group_files(loose_files_paths)
-            selected_items.update(smart_groups)
-
         return selected_items
 
     def _smart_group_files(self, file_paths):
-        """
-        Thuật toán Clustering dựa trên Longest Common Substring (LCS) & Tỷ lệ.
-        Thay vì fix cứng số ký tự, ta dùng % giống nhau.
-        """
-        import difflib
+        """Gom nhóm file dựa trên tên tương tự"""
         groups = {}
-        
-        # Copy danh sách để không ảnh hưởng list gốc
         pending_files = file_paths.copy()
         
         while pending_files:
-            # Lấy file đầu tiên làm "Hạt giống" (Seed) cho nhóm mới
             seed_file = pending_files.pop(0)
             seed_name = os.path.splitext(os.path.basename(seed_file))[0]
             
             current_group = [seed_file]
-            current_common_str = seed_name # Chuỗi chung khởi tạo là tên file đầu
+            current_common_str = seed_name
             
-            # Duyệt ngược để có thể remove an toàn
             for i in range(len(pending_files) - 1, -1, -1):
                 candidate_file = pending_files[i]
                 candidate_name = os.path.splitext(os.path.basename(candidate_file))[0]
                 
-                # Tìm chuỗi chung dài nhất giữa (Lõi nhóm hiện tại) và (Ứng viên)
                 matcher = difflib.SequenceMatcher(None, current_common_str, candidate_name)
                 match = matcher.find_longest_match(0, len(current_common_str), 0, len(candidate_name))
                 
-                # Lấy ra chuỗi chung
                 lcs = current_common_str[match.a : match.a + match.size].strip()
                 
-                # === CÔNG THỨC QUYẾT ĐỊNH GOM NHÓM (QUAN TRỌNG) ===
-                # Tính tỷ lệ: Độ dài chuỗi chung / Độ dài ngắn nhất trong 2 chuỗi
-                # Ví dụ: "Bai1" (4) và "Bai2" (4) -> Chung "Bai" (3) -> Tỷ lệ 3/4 = 0.75 (75%) -> GOM
                 min_len = min(len(current_common_str), len(candidate_name))
                 if min_len == 0: ratio = 0
                 else: ratio = len(lcs) / min_len
                 
-                # CONFIG: NGƯỠNG TƯƠNG ĐỒNG (THRESHOLD)
-                # 0.4 nghĩa là chỉ cần giống nhau 40% cấu trúc tên là gom.
-                # Kết hợp điều kiện: Chuỗi chung phải có ít nhất 3 ký tự có nghĩa.
                 clean_lcs = lcs.replace("-", "").replace("_", "").replace(".", "").strip()
                 
                 if ratio >= 0.4 and len(clean_lcs) >= 3:
-                    # GOM VÀO NHÓM
                     current_group.append(candidate_file)
-                    
-                    # Cập nhật lại chuỗi chung của nhóm (Intersection)
-                    # Nhóm càng đông, tên chung càng ngắn lại (nhưng chính xác hơn)
                     current_common_str = lcs
-                    
-                    # Xóa khỏi danh sách chờ để không xét lại
                     pending_files.pop(i)
             
-            # Xử lý tên Output cho nhóm này
             final_name = current_common_str.strip(" -_.")
             
-            # Fallback: Nếu tên chung bị co lại còn quá ngắn hoặc rỗng
             if len(final_name) < 3: 
-                final_name = seed_name # Dùng tên file hạt giống
+                final_name = seed_name
             
             current_group.sort()
             
-            # Merge vào kết quả (xử lý trùng key)
             if final_name in groups:
                 groups[final_name].extend(current_group)
                 groups[final_name] = sorted(list(set(groups[final_name])))
@@ -981,8 +970,9 @@ class MainWindow(QWidget):
                 groups[final_name] = current_group
                 
         return groups
+
     def _collect_checked_pdfs_recursive(self, parent_item, pdf_list):
-        """Hàm đệ quy hỗ trợ get_selected_items"""
+        """Lấy tất cả PDF trong folder"""
         for i in range(parent_item.childCount()):
             child = parent_item.child(i)
             if child.checkState(0) == Qt.Unchecked: continue
@@ -994,7 +984,7 @@ class MainWindow(QWidget):
                 self._collect_checked_pdfs_recursive(child, pdf_list)
 
     def process_files(self):
-        
+        """Bắt đầu xử lý với đa luồng"""
         selected_items = self.get_selected_items()
         if not selected_items:
             QMessageBox.warning(self, "Lỗi", "Vui lòng chọn ít nhất một file hoặc folder để xử lý!")
@@ -1002,6 +992,7 @@ class MainWindow(QWidget):
         if not self.checkbox_tn.isChecked() and not self.checkbox_ds.isChecked():
             QMessageBox.warning(self, "Lỗi", "Vui lòng chọn ít nhất một dạng đề!")
             return
+        
         prompt_paths = {}
         if self.checkbox_tn.isChecked():
             prompt_file = self.default_prompt_tn if os.path.isfile(self.default_prompt_tn) else None
@@ -1016,32 +1007,35 @@ class MainWindow(QWidget):
                 return
             prompt_paths["dung_sai"] = prompt_file
         
-        if hasattr(self, 'thread') and self.thread is not None:
-            try:
-                self.thread.quit()
-                self.thread.wait()
-            except Exception: pass
-        
         self.set_ui_enabled(False)
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
-        self.status_label.setText("Đang kết nối AI và xử lý...")
+        # self.progress_bar.setMaximum(len(selected_items))  <-- XÓA HOẶC COMMENT DÒNG NÀY
+        self.progress_bar.setMaximum(100) # Giá trị tạm, sẽ được update_progress cập nhật lại ngay lập tức
         
-        self.thread = ProcessingThread(
+        self.status_label.setText("⏳ Đang khởi tạo quá trình xử lý đa luồng...")
+        
+        max_workers = self.thread_spinbox.value()
+        
+        # Khởi tạo và chạy processing thread
+        self.processing_thread = ProcessingThread(
             selected_items,
             prompt_paths,
-            self.app_key,
-            self.app_id,
             self.project_id,
-            self.credentials
+            self.credentials,
+            max_workers
         )
-        self.thread.progress.connect(self.update_status)
-        self.thread.error.connect(self.show_error)
-        self.thread.finished.connect(self.processing_finished)
-        self.thread.start()
+        
+        self.processing_thread.progress.connect(self.update_status)
+        self.processing_thread.progress_update.connect(self.update_progress)
+        self.processing_thread.finished.connect(self.processing_finished)
+        self.processing_thread.error_signal.connect(self.handle_error)
+        
+        # Chạy thread
+        self.processing_thread.start()
 
     def set_ui_enabled(self, enabled):
-        
+        """Bật/tắt giao diện"""
         self.process_button.setEnabled(enabled)
         self.add_files_button.setEnabled(enabled)
         self.add_folder_button.setEnabled(enabled)
@@ -1054,41 +1048,69 @@ class MainWindow(QWidget):
         self.btn_select_prompt_ds.setEnabled(enabled)
         self.btn_edit_prompt_tn.setEnabled(enabled)
         self.btn_edit_prompt_ds.setEnabled(enabled)
+        self.thread_spinbox.setEnabled(enabled)
 
     def update_status(self, message):
-        
+        """Cập nhật trạng thái"""
         self.status_label.setText(message)
-        current = self.progress_bar.value()
-        self.progress_bar.setValue(min(current + 10, 90))
 
-    def show_error(self, message):
+    def update_progress(self, completed, total):
+        """Cập nhật thanh tiến độ"""
+        if self.progress_bar.maximum() != total:
+            self.progress_bar.setMaximum(total)
+            
+        self.progress_bar.setValue(completed)
         
-        QMessageBox.critical(self, "Lỗi", message)
-        self.status_label.setText("Đã xảy ra lỗi")
+        # Tính phần trăm hiển thị
+        percentage = int((completed / total) * 100) if total > 0 else 0
+        self.status_label.setText(f"Đang xử lý: {completed}/{total} ({percentage}%)")
+
+    def handle_error(self, error_msg):
+        """Xử lý lỗi"""
+        self.status_label.setText(f"❌ {error_msg}")
+        QMessageBox.critical(self, "Lỗi", error_msg)
+
+    def processing_finished(self, generated_files):
+        """Xử lý hoàn thành và hiển thị thông báo"""
+        # Lọc bỏ các kết quả None (nếu có lỗi)
+        self.generated_files = [f for f in generated_files if f is not None]
+        self.docx_list.clear()
+        
+        # 1. Reset trạng thái UI trước (để giao diện không bị đơ)
         self.progress_bar.setVisible(False)
         self.set_ui_enabled(True)
 
-    def processing_finished(self, generated_files):
-        
-        self.generated_files = [f for f in generated_files if f is not None]
-        self.docx_list.clear()
+        # 2. Kiểm tra kết quả
         if not self.generated_files:
-            QMessageBox.warning(self, "Cảnh báo", "Không có file nào được tạo ra.")
-            self.status_label.setText("Không có file được tạo")
+            # Trường hợp thất bại hết
+            self.status_label.setText("❌ Không có file được tạo")
+            QMessageBox.warning(self, "Cảnh báo", "Quá trình kết thúc nhưng không có file nào được tạo ra.\nVui lòng kiểm tra lại kết nối hoặc file đầu vào.")
         else:
+            # Trường hợp thành công
             for fname in self.generated_files:
                 self.docx_list.addItem(os.path.basename(fname))
-            self.status_label.setText(f"✓ Hoàn tất! Đã tạo {len(self.generated_files)} file")
+            
+            self.status_label.setText(f"✅ Hoàn tất! Đã tạo {len(self.generated_files)} file")
+            
+            # Tự động chuyển sang tab kết quả
             self.tab_widget.setCurrentIndex(1)
+            
+            # Tự động chọn file đầu tiên để preview
             if self.generated_files:
                 self.docx_list.setCurrentRow(0)
                 self.show_selected_docx(self.docx_list.item(0))
-        self.progress_bar.setValue(100)
-        self.progress_bar.setVisible(False)
-        self.set_ui_enabled(True)
+
+            # --- [MỚI] HIỂN THỊ THÔNG BÁO HOÀN THÀNH ---
+            QMessageBox.information(
+                self, 
+                "Xử lý hoàn tất", 
+                f"✅ Đã chạy xong chương trình!\n\n"
+                f"📄 Tổng số file tạo thành công: {len(self.generated_files)}\n"
+                f"👉 Bạn có thể xem và mở file tại tab 'KẾT QUẢ ĐẦU RA'."
+            )
 
     def show_selected_docx(self, item):
-        # ... (Giữ nguyên code logic v2.0 - check 10MB) ...
+        """Hiển thị preview"""
         file_name = item.text()
         full_path = next((f for f in self.generated_files if os.path.basename(f) == file_name), None)
         self.btn_open_external.setEnabled(True)
@@ -1096,14 +1118,15 @@ class MainWindow(QWidget):
             self.docx_viewer.setHtml(f"<h3>Lỗi:</h3><p>File không tồn tại: {file_name}</p>")
             self.btn_open_external.setEnabled(False)
             return
+        
         file_size_mb = os.path.getsize(full_path) / (1024 * 1024)
-        limit_mb = 10.0 
-        if file_size_mb > limit_mb:
+        if file_size_mb > 10.0:
             msg = f"""<html><body style="font-family: Arial; text-align: center; padding-top: 50px;">
                 <h2 style="color: #f44336;">⚠️ File quá lớn để xem trước ({file_size_mb:.2f} MB)</h2>
                 <p>Vui lòng nhấn nút <b>"↗️ Mở bằng Word/WPS"</b> ở góc trên.</p></body></html>"""
             self.docx_viewer.setHtml(msg)
             return
+        
         try:
             with open(full_path, "rb") as docx_file:
                 result = mammoth.convert_to_html(docx_file)
@@ -1112,15 +1135,30 @@ class MainWindow(QWidget):
                     styled_html = f"""<html><head><style>
                             body {{ font-family: 'Segoe UI', Arial, sans-serif; padding: 30px; line-height: 1.6; color: #333; }}
                             p {{ margin-bottom: 15px; }}
-                            img {{ max-width: 100%; height: auto; border: 1px solid #ddd; box-shadow: 2px 2px 5px #eee; }}
+                            img {{ max-width: 100%; height: auto; border: 1px solid #ddd; }}
                             table {{ border-collapse: collapse; width: 100%; margin: 15px 0; }}
                             th, td {{ border: 1px solid #ddd; padding: 8px; }}
                         </style></head><body>{html}</body></html>"""
                     self.docx_viewer.setHtml(styled_html)
                 else:
-                    self.docx_viewer.setHtml(f"<p>File {file_name} không có nội dung văn bản/ảnh đọc được.</p>")
+                    self.docx_viewer.setHtml(f"<p>File không có nội dung để hiển thị.</p>")
         except Exception as e:
             self.docx_viewer.setHtml(f"<h3>Lỗi khi đọc file</h3><p>{str(e)}</p>")
+
+    def open_current_docx(self):
+        """Mở file bằng Word/WPS"""
+        current_item = self.docx_list.currentItem()
+        if not current_item:
+            return
+        file_name = current_item.text()
+        full_path = next((f for f in self.generated_files if os.path.basename(f) == file_name), None)
+        if full_path and os.path.exists(full_path):
+            try:
+                os.startfile(full_path)
+            except Exception as e:
+                QMessageBox.warning(self, "Lỗi", f"Không thể mở file: {str(e)}")
+
+
 if __name__ == "__main__":
     app = QApplication(sys.argv)
     window = MainWindow()

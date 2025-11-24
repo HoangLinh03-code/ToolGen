@@ -22,7 +22,7 @@ Tổng số câu hỏi: 80 câu.
 + ĐẶC BIỆT QUAN TRỌNG các đáp án có độ dài như nhau và có cấu trúc tương đương nhau.
 
 ## Yêu cầu ĐẶC BIỆT về hình ảnh:
-+ QUAN TRỌNG Số lượng: 30% tổng số câu hỏi (tức là 24 câu) phải có hình ảnh minh họa, ĐẶC BIỆT ưu tiên sử dụng tất cả hình ảnh có sẵn trong file PDF. Nếu không có, hãy tạo mô tả chi tiết để vẽ hình mới.
++ QUAN TRỌNG Số lượng: 25% tổng số câu hỏi (tức là 20 câu) phải có hình ảnh minh họa, ĐẶC BIỆT ưu tiên sử dụng tất cả hình ảnh có sẵn trong file PDF. Nếu không có, hãy tạo mô tả chi tiết để vẽ hình mới.
 + Mô tả chi tiết: Mô tả hình ảnh phải đủ rõ ràng để học sinh hiểu bối cảnh câu hỏi mà không cần mở file PDF gốc.
 + Định dạng chú thích: [HÌNH ẢNH: Hình [X] - Lấy từ trang X của file PDF] hoặc HÌNH ẢNH MINH HỌA: [Mô tả chi tiết]
 

@@ -7,6 +7,12 @@ from process.text2Image import generate_image_from_text, get_image_size_for_aspe
 from io import BytesIO
 import os
 import sys
+import threading
+import time
+
+# Global lock để bảo vệ file operations
+_FILE_LOCK = threading.RLock()
+_OUTPUT_DIR_LOCK = threading.RLock()
 
 def get_app_path():
     """Lấy đường dẫn chứa file .exe hoặc file script đang chạy"""
@@ -15,27 +21,92 @@ def get_app_path():
     else:
         return os.path.dirname(os.path.abspath(__file__))
 
-def save_document_securely(doc, file_name):
-    """Hàm lưu file an toàn"""
+def ensure_output_folder_for_batch(batch_name):
+    """
+    Tạo folder riêng cho từng batch bài học
+    Cấu trúc: output/{batch_name}/
+    """
     base_path = get_app_path()
-    output_dir = os.path.join(base_path, "output")
+    output_base = os.path.join(base_path, "output")
+    batch_folder = os.path.join(output_base, batch_name)
     
-    if not os.path.exists(output_dir):
-        try:
-            os.makedirs(output_dir)
-            print(f"Đã tạo thư mục: {output_dir}")
-        except OSError as e:
-            print(f"Lỗi không thể tạo thư mục output: {e}")
-            return None
+    with _OUTPUT_DIR_LOCK:
+        # Tạo thư mục base/output nếu chưa có
+        if not os.path.exists(output_base):
+            try:
+                os.makedirs(output_base, exist_ok=True)
+                print(f"✅ Đã tạo thư mục: {output_base}")
+            except OSError as e:
+                print(f"❌ Lỗi không thể tạo thư mục output: {e}")
+                return None
+        
+        # Tạo thư mục riêng cho batch (bài học)
+        if not os.path.exists(batch_folder):
+            try:
+                os.makedirs(batch_folder, exist_ok=True)
+                print(f"✅ Đã tạo thư mục batch: {batch_folder}")
+            except OSError as e:
+                print(f"❌ Lỗi không thể tạo thư mục batch '{batch_name}': {e}")
+                return None
+    
+    return batch_folder
 
-    output_path = os.path.join(output_dir, f"{file_name}.docx")
+def save_document_securely(doc, batch_name, file_name):
+    """
+    Hàm lưu file DOCX với thread-safety
     
-    try:
-        doc.save(output_path)
-        print(f"Đã lưu file tại: {output_path}")
-        return output_path
-    except Exception as e:
-        print(f"Lỗi khi lưu file docx: {e}")
+    Args:
+        doc: Document object
+        batch_name: Tên batch (sẽ tạo folder có tên này)
+        file_name: Tên file mà không cần .docx
+    
+    Returns:
+        Đường dẫn file hoặc None
+    """
+    # Tạo folder cho batch
+    batch_folder = ensure_output_folder_for_batch(batch_name)
+    
+    if not batch_folder:
+        return None
+
+    output_path = os.path.join(batch_folder, f"{file_name}.docx")
+    
+    # ============================================================
+    # LOCK: Bảo vệ toàn bộ quá trình save file
+    # ============================================================
+    with _FILE_LOCK:
+        max_retries = 3
+        retry_count = 0
+        
+        while retry_count < max_retries:
+            try:
+                # Lưu file với chế độ độc quyền (overwrite)
+                doc.save(output_path)
+                
+                # Xác nhận file tồn tại
+                if os.path.exists(output_path):
+                    file_size = os.path.getsize(output_path)
+                    print(f"✅ Đã lưu file: {output_path} ({file_size} bytes)")
+                    return output_path
+                else:
+                    raise FileNotFoundError(f"File không được tạo: {output_path}")
+                    
+            except PermissionError as e:
+                print(f"⚠️ Lỗi permission lần {retry_count + 1}: {e}")
+                retry_count += 1
+                if retry_count < max_retries:
+                    time.sleep(0.5)  # Delay trước khi retry
+                continue
+                
+            except Exception as e:
+                print(f"❌ Lỗi khi lưu file docx: {e}")
+                retry_count += 1
+                if retry_count < max_retries:
+                    time.sleep(0.5)
+                continue
+        
+        # Nếu sau 3 lần vẫn fail
+        print(f"❌ Không thể lưu file sau {max_retries} lần thử: {output_path}")
         return None
 
 def clean_json_string(text):
@@ -93,14 +164,7 @@ def generate_or_get_image(hinh_anh_data):
     loai = hinh_anh_data.get("loai", "tu_mo_ta")
     mo_ta = hinh_anh_data.get("mo_ta", "")
     
-    # # Trường hợp 1: Ảnh từ PDF - luôn dùng placeholder
-    # if loai == "tu_pdf":
-    #     trang = hinh_anh_data.get("trang", "?")
-    #     so_hinh = hinh_anh_data.get("so_hinh", "?")
-    #     placeholder = f"📄 [Chèn hình {so_hinh} từ trang {trang} của file PDF gốc]"
-    #     return None, placeholder
-    
-    # Trường hợp 2: Sinh ảnh từ mô tả
+    # Trường hợp: Sinh ảnh từ mô tả
     if loai == "tu_mo_ta" and mo_ta:
         try:
             print(f"🎨 Đang sinh ảnh từ mô tả: {mo_ta[:50]}...")
@@ -111,7 +175,7 @@ def generate_or_get_image(hinh_anh_data):
         except Exception as e:
             print(f"❌ Lỗi khi sinh ảnh: {e}")
     
-    # Trường hợp 3: Lỗi hoặc không có mô tả - dùng placeholder
+    # Trường hợp: Lỗi hoặc không có mô tả - dùng placeholder
     placeholder = f"🖼️ [Cần chèn hình ảnh: {mo_ta if mo_ta else 'Không có mô tả'}]"
     return None, placeholder
 
@@ -145,11 +209,12 @@ def insert_image_or_placeholder(doc, hinh_anh_data):
         run.bold = True
         p.alignment = WD_ALIGN_PARAGRAPH.CENTER
 
-def response2docx_json(file_path, prompt, file_name, project_id, creds, model_name):
-    """
-    Phiên bản tối ưu sử dụng JSON thay vì text string
-    """
+def response2docx_json(file_path, prompt, file_name, project_id, creds, model_name, batch_name=None):
     client = VertexClient(project_id, creds, model_name)
+    
+    # Nếu không có batch_name, lấy từ file_name (bỏ đi _TN hoặc _DS)
+    if not batch_name:
+        batch_name = file_name.replace("_TN", "").replace("_DS", "")
     
     prompt_json = f"""{prompt}
 
@@ -180,7 +245,7 @@ Trả về ĐÚNG định dạng JSON sau (không thêm markdown backticks):
         {{"ky_hieu": "D", "noi_dung": "Đáp án D"}}
       ],
       "dap_an_dung": 2,
-      "giai_thich": "Giải thích chi tiết đáp án đúng TUYỆT ĐỐI KHÔNG giải thích các đáp án sai khác..."
+      "giai_thich": "Giải thích chi tiết TUYỆT ĐỐI KHÔNG giải thích các đáp án sai khác..."
     }}
   ]
 }}
@@ -202,7 +267,8 @@ LƯU Ý:
     data = check_and_fix_questions(data, client)
     doc = create_docx_from_json(data)
     
-    output_path = save_document_securely(doc, file_name)
+    # SỬ DỤNG HÀM SAVE THREAD-SAFE VỚI BATCH FOLDER
+    output_path = save_document_securely(doc, batch_name, file_name)
     print(f"Đã lưu file: {output_path}")
     return output_path
 
@@ -218,7 +284,7 @@ Yêu cầu:
 2. Kiểm tra độ dài giải thích (tối thiểu 60 từ)
 3. Sửa lỗi nếu có
 
-Trả về JSON đã được sửa (format giống input, không thêm markdown):
+Trả về JSON đã sửa (format giống input, không thêm markdown):
 '''
     
     response = client.send_data_to_check(prompt=prompt_check)
@@ -242,7 +308,7 @@ def create_docx_from_json(data):
     """Tạo file DOCX từ JSON data"""
     doc = Document()
     
-    title = doc.add_heading(f'ĐỀ {data.get("loai_de", "").upper()}', level=1)
+    title = doc.add_heading(f'Đề {data.get("loai_de", "").upper()}', level=1)
     title.alignment = WD_ALIGN_PARAGRAPH.CENTER
     
     # Nhóm câu hỏi theo mức độ
@@ -278,7 +344,7 @@ def render_question(doc, cau):
     p.add_run(f"Câu {cau['stt']}: ").bold = True
     p.add_run(cau['noi_dung'])
     
-    # Hình ảnh (nếu có) - GỌI HÀM XỬ LÝ HÌNH ẢNH
+    # Hình ảnh (nếu có)
     hinh_anh = cau.get("hinh_anh", {})
     if hinh_anh.get("co_hinh"):
         insert_image_or_placeholder(doc, hinh_anh)
@@ -314,7 +380,7 @@ def render_question(doc, cau):
         run_ket_luan.bold = True
 
 def render_question_dung_sai(doc, cau):
-    """Render chi tiết một câu hỏi đúng/sai"""
+    """Render chi tiết một câu hỏi Đúng/sai"""
     # Số câu
     p = doc.add_paragraph()
     p.add_run(f"Câu {cau['stt']}:").bold = True
@@ -357,9 +423,12 @@ def render_question_dung_sai(doc, cau):
             p_giai_thich = doc.add_paragraph(gt.get('giai_thich', ''))
             p_giai_thich.alignment = WD_ALIGN_PARAGRAPH.LEFT
 
-def response2docx_dung_sai_json(file_path, prompt, file_name, project_id, creds, model_name):
-    """Phiên bản cho câu hỏi đúng/sai (40 câu)"""
+def response2docx_dung_sai_json(file_path, prompt, file_name, project_id, creds, model_name, batch_name=None):
     client = VertexClient(project_id, creds, model_name)
+    
+    # Nếu không có batch_name, lấy từ file_name (bỏ đi _TN hoặc _DS)
+    if not batch_name:
+        batch_name = file_name.replace("_TN", "").replace("_DS", "")
     
     prompt_json = f"""{prompt}
 
@@ -398,7 +467,7 @@ def response2docx_dung_sai_json(file_path, prompt, file_name, project_id, creds,
   ]
 }}
 
-Lưu ý: 
+LƯU Ý: 
 - Với hình ảnh:
   + Nếu cần sinh ảnh: "loai": "tu_mo_ta", "mo_ta": "Mô tả chi tiết để sinh ảnh"
   + Nếu KHÔNG có hình ảnh: "hinh_anh": {{"co_hinh": false}}
@@ -415,13 +484,15 @@ Lưu ý:
         return None
     
     doc = create_docx_dung_sai(data)
-    output_path = save_document_securely(doc, file_name)
+    
+    # SỬ DỤNG HÀM SAVE THREAD-SAFE VỚI BATCH FOLDER
+    output_path = save_document_securely(doc, batch_name, file_name)
     print(f"Đã lưu file: {output_path}")
     return output_path
 
 def create_docx_dung_sai(data):
     """
-    Tạo DOCX cho câu hỏi đúng/sai có phân chia mức độ (Header)
+    Tạo DOCX cho câu hỏi Đúng/sai có phân chia mức độ (Header)
     Logic mapping:
     - 1-19: Thông hiểu
     - 20-32: Vận dụng
@@ -447,13 +518,12 @@ def create_docx_dung_sai(data):
     }
     
     # 3. Phân loại câu hỏi vào nhóm dựa trên STT
-    # Sắp xếp danh sách câu hỏi theo STT để đảm bảo thứ tự đúng
     list_cau_hoi = sorted(data.get("cau_hoi", []), key=lambda x: x.get("stt", 0))
     
     for cau in list_cau_hoi:
         stt = cau.get("stt", 0)
         
-        # Logic mapping STT -> Mức độ
+        # Logic mapping STT -> Mức Độ
         if 1 <= stt <= 19:
             key = "thong_hieu"
         elif 20 <= stt <= 32:
@@ -474,7 +544,7 @@ def create_docx_dung_sai(data):
         
         # Chỉ render nếu nhóm đó có câu hỏi
         if ds_cau_hoi:
-            # Thêm Heading Mức độ
+            # Thêm Heading Mức Độ
             header_text = muc_do_display.get(muc_do, muc_do.upper())
             doc.add_heading(header_text, level=2)
             

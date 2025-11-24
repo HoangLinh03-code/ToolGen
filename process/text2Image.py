@@ -14,7 +14,7 @@ def generate_image_from_text(prompt, aspect_ratio="1:1", number_of_images=1):
         )
 
         # Tải model Imagen
-        model = ImageGenerationModel.from_pretrained("imagen-4.0-generate-preview-06-06")
+        model = ImageGenerationModel.from_pretrained("imagen-4.0-generate-001")
 
         # Sinh ảnh
         result = model.generate_images(
