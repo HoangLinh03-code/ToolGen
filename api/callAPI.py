@@ -1,30 +1,46 @@
 import vertexai, os
+import sys
 from vertexai.generative_models import GenerativeModel, Part, GenerationConfig
 from dotenv import load_dotenv
 from google.oauth2 import service_account
-import sys
 
-load_dotenv()
-# ============ QUAN TRỌNG: Xử lý đường dẫn cho PyInstaller ============
+# ============================================================
+# CẤU HÌNH LOAD .ENV (SỬA LỖI KHÔNG NHẬN BIẾN MỚI)
+# ============================================================
+
+# 1. Xác định đường dẫn gốc (nơi chứa file .py này hoặc file exe)
 if getattr(sys, 'frozen', False):
-    # Chạy từ file .exe (PyInstaller)
-    base_path = sys._MEIPASS  # Thư mục tạm của PyInstaller
+    # Nếu chạy từ file .exe (PyInstaller)
+    base_path = os.path.dirname(sys.executable)
 else:
-    # Chạy từ Python script thường
-    base_path = os.path.dirname(__file__)
+    # Nếu chạy từ code Python thường (lấy thư mục chứa file hiện tại)
+    base_path = os.path.dirname(os.path.abspath(__file__))
 
-# Đường dẫn đến file .env
-dotenv_path = os.path.join('.env')
+# Lưu ý: Nếu file này nằm trong thư mục con (ví dụ /api/), 
+# mà file .env nằm ở thư mục gốc project, bạn cần lùi lại 1 cấp:
+# base_path = os.path.dirname(base_path) # Bỏ comment dòng này nếu file .py nằm trong thư mục con
 
-# Load .env với explicit path
+# 2. Đường dẫn tuyệt đối đến .env
+dotenv_path = os.path.join(base_path, '.env')
+
+# 3. Load .env với quyền GHI ĐÈ (override=True)
 if os.path.exists(dotenv_path):
-    load_dotenv(dotenv_path)
-    print(f"\nLoaded .env from: {dotenv_path}\n")
+    # override=True: Bắt buộc lấy giá trị mới trong file, bỏ qua cache cũ
+    load_dotenv(dotenv_path, override=True) 
+    print(f"✅ Đã load (và ghi đè) cấu hình từ: {dotenv_path}")
 else:
-    print(f"Warning: .env not found at {dotenv_path}\n")
-    # print(f"Base path: {base_path}\n")
-    # print(f"Files in base_path: {os.listdir(base_path) if os.path.exists(base_path) else 'N/A'}\n")
+    # Thử tìm ở thư mục làm việc hiện tại (Current Working Directory) nếu không thấy ở base_path
+    cwd_env = os.path.join(os.getcwd(), '.env')
+    if os.path.exists(cwd_env):
+        load_dotenv(cwd_env, override=True)
+        print(f"✅ Đã load (và ghi đè) cấu hình từ CWD: {cwd_env}")
+    else:
+        print(f"⚠️ CẢNH BÁO: Không tìm thấy file .env tại {dotenv_path} hoặc {cwd_env}")
+
+# ============================================================
+
 class VertexClient:
+    # ... (Giữ nguyên code class VertexClient của bạn ở đây) ...
     def __init__(self, project_id, creds, model, region="us-central1"):
         vertexai.init(
             project=project_id,
@@ -79,13 +95,19 @@ class VertexClient:
 def get_vertex_ai_credentials():
     """Lấy đối tượng credentials cho Vertex AI từ .env."""
     try:
+        # Kiểm tra xem biến môi trường có giá trị không
+        private_key = os.getenv("PRIVATE_KEY")
+        if not private_key:
+            print("❌ Lỗi: Không tìm thấy PRIVATE_KEY trong biến môi trường")
+            return None
+
         service_account_data = {
             "type": os.getenv("TYPE"),
             "project_id": os.getenv("PROJECT_ID"),
             "private_key_id": os.getenv("PRIVATE_KEY_ID"),
-            "private_key": os.getenv("PRIVATE_KEY").replace('\\n', '\n'), # Quan trọng: Thay thế chuỗi \n
+            "private_key": private_key.replace('\\n', '\n'),
             "client_email": os.getenv("CLIENT_EMAIL"),
-            "client_id": os.getenv("CLIENT_ID", ""),
+            "client_id": os.getenv("CLIENT_ID"),
             "auth_uri": os.getenv("AUTH_URI"),
             "token_uri": os.getenv("TOKEN_URI"),
             "auth_provider_x509_cert_url": os.getenv("AUTH_PROVIDER_X509_CERT_URL"),
@@ -98,5 +120,5 @@ def get_vertex_ai_credentials():
         )
         return credentials
     except Exception as e:
-        print(f"Lỗi khi tạo credentials từ service account: {e}")
+        print(f"❌ Lỗi khi tạo credentials từ service account: {e}")
         return None
