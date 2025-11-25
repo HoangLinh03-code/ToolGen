@@ -8,6 +8,7 @@ colorama==0.4.6
 docstring_parser==0.17.0
 dotenv==0.9.9
 google==3.0.0
+google-genai
 google-ai-generativelanguage==0.6.15
 google-api-core==2.25.1
 google-api-python-client==2.184.0

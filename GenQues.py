@@ -1,6 +1,3 @@
-# File: GenQues_MultiThread_Optimized.py
-# Phiên bản cải thiện xử lý đa luồng
-
 import sys
 import os
 from PyQt5.QtWidgets import (
@@ -174,36 +171,34 @@ class ProcessingThread(QThread):
     def _process_worker(task, project_id, creds):
         """
         Hàm xử lý chạy trong từng luồng con.
-        Đảm bảo không crash luồng chính.
         """
         import os
-        # Import local để tránh circular import và đảm bảo luồng sạch
         from process.response2docx import response2docx_json, response2docx_dung_sai_json
 
+        # Tên model chuẩn đã test thành công
+        MODEL_NAME = "gemini-3-pro-preview" 
+
         try:
-            # Xác định tên file đầu ra
             if task.task_type == "TN":
                 output_filename = f"{task.output_name}_TN"
-                # Gọi hàm sinh trắc nghiệm
                 docx_path = response2docx_json(
                     task.pdf_files,
                     task.prompt_content,
                     output_filename,
                     project_id,
                     creds,
-                    "gemini-2.5-pro",
+                    MODEL_NAME, 
                     batch_name=task.output_name
                 )
             else: # task_type == "DS"
                 output_filename = f"{task.output_name}_DS"
-                # Gọi hàm sinh đúng sai
                 docx_path = response2docx_dung_sai_json(
                     task.pdf_files,
                     task.prompt_content,
                     output_filename,
                     project_id,
                     creds,
-                    "gemini-2.5-pro",
+                    MODEL_NAME, 
                     batch_name=task.output_name
                 )
 
@@ -216,7 +211,7 @@ class ProcessingThread(QThread):
             return None, str(e)
 
 # ============================================================
-# PHẦN GIAO DIỆN CHÍNH (MainWindow) - GIỮ NGUYÊN
+# PHẦN GIAO DIỆN CHÍNH (MainWindow)
 # ============================================================
 
 class MainWindow(QWidget):
@@ -802,30 +797,37 @@ class MainWindow(QWidget):
                 QMessageBox.warning(self, "Lỗi", f"Không thể đọc file: {str(e)}")
 
     def edit_prompt(self, prompt_type):
-        """Sửa prompt"""
+        """Sửa prompt và LƯU VÀO FILE (ĐÃ FIX LỖI HIỂN THỊ)"""
         edit_dialog = QDialog(self)
-        edit_dialog.setWindowTitle(f"Sửa Prompt - {'Trắc nghiệm' if prompt_type == 'trac_nghiem' else 'Đúng/Sai'}")
+        title_type = 'Trắc nghiệm' if prompt_type == 'trac_nghiem' else 'Đúng/Sai'
+        edit_dialog.setWindowTitle(f"Sửa Prompt - {title_type}")
         edit_dialog.setModal(True)
         edit_dialog.resize(750, 600)
         
+        # Tạo Layout chính
         dialog_layout = QVBoxLayout()
         
-        label = QLabel("📝 Chỉnh sửa nội dung prompt:")
+        # Tiêu đề
+        label = QLabel(f"📝 Chỉnh sửa nội dung prompt ({title_type}):")
         label.setFont(QFont("Arial", 10, QFont.Bold))
         dialog_layout.addWidget(label)
         
+        # Khung soạn thảo
         text_edit = QTextEdit()
         text_edit.setFont(QFont("Consolas", 10))
+        
+        # Load nội dung hiện tại
         if prompt_type == "trac_nghiem": 
             text_edit.setPlainText(self.prompt_tn_content)
         else: 
             text_edit.setPlainText(self.prompt_ds_content)
         dialog_layout.addWidget(text_edit)
         
+        # Layout nút bấm
         btn_layout = QHBoxLayout()
         
-        btn_save = QPushButton("💾 Lưu")
-        btn_save.setFixedSize(100, 35)
+        btn_save = QPushButton("💾 Lưu & Ghi File")
+        btn_save.setFixedSize(120, 35)
         btn_save.setStyleSheet("background-color: #4CAF50; color: white; border-radius: 5px; font-weight: bold;")
         
         btn_cancel = QPushButton("❌ Hủy")
@@ -840,20 +842,43 @@ class MainWindow(QWidget):
         btn_layout.addStretch()
         btn_layout.addWidget(btn_save)
         btn_layout.addWidget(btn_cancel)
+        
+        # Thêm layout nút bấm vào layout chính
         dialog_layout.addLayout(btn_layout)
         
-        edit_dialog.setLayout(dialog_layout)
-        
+        # --- QUAN TRỌNG: GÁN LAYOUT CHO DIALOG (Lỗi cũ nằm ở đây) ---
+        edit_dialog.setLayout(dialog_layout) 
+        # -------------------------------------------------------------
+
+        # Hàm xử lý lưu
         def save_prompt():
             new_content = text_edit.toPlainText()
+            file_path = ""
+            
             if prompt_type == "trac_nghiem":
                 self.prompt_tn_content = new_content
                 self.prompt_tn_label.setText("✏️ Prompt đã chỉnh sửa")
+                file_path = self.default_prompt_tn
             else:
                 self.prompt_ds_content = new_content
                 self.prompt_ds_label.setText("✏️ Prompt đã chỉnh sửa")
+                file_path = self.default_prompt_ds
+            
+            # Ghi file
+            try:
+                if file_path:
+                    with open(file_path, "w", encoding="utf-8") as f:
+                        f.write(new_content)
+                    QMessageBox.information(edit_dialog, "Thành công", f"Đã lưu thay đổi vào file:\n{os.path.basename(file_path)}")
+                else:
+                    QMessageBox.warning(edit_dialog, "Cảnh báo", "Không xác định được đường dẫn file gốc để lưu!")
+            except Exception as e:
+                QMessageBox.critical(edit_dialog, "Lỗi Ghi File", f"Không thể ghi file txt:\n{str(e)}")
+                return
+
             edit_dialog.accept()
         
+        # Hàm xử lý reset
         def reset_prompt():
             default_file = self.default_prompt_tn if prompt_type == "trac_nghiem" else self.default_prompt_ds
             if os.path.isfile(default_file):
@@ -861,10 +886,11 @@ class MainWindow(QWidget):
                     with open(default_file, "r", encoding="utf-8") as f:
                         default_content = f.read()
                     text_edit.setPlainText(default_content)
-                    QMessageBox.information(edit_dialog, "Thành công", "Đã reset về prompt mặc định!")
+                    QMessageBox.information(edit_dialog, "Thành công", "Đã load lại nội dung từ file gốc!")
                 except Exception as e:
-                    QMessageBox.warning(edit_dialog, "Lỗi", f"Không thể load prompt mặc định: {str(e)}")
+                    QMessageBox.warning(edit_dialog, "Lỗi", f"Không thể load prompt: {str(e)}")
         
+        # Kết nối sự kiện
         btn_save.clicked.connect(save_prompt)
         btn_cancel.clicked.connect(edit_dialog.reject)
         btn_reset.clicked.connect(reset_prompt)
@@ -913,77 +939,86 @@ class MainWindow(QWidget):
         if not all_checked_pdfs:
             return {}
 
-        # 2. GỌI THUẬT TOÁN "STRING CON CHUNG" CỦA BẠN
-        # Hàm này đã có sẵn ở dưới, nó sẽ tự tách 7 chủ đề ra riêng 
-        # và gom các file có tên giống nhau (Part 1, Part 2...) vào chung 1 nhóm.
+        # 2. GỌI THUẬT TOÁN "STRING CON CHUNG"
         return self._smart_group_files(all_checked_pdfs)
+
     def _smart_group_files(self, file_paths):
         """
-        Gom nhóm dựa trên chuỗi chung dài nhất (Longest Common Substring).
-        Logic:
-        1. Tìm chuỗi chung dài nhất giữa file gốc và file đang xét.
-        2. Tính tỷ lệ % của chuỗi chung so với độ dài file dài hơn.
-        3. Nếu tỷ lệ > 80% (tức là chỉ khác nhau chút xíu ở số hiệu đuôi) -> Gộp.
-        4. Nếu tỷ lệ thấp (như trường hợp 7 file của bạn, chung đầu nhưng đuôi dài ngoằng khác nhau) -> Tách riêng.
+        Gom nhóm thông minh v4 (Fix triệt để TH1, 2, 3, 4):
+        - Cùng Folder: Dùng tỷ lệ độ dài tiền tố (Prefix Ratio) thay vì số lượng ký tự cố định.
+          Giúp phân biệt file cắt nhỏ (Part1, Part2 -> giống 90%) với file khác chủ đề (TopicA, TopicB -> giống 40-50%).
+        - Khác Folder: Giữ nguyên logic chặt (tránh gộp nhầm).
         """
         groups = {}
-        # Sắp xếp để các file tên giống nhau đứng cạnh nhau cho dễ xử lý
         pending_files = sorted(file_paths)
         
         while pending_files:
-            # Lấy file đầu tiên làm "hạt giống" (Seed)
-            seed_file = pending_files.pop(0)
-            seed_name = os.path.splitext(os.path.basename(seed_file))[0]
+            seed = pending_files.pop(0)
+            seed_name = os.path.basename(seed)
+            seed_base = os.path.splitext(seed_name)[0]
             
-            current_group = [seed_file]
+            current_group = [seed]
             
-            # Duyệt các file còn lại để so sánh
             i = 0
             while i < len(pending_files):
-                candidate_file = pending_files[i]
-                candidate_name = os.path.splitext(os.path.basename(candidate_file))[0]
+                candidate = pending_files[i]
+                cand_name = os.path.basename(candidate)
+                cand_base = os.path.splitext(cand_name)[0]
                 
-                # --- THUẬT TOÁN TÌM CHUỖI CHUNG DÀI NHẤT ---
-                matcher = difflib.SequenceMatcher(None, seed_name, candidate_name)
-                match = matcher.find_longest_match(0, len(seed_name), 0, len(candidate_name))
+                should_merge = False
                 
-                # Lấy ra chuỗi chung đó
-                common_substring = seed_name[match.a : match.a + match.size].strip()
+                # Tính toán thông số chung
+                matcher = difflib.SequenceMatcher(None, seed_base, cand_base)
+                match = matcher.find_longest_match(0, len(seed_base), 0, len(cand_base))
+                common_prefix = seed_base[match.a : match.a + match.size] # Lấy đoạn chung dài nhất
                 
-                # --- TÍNH TỶ LỆ TRÙNG KHỚP (QUAN TRỌNG) ---
-                # Lấy độ dài chuỗi dài nhất trong 2 thằng để chia
-                max_len = max(len(seed_name), len(candidate_name))
-                
-                if max_len == 0:
-                    ratio = 0
+                # --- CHECK 1: CÙNG FOLDER ---
+                if os.path.dirname(seed) == os.path.dirname(candidate):
+                    # Logic mới: Tính tỷ lệ độ dài tiền tố so với file ngắn hơn
+                    min_len = min(len(seed_base), len(cand_base))
+                    prefix_ratio = len(common_prefix) / min_len if min_len > 0 else 0
+                    
+                    # Điều kiện gộp:
+                    # 1. Rất giống nhau về nội dung chuỗi (ratio > 0.8) - Fix TH 1
+                    # 2. HOẶC: Tiền tố chung chiếm phần lớn tên file (> 70%) - Fix TH 1 & 2 (File cắt nhỏ)
+                    #    (VD: "TaiLieu_Part1" vs "TaiLieu_Part2" -> prefix "TaiLieu_Part" chiếm ~90% -> GỘP)
+                    #    (VD: "Topic_A..." vs "Topic_B..." -> prefix "Topic_" chiếm ~30% -> KHÔNG GỘP -> Fix TH3,4)
+                    
+                    if matcher.ratio() > 0.8 or prefix_ratio > 0.7:
+                        should_merge = True
+                            
+                # --- CHECK 2: KHÁC FOLDER (TH3 & 4) ---
                 else:
-                    ratio = len(common_substring) / max_len
+                    # Giữ nguyên logic chặt chẽ để tránh gộp nhầm file khác bài
+                    if matcher.ratio() > 0.85: 
+                        should_merge = True
                 
-                # --- QUYẾT ĐỊNH GỘP HAY KHÔNG ---
-                # Ngưỡng 0.8 (80%) là con số an toàn.
-                # Ví dụ: "Toan_Part1" và "Toan_Part2" -> Giống nhau 90% -> GỘP.
-                # Ví dụ của bạn: "TLGD...Chủ đề 1..." và "TLGD...Chủ đề 2..." 
-                # -> Chỉ giống nhau đoạn đầu (khoảng 40%) -> KHÔNG GỘP.
-                if ratio >= 0.8:
-                    current_group.append(candidate_file)
-                    pending_files.pop(i) # Đã gộp thì xóa khỏi danh sách chờ
+                if should_merge:
+                    current_group.append(candidate)
+                    pending_files.pop(i)
                 else:
-                    i += 1 # Không khớp thì xét file kế tiếp
+                    i += 1
             
-            # Đặt tên key cho nhóm
-            # Nếu nhóm có nhiều file, lấy chuỗi chung làm tên
+            # --- ĐẶT TÊN NHÓM ---
             if len(current_group) > 1:
-                # Tìm lại chuỗi chung của cả nhóm để đặt tên cho đẹp
-                # (Lấy đơn giản theo logic so sánh với thằng đầu tiên)
-                match = difflib.SequenceMatcher(None, 
-                            os.path.splitext(os.path.basename(current_group[0]))[0], 
-                            os.path.splitext(os.path.basename(current_group[1]))[0]
-                        ).find_longest_match(0, len(os.path.splitext(os.path.basename(current_group[0]))[0]), 
-                                            0, len(os.path.splitext(os.path.basename(current_group[1]))[0]))
-                group_name = os.path.splitext(os.path.basename(current_group[0]))[0][match.a : match.a + match.size].strip(" _-")
-                if not group_name: group_name = seed_name
+                # Lấy tên chung nhất làm tên file output
+                name1 = os.path.splitext(os.path.basename(current_group[0]))[0]
+                name2 = os.path.splitext(os.path.basename(current_group[1]))[0]
+                
+                common_prefix = os.path.commonprefix([name1, name2]).strip(" .-_")
+                if len(common_prefix) >= 3:
+                    group_name = common_prefix
+                else:
+                    group_name = name1
             else:
-                group_name = seed_name
+                group_name = seed_base
+
+            # Xử lý trùng tên group
+            base_key = group_name
+            counter = 1
+            while group_name in groups:
+                group_name = f"{base_key}_{counter}"
+                counter += 1
 
             groups[group_name] = current_group
             
@@ -1028,8 +1063,7 @@ class MainWindow(QWidget):
         self.set_ui_enabled(False)
         self.progress_bar.setVisible(True)
         self.progress_bar.setValue(0)
-        # self.progress_bar.setMaximum(len(selected_items))  <-- XÓA HOẶC COMMENT DÒNG NÀY
-        self.progress_bar.setMaximum(100) # Giá trị tạm, sẽ được update_progress cập nhật lại ngay lập tức
+        self.progress_bar.setMaximum(100) 
         
         self.status_label.setText("⏳ Đang khởi tạo quá trình xử lý đa luồng...")
         
@@ -1090,35 +1124,27 @@ class MainWindow(QWidget):
 
     def processing_finished(self, generated_files):
         """Xử lý hoàn thành và hiển thị thông báo"""
-        # Lọc bỏ các kết quả None (nếu có lỗi)
         self.generated_files = [f for f in generated_files if f is not None]
         self.docx_list.clear()
         
-        # 1. Reset trạng thái UI trước (để giao diện không bị đơ)
         self.progress_bar.setVisible(False)
         self.set_ui_enabled(True)
 
-        # 2. Kiểm tra kết quả
         if not self.generated_files:
-            # Trường hợp thất bại hết
             self.status_label.setText("❌ Không có file được tạo")
             QMessageBox.warning(self, "Cảnh báo", "Quá trình kết thúc nhưng không có file nào được tạo ra.\nVui lòng kiểm tra lại kết nối hoặc file đầu vào.")
         else:
-            # Trường hợp thành công
             for fname in self.generated_files:
                 self.docx_list.addItem(os.path.basename(fname))
             
             self.status_label.setText(f"✅ Hoàn tất! Đã tạo {len(self.generated_files)} file")
             
-            # Tự động chuyển sang tab kết quả
             self.tab_widget.setCurrentIndex(1)
             
-            # Tự động chọn file đầu tiên để preview
             if self.generated_files:
                 self.docx_list.setCurrentRow(0)
                 self.show_selected_docx(self.docx_list.item(0))
 
-            # --- [MỚI] HIỂN THỊ THÔNG BÁO HOÀN THÀNH ---
             QMessageBox.information(
                 self, 
                 "Xử lý hoàn tất", 
