@@ -881,49 +881,42 @@ class MainWindow(QWidget):
             self.process_button.setText("🚀 BẮT ĐẦU XỬ LÝ ĐA LUỒNG")
 
     def get_selected_items(self):
-        """Lấy danh sách items được chọn - Lấy tên folder từ đường dẫn PDF"""
-        selected_items = {}
+        """
+        Lấy danh sách items và gom nhóm bằng thuật toán _smart_group_files CÓ SẴN.
+        """
+        # 1. Thu thập TẤT CẢ các file PDF đang được tick chọn vào 1 danh sách
+        all_checked_pdfs = []
 
         def traverse(item):
+            # Nếu item không được check thì bỏ qua
             if item.checkState(0) == Qt.Unchecked: return
 
             item_type = item.data(0, Qt.UserRole)
-
-            if item_type == "folder" and item.checkState(0) == Qt.Checked:
-                pdf_list = []
-                self._collect_checked_pdfs_recursive(item, pdf_list)
-                
-                if not pdf_list: return
-
-                # Lấy tên folder từ đường dẫn PDF, không dùng smart grouping
-                # Vì mỗi folder PDF sẽ có output cùng tên
-                for pdf_file in pdf_list:
-                    folder_name = os.path.basename(os.path.dirname(pdf_file))
-                    if folder_name not in selected_items:
-                        selected_items[folder_name] = []
-                    selected_items[folder_name].append(pdf_file)
-                
-                return 
-
-            if item_type == "folder": 
+            
+            # Nếu là file lẻ -> Thêm vào list
+            if item_type == "file" and item.checkState(0) == Qt.Checked:
+                all_checked_pdfs.append(item.text(1))
+            
+            # Nếu là folder -> Duyệt tiếp con của nó
+            elif item_type == "folder":
                 for i in range(item.childCount()):
                     traverse(item.child(i))
-                return
 
-            if item_type == "file" and item.checkState(0) == Qt.Checked:
-                # Lấy tên folder chứa file PDF
-                pdf_file_path = item.text(1)
-                folder_name = os.path.basename(os.path.dirname(pdf_file_path))
-                if folder_name not in selected_items:
-                    selected_items[folder_name] = []
-                selected_items[folder_name].append(pdf_file_path)
-
+        # Bắt đầu duyệt từ gốc
         root = self.file_tree.invisibleRootItem()
         for i in range(root.childCount()):
             traverse(root.child(i))
+            
+        # Loại bỏ file trùng lặp (nếu có) và sắp xếp
+        all_checked_pdfs = sorted(list(set(all_checked_pdfs)))
+        
+        if not all_checked_pdfs:
+            return {}
 
-        return selected_items
-
+        # 2. GỌI THUẬT TOÁN "STRING CON CHUNG" CỦA BẠN
+        # Hàm này đã có sẵn ở dưới, nó sẽ tự tách 7 chủ đề ra riêng 
+        # và gom các file có tên giống nhau (Part 1, Part 2...) vào chung 1 nhóm.
+        return self._smart_group_files(all_checked_pdfs)
     def _smart_group_files(self, file_paths):
         """Gom nhóm file dựa trên tên tương tự"""
         groups = {}
