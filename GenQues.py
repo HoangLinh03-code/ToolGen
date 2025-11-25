@@ -918,50 +918,75 @@ class MainWindow(QWidget):
         # và gom các file có tên giống nhau (Part 1, Part 2...) vào chung 1 nhóm.
         return self._smart_group_files(all_checked_pdfs)
     def _smart_group_files(self, file_paths):
-        """Gom nhóm file dựa trên tên tương tự"""
+        """
+        Gom nhóm dựa trên chuỗi chung dài nhất (Longest Common Substring).
+        Logic:
+        1. Tìm chuỗi chung dài nhất giữa file gốc và file đang xét.
+        2. Tính tỷ lệ % của chuỗi chung so với độ dài file dài hơn.
+        3. Nếu tỷ lệ > 80% (tức là chỉ khác nhau chút xíu ở số hiệu đuôi) -> Gộp.
+        4. Nếu tỷ lệ thấp (như trường hợp 7 file của bạn, chung đầu nhưng đuôi dài ngoằng khác nhau) -> Tách riêng.
+        """
         groups = {}
-        pending_files = file_paths.copy()
+        # Sắp xếp để các file tên giống nhau đứng cạnh nhau cho dễ xử lý
+        pending_files = sorted(file_paths)
         
         while pending_files:
+            # Lấy file đầu tiên làm "hạt giống" (Seed)
             seed_file = pending_files.pop(0)
             seed_name = os.path.splitext(os.path.basename(seed_file))[0]
             
             current_group = [seed_file]
-            current_common_str = seed_name
             
-            for i in range(len(pending_files) - 1, -1, -1):
+            # Duyệt các file còn lại để so sánh
+            i = 0
+            while i < len(pending_files):
                 candidate_file = pending_files[i]
                 candidate_name = os.path.splitext(os.path.basename(candidate_file))[0]
                 
-                matcher = difflib.SequenceMatcher(None, current_common_str, candidate_name)
-                match = matcher.find_longest_match(0, len(current_common_str), 0, len(candidate_name))
+                # --- THUẬT TOÁN TÌM CHUỖI CHUNG DÀI NHẤT ---
+                matcher = difflib.SequenceMatcher(None, seed_name, candidate_name)
+                match = matcher.find_longest_match(0, len(seed_name), 0, len(candidate_name))
                 
-                lcs = current_common_str[match.a : match.a + match.size].strip()
+                # Lấy ra chuỗi chung đó
+                common_substring = seed_name[match.a : match.a + match.size].strip()
                 
-                min_len = min(len(current_common_str), len(candidate_name))
-                if min_len == 0: ratio = 0
-                else: ratio = len(lcs) / min_len
+                # --- TÍNH TỶ LỆ TRÙNG KHỚP (QUAN TRỌNG) ---
+                # Lấy độ dài chuỗi dài nhất trong 2 thằng để chia
+                max_len = max(len(seed_name), len(candidate_name))
                 
-                clean_lcs = lcs.replace("-", "").replace("_", "").replace(".", "").strip()
+                if max_len == 0:
+                    ratio = 0
+                else:
+                    ratio = len(common_substring) / max_len
                 
-                if ratio >= 0.4 and len(clean_lcs) >= 3:
+                # --- QUYẾT ĐỊNH GỘP HAY KHÔNG ---
+                # Ngưỡng 0.8 (80%) là con số an toàn.
+                # Ví dụ: "Toan_Part1" và "Toan_Part2" -> Giống nhau 90% -> GỘP.
+                # Ví dụ của bạn: "TLGD...Chủ đề 1..." và "TLGD...Chủ đề 2..." 
+                # -> Chỉ giống nhau đoạn đầu (khoảng 40%) -> KHÔNG GỘP.
+                if ratio >= 0.8:
                     current_group.append(candidate_file)
-                    current_common_str = lcs
-                    pending_files.pop(i)
+                    pending_files.pop(i) # Đã gộp thì xóa khỏi danh sách chờ
+                else:
+                    i += 1 # Không khớp thì xét file kế tiếp
             
-            final_name = current_common_str.strip(" -_.")
-            
-            if len(final_name) < 3: 
-                final_name = seed_name
-            
-            current_group.sort()
-            
-            if final_name in groups:
-                groups[final_name].extend(current_group)
-                groups[final_name] = sorted(list(set(groups[final_name])))
+            # Đặt tên key cho nhóm
+            # Nếu nhóm có nhiều file, lấy chuỗi chung làm tên
+            if len(current_group) > 1:
+                # Tìm lại chuỗi chung của cả nhóm để đặt tên cho đẹp
+                # (Lấy đơn giản theo logic so sánh với thằng đầu tiên)
+                match = difflib.SequenceMatcher(None, 
+                            os.path.splitext(os.path.basename(current_group[0]))[0], 
+                            os.path.splitext(os.path.basename(current_group[1]))[0]
+                        ).find_longest_match(0, len(os.path.splitext(os.path.basename(current_group[0]))[0]), 
+                                            0, len(os.path.splitext(os.path.basename(current_group[1]))[0]))
+                group_name = os.path.splitext(os.path.basename(current_group[0]))[0][match.a : match.a + match.size].strip(" _-")
+                if not group_name: group_name = seed_name
             else:
-                groups[final_name] = current_group
-                
+                group_name = seed_name
+
+            groups[group_name] = current_group
+            
         return groups
 
     def _collect_checked_pdfs_recursive(self, parent_item, pdf_list):
