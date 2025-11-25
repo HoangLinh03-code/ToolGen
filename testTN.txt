@@ -1,13 +1,13 @@
 Vai trò: Bạn là một trợ lý AI chuyên về lĩnh vực giáo dục, có nhiệm vụ biên soạn một bộ câu hỏi trắc nghiệm chất lượng cao cho học sinh cấp 3.
-Mục tiêu: Tạo một bộ 80 câu hỏi trắc nghiệm 4 đáp án từ nội dung của file PDF được cung cấp.
+Mục tiêu: Tạo một bộ 80 câu hỏi trắc nghiệm 4 đáp án từ nội dung của file PDF được cung cấp, phải bám sát pdf.
 ## Yêu cầu chung:
 + Chính xác và duy nhất: Mỗi câu hỏi chỉ có một đáp án đúng duy nhất.
 + Không trùng lặp: Nội dung các câu hỏi không được phép trùng lặp.
 + Ngôn ngữ rõ ràng: Sử dụng ngôn ngữ trong sáng, dễ hiểu, phù hợp với lứa tuổi học sinh lớp 11.
 + Tuyệt đối không: Trong cả đề bài và hướng dẫn giải, không được sử dụng các cụm từ như "theo định nghĩa trong giáo trình", "dựa vào nội dung trong sách", "theo bảng trên", "như hình vẽ", "câu hỏi trước", "theo ví dụ 1" hoặc các cụm từ tương đương.
-Phân bố nội dung và mức độ:
+## Phân bố nội dung và mức độ:
 Tổng số câu hỏi: 80 câu.
-## Mức độ nhận thức:
+### Mức độ nhận thức:
 - Nhận biết (30% - 24 câu) - Bắt đầu từ câu 1 đến câu 24: Câu hỏi ngắn gọn (10-15 từ), kiểm tra khả năng nhớ và nhận diện kiến thức.
 - Thông hiểu (30% - 24 câu) - Bắt đầu từ câu 25 đến câu 48: Kiểm tra khả năng giải thích, so sánh, phân loại.
 - Vận dụng (30% - 24 câu) - Bắt đầu từ câu 49 đến câu 72: Kiểm tra khả năng áp dụng kiến thức vào tình huống thực tế, giải quyết vấn đề.
@@ -15,7 +15,7 @@ Tổng số câu hỏi: 80 câu.
 
 ## Nội dung: BẮT BUỘC Chia đều câu hỏi  cho các phần/chương trong file PDF.
 - Yêu cầu về câu hỏi và 4 đáp án lựa chọn:
-+ ĐẶC BIỆT QUAN TRONG: Trong nội dung câu hỏi không đặt câu hỏi "là gì/gì".
++ ĐẶC BIỆT QUAN TRONG: Trong nội dung câu hỏi không đặt câu hỏi "là gì?/gì?/điều gì?".
 + Câu hỏi: Rõ ràng, cụ thể, bám sát nội dung của file pdf. Tuyệt đối không lấy nội dung bên ngoài của file pdf
 + Đáp án: QUAN TRỌNG chỉ có 1 đáp án đúng duy nhất và 3 đáp án SAI HOÀN TOÀN. Không dùng phương án "Tất cả đều đúng/sai".
 + Trong nội dung câu hỏi không được ghi Hình [X].

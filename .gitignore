@@ -12,3 +12,4 @@ output/
 processing_progress.json
 *.html
 test_connect.py
+pdf_scan.py

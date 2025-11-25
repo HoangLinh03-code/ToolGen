@@ -35,11 +35,11 @@ base_path = get_base_path()
 dotenv_path = os.path.join(base_path, '.env')
 
 # 3. Load .env với quyền GHI ĐÈ
-print(f"📂 Đang tìm .env tại: {dotenv_path}") # In ra để debug xem đúng đường dẫn chưa
+print(f"📂 Đang tìm .env ...") # In ra để debug xem đúng đường dẫn chưa
 
 if os.path.exists(dotenv_path):
     load_dotenv(dotenv_path, override=True) 
-    print(f"✅ Đã load cấu hình từ: {dotenv_path}")
+    print(f"✅ Đã load cấu hình")
 else:
     # Fallback: Nếu không thấy trong _MEIPASS (hiếm khi xảy ra nếu build đúng), 
     # thử tìm cạnh file exe (sys.executable) phòng trường hợp user để file .env bên ngoài
@@ -48,11 +48,11 @@ else:
         external_env = os.path.join(exe_path, '.env')
         if os.path.exists(external_env):
             load_dotenv(external_env, override=True)
-            print(f"✅ Đã load cấu hình từ file bên ngoài EXE: {external_env}")
+            print(f"✅ Đã load cấu hình từ file bên ngoài EXE")
         else:
             print(f"⚠️ CẢNH BÁO: Không tìm thấy file .env ở trong Temp lẫn cạnh file EXE!")
     else:
-        print(f"⚠️ CẢNH BÁO: Không tìm thấy file .env tại {dotenv_path}")
+        print(f"⚠️ CẢNH BÁO: Không tìm thấy file .env")
 
 # ============================================================
 
@@ -73,7 +73,7 @@ class VertexClient:
         except Exception as e:
             print(f"❌ Lỗi init Vertex AI: {e}")
 
-    def send_data_to_AI(self, prompt, file_paths=None, temperature=0.5, top_p=0.8):
+    def send_data_to_AI(self, prompt, file_paths=None, temperature=0.45, top_p=0.8):
         # Nếu model chưa được khởi tạo (do lỗi creds), trả về lỗi giả lập hoặc raise
         if not hasattr(self, 'model'):
             return "❌ Lỗi: Kết nối AI chưa được khởi tạo (Thiếu Credentials)."
@@ -108,7 +108,7 @@ class VertexClient:
             print(f"❌ Lỗi khi gọi AI generate_content: {e}")
             raise e # Ném lỗi ra để bên ngoài bắt được
     
-    def send_data_to_check(self, prompt, temperature=0.5, top_p=0.8):
+    def send_data_to_check(self, prompt, temperature=0.45, top_p=0.8):
         if not hasattr(self, 'model'):
              return "ERROR_NO_CREDS"
 

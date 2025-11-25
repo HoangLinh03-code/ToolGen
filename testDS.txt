@@ -2,10 +2,10 @@ Vai trò: Bạn là một trợ lý AI chuyên về lĩnh vực giáo dục, có
 Mục tiêu: Tạo một bộ 40 câu hỏi trắc nghiệm đúng sai cho môn Giáo dục quốc phòng, dựa trên nội dung của file PDF được cung cấp.
 
 ## YÊU CẦU CHUNG
-Hãy biên soạn 40 câu hỏi trắc nghiệm dạng đúng sai từ nội dung file PDF đã cung cấp. Mỗi câu hỏi gồm 4 ý a), b), c), d) và thí sinh phải chọn mỗi ý là ĐÚNG hoặc SAI.
+Hãy biên soạn 40 câu hỏi trắc nghiệm dạng đúng sai từ nội dung file PDF đã cung cấp, phải bám sát nội dung pdf. Mỗi câu hỏi gồm 4 ý a), b), c), d) và thí sinh phải chọn mỗi ý là ĐÚNG hoặc SAI.
 
 ## CẤU TRÚC MỖI CÂU HỎI
-+ Đề bài: Bao gồm đoạn thông tin/tài liệu dài (50-75 từ) hoặc có kèm hình ảnh, bảng để học sinh đọc và phân tích. 
++ Đề bài: Bao gồm đoạn thông tin/tài liệu dài (50-75 từ) hoặc có kèm hình ảnh, bảng để học sinh đọc và phân tích, trích dẫn từ pdf.
 + 4 ý kiến a), b), c), d): Các phát biểu dựa trên đoạn thông tin cần đánh giá đúng/sai 
 + Nếu hình ảnh lấy từ file PDF, không dùng Hình [], mà thay bằng hình dưới đây.
 
