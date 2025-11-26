@@ -944,10 +944,9 @@ class MainWindow(QWidget):
 
     def _smart_group_files(self, file_paths):
         """
-        Gom nhóm thông minh v4 (Fix triệt để TH1, 2, 3, 4):
-        - Cùng Folder: Dùng tỷ lệ độ dài tiền tố (Prefix Ratio) thay vì số lượng ký tự cố định.
-          Giúp phân biệt file cắt nhỏ (Part1, Part2 -> giống 90%) với file khác chủ đề (TopicA, TopicB -> giống 40-50%).
-        - Khác Folder: Giữ nguyên logic chặt (tránh gộp nhầm).
+        Gom nhóm thông minh v5 (Final Fix):
+        - Xử lý triệt để trường hợp file trong cùng folder có tên na ná nhau (ví dụ KNTT SGK và KNTT_SBT).
+        - Khi prefix chung quá ngắn -> Tự động lấy tên FOLDER cha làm tên file output.
         """
         groups = {}
         pending_files = sorted(file_paths)
@@ -967,29 +966,21 @@ class MainWindow(QWidget):
                 
                 should_merge = False
                 
-                # Tính toán thông số chung
+                # --- LOGIC GOM NHÓM (GIỮ NGUYÊN) ---
                 matcher = difflib.SequenceMatcher(None, seed_base, cand_base)
                 match = matcher.find_longest_match(0, len(seed_base), 0, len(cand_base))
-                common_prefix = seed_base[match.a : match.a + match.size] # Lấy đoạn chung dài nhất
+                common_prefix_raw = seed_base[match.a : match.a + match.size]
                 
-                # --- CHECK 1: CÙNG FOLDER ---
+                # Check 1: Cùng Folder
                 if os.path.dirname(seed) == os.path.dirname(candidate):
-                    # Logic mới: Tính tỷ lệ độ dài tiền tố so với file ngắn hơn
                     min_len = min(len(seed_base), len(cand_base))
-                    prefix_ratio = len(common_prefix) / min_len if min_len > 0 else 0
-                    
-                    # Điều kiện gộp:
-                    # 1. Rất giống nhau về nội dung chuỗi (ratio > 0.8) - Fix TH 1
-                    # 2. HOẶC: Tiền tố chung chiếm phần lớn tên file (> 70%) - Fix TH 1 & 2 (File cắt nhỏ)
-                    #    (VD: "TaiLieu_Part1" vs "TaiLieu_Part2" -> prefix "TaiLieu_Part" chiếm ~90% -> GỘP)
-                    #    (VD: "Topic_A..." vs "Topic_B..." -> prefix "Topic_" chiếm ~30% -> KHÔNG GỘP -> Fix TH3,4)
-                    
-                    if matcher.ratio() > 0.8 or prefix_ratio > 0.7:
+                    prefix_ratio = len(common_prefix_raw) / min_len if min_len > 0 else 0
+                    # Giống nội dung > 80% HOẶC Tiền tố giống > 70% (để bắt KNTT SGK và KNTT_SBT)
+                    if matcher.ratio() > 0.8 or prefix_ratio > 0.6: 
                         should_merge = True
                             
-                # --- CHECK 2: KHÁC FOLDER (TH3 & 4) ---
+                # Check 2: Khác Folder (Logic chặt hơn)
                 else:
-                    # Giữ nguyên logic chặt chẽ để tránh gộp nhầm file khác bài
                     if matcher.ratio() > 0.85: 
                         should_merge = True
                 
@@ -999,21 +990,38 @@ class MainWindow(QWidget):
                 else:
                     i += 1
             
-            # --- ĐẶT TÊN NHÓM ---
+            # --- LOGIC ĐẶT TÊN (ĐÃ SỬA ĐỂ FIX LỖI CỦA BẠN) ---
             if len(current_group) > 1:
-                # Lấy tên chung nhất làm tên file output
+                # Lấy tên của 2 file đầu tiên để so sánh
                 name1 = os.path.splitext(os.path.basename(current_group[0]))[0]
                 name2 = os.path.splitext(os.path.basename(current_group[1]))[0]
                 
+                # Tìm prefix chung
                 common_prefix = os.path.commonprefix([name1, name2]).strip(" .-_")
-                if len(common_prefix) >= 3:
-                    group_name = common_prefix
+                
+                # [FIX QUAN TRỌNG TẠI ĐÂY]
+                # Nếu tên chung quá ngắn (ví dụ chỉ ra "KNTT" hay "SGV")
+                if len(common_prefix) < 6:
+                    # Kiểm tra xem có cùng nằm trong 1 folder không
+                    folder_path = os.path.dirname(current_group[0])
+                    is_same_folder = all(os.path.dirname(f) == folder_path for f in current_group)
+                    
+                    if is_same_folder:
+                        # NẾU CÙNG FOLDER: Lấy luôn tên Folder làm tên file output
+                        # Ví dụ: Folder "Bài 9 - Chủ đề 9" -> File ra "Bài 9 - Chủ đề 9_TN.docx"
+                        folder_name = os.path.basename(folder_path)
+                        group_name = folder_name
+                    else:
+                        # Nếu khác folder mà tên lại ngắn -> Gộp tên file đầu + hậu tố
+                        group_name = f"{name1}_Combined"
                 else:
-                    group_name = name1
+                    # Nếu tên chung đủ dài và có nghĩa -> Giữ nguyên
+                    group_name = common_prefix
             else:
+                # Nếu nhóm chỉ có 1 file
                 group_name = seed_base
 
-            # Xử lý trùng tên group
+            # Xử lý trùng tên (thêm số _1, _2 nếu cần)
             base_key = group_name
             counter = 1
             while group_name in groups:

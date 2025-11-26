@@ -62,7 +62,7 @@ BẮT BUỘC Đảm bảo mỗi phần nội dung đều có câu hỏi ở các
 + KHÔNG được ghi Hình [X], nếu lấy dẫn chứng thì dùng cụm từ "hình trên"
 
 ## ĐỊNH DẠNG ĐẦU RA
-I. CÂU HỎI THÔNG HIỂU (20 câu)
+I. CÂU HỎI THÔNG HIỂU (24 câu)
 Câu 1:
 [Đoạn thông tin/tài liệu dài (80-100 từ) hoặc có kèm hình ảnh từ nội dung PDF]
 [Hình ảnh: Mô tả chi tiết hình ảnh nếu có]
