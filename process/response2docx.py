@@ -77,7 +77,7 @@ def repair_json_with_ai(broken_json_str: str, client) -> str:
 
 NHIỆM VỤ:
 1. Sửa lỗi cú pháp JSON (escape quotes, thêm phẩy, đóng ngoặc)
-2. KHÔNG thay đổi nội dung tiếng Việt
+2. KHÔNG thay đổi nội dung Tiếng Việt
 3. CHỈ TRẢ VỀ JSON ĐÃ SỬA (không markdown)
     """
     repaired_text = client.send_data_to_check(prompt_fix)
@@ -174,7 +174,7 @@ class PromptBuilder:
       "stt": 1,
       "muc_do": "nhan_biet",
       "phan": "Phần I",
-      "noi_dung": "Nội dung câu hỏi",
+      "noi_dung": "Nội dung câu hỏi khoảng 50 - 70 từ...",
       "hinh_anh": {
         "co_hinh": true,
         "loai": "tu_mo_ta",
@@ -203,12 +203,8 @@ class PromptBuilder:
       "stt": 1,
       "muc_do": "thong_hieu",
       "phan": "Phần I",
-      "doan_thong_tin": "Đoạn văn bản...",
-      "hinh_anh": {
-        "co_hinh": true,
-        "loai": "tu_mo_ta",
-        "mo_ta": "Mô tả để sinh ảnh..."
-      },
+      "doan_thong_tin": "Nội dung...",
+      "hinh_anh": { "co_hinh": false },
       "cac_y": [
         {"ky_hieu": "a", "noi_dung": "Phát biểu a", "dung": false},
         {"ky_hieu": "b", "noi_dung": "Phát biểu b", "dung": true},
@@ -217,8 +213,10 @@ class PromptBuilder:
       ],
       "dap_an_dung_sai": "0101",
       "giai_thich": [
-        {"y": "a", "noi_dung_y": "Phát biểu a", "giai_thich": "Giải thích...", "ket_luan": "SAI"},
-        {"y": "b", "noi_dung_y": "Phát biểu b", "giai_thich": "Giải thích...", "ket_luan": "ĐÚNG"}
+        {"y": "a", "noi_dung_y": "...", "ket_luan": "SAI", "giai_thich": "BẮT BUỘC GIẢI THÍCH CHI TIẾT TẠI ĐÂY (70 từ)"},
+        {"y": "b", "noi_dung_y": "...", "ket_luan": "ĐÚNG", "giai_thich": "BẮT BUỘC GIẢI THÍCH CHI TIẾT TẠI ĐÂY (70 từ)"},
+        {"y": "c", "noi_dung_y": "...", "ket_luan": "SAI", "giai_thich": "BẮT BUỘC GIẢI THÍCH CHI TIẾT TẠI ĐÂY (70 từ)"},
+        {"y": "d", "noi_dung_y": "...", "ket_luan": "ĐÚNG", "giai_thich": "BẮT BUỘC GIẢI THÍCH CHI TIẾT TẠI ĐÂY (70 từ)"}
       ]
     }
   ]

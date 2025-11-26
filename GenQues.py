@@ -176,7 +176,7 @@ class ProcessingThread(QThread):
         from process.response2docx import response2docx_json, response2docx_dung_sai_json
 
         # Tên model chuẩn đã test thành công
-        MODEL_NAME = "gemini-3-pro-preview" 
+        MODEL_NAME = "gemini-2.5-pro" 
 
         try:
             if task.task_type == "TN":

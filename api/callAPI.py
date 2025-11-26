@@ -72,7 +72,7 @@ def get_vertex_ai_credentials():
 # ============================================================
 
 class VertexClient:
-    def __init__(self, project_id, creds, model_name, region="global"):
+    def __init__(self, project_id, creds, model_name, region="us-central1"):
         """
         Khởi tạo Client sử dụng google.genai SDK mới
         """
