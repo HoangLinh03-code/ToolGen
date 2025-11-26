@@ -472,16 +472,16 @@ class MainWindow(QWidget):
         
         # Thread count control
         thread_layout = QHBoxLayout()
-        thread_layout.addWidget(QLabel("Số luồng xử lí:"))
+        thread_layout.addWidget(QLabel("Số bài xử lí cùng lúc:"))
         self.thread_spinbox = QSpinBox()
         self.thread_spinbox.setRange(1, 50)
         self.thread_spinbox.setValue(3)
         self.thread_spinbox.setFixedWidth(60)
         thread_layout.addWidget(self.thread_spinbox)
-        thread_layout.addWidget(QLabel("(Dựa trên số bài xử lí, ví dụ: xử lí 2 bài thì tăng x2 số luồng)"))
+        # thread_layout.addWidget(QLabel("(Dựa trên số bài xử lí, ví dụ: xử lí 2 bài thì tăng x2 số luồng)"))
         thread_layout.addStretch()
         
-        self.process_button = QPushButton("BẮT ĐẦU XỬ LÝ ĐA LUỒNG")
+        self.process_button = QPushButton("BẮT ĐẦU XỬ LÝ")
         self.process_button.setObjectName("ProcessBtn")
         self.process_button.setMinimumHeight(50)
         self.process_button.clicked.connect(self.process_files)
@@ -904,7 +904,7 @@ class MainWindow(QWidget):
         if not has_selection: 
             self.process_button.setText("⚠️ Vui lòng chọn ít nhất 1 dạng đề")
         else: 
-            self.process_button.setText("🚀 BẮT ĐẦU XỬ LÝ ĐA LUỒNG")
+            self.process_button.setText("BẮT ĐẦU XỬ LÝ")
 
     def get_selected_items(self):
         """
