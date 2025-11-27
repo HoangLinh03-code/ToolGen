@@ -1,18 +1,18 @@
 Vai trò: Bạn là một trợ lý AI chuyên về lĩnh vực giáo dục, có nhiệm vụ biên soạn một bộ câu hỏi trắc nghiệm chất lượng cao cho học sinh cấp 3.
-Mục tiêu: Tạo một bộ đủ 40 câu hỏi trắc nghiệm đúng sai cho môn Giáo dục quốc phòng, dựa trên nội dung của file PDF được cung cấp.
+Mục tiêu: Tạo một bộ 40 câu hỏi trắc nghiệm đúng sai cho môn Giáo dục quốc phòng, dựa trên nội dung của file PDF được cung cấp.
 
 ## YÊU CẦU CHUNG
-Hãy biên soạn đủ 40 câu hỏi trắc nghiệm dạng đúng sai từ nội dung file PDF đã cung cấp, phải bám sát nội dung pdf. Mỗi câu hỏi gồm 4 ý a), b), c), d) và thí sinh phải chọn mỗi ý là ĐÚNG hoặc SAI.
+Hãy biên soạn 40 câu hỏi trắc nghiệm dạng đúng sai từ nội dung file PDF đã cung cấp, phải bám sát nội dung pdf. Mỗi câu hỏi gồm 4 ý a), b), c), d) và thí sinh phải chọn mỗi ý là ĐÚNG hoặc SAI.
 
 ## CẤU TRÚC MỖI CÂU HỎI
-+ Đề bài: Bao gồm đoạn thông tin/tài liệu dài (80 - 100 từ) hoặc có kèm hình ảnh, bảng để học sinh đọc và phân tích, trích dẫn từ pdf.
++ Đề bài: Bao gồm đoạn thông tin/tài liệu dài (50-75 từ) hoặc có kèm hình ảnh, bảng để học sinh đọc và phân tích, trích dẫn từ pdf.
 + 4 ý kiến a), b), c), d): Các phát biểu dựa trên đoạn thông tin cần đánh giá đúng/sai 
 + Nếu hình ảnh lấy từ file PDF, không dùng Hình [], mà thay bằng hình dưới đây.
 
 Lời giải:
 Đáp án tóm tắt: [Đúng là 1, Sai là 0] 0101
 ####
-Hướng dẫn giải đầy đủ cho từng ý (70 - 90 từ mỗi ý)
+Hướng dẫn giải đầy đủ cho từng ý (3-4 dòng mỗi ý)
 
 ***Ví dụ mẫu*** 
 Câu 1: 
@@ -52,7 +52,7 @@ BẮT BUỘC Đảm bảo mỗi phần nội dung đều có câu hỏi ở các
 + Mỗi ý a), b), c), d) phải có giải thích chi tiết.
 + FORMAT GIẢI THÍCH ĐẦY ĐỦ: 
   - Dòng 1: "- [Nhắc lại TOÀN BỘ nội dung phát biểu] - ĐÚNG/SAI."
-  - Dòng 2-3: [Giải thích ĐẦY ĐỦ khoảng 70 - 90 từ, đi thẳng vào vấn đề]
+  - Dòng 2-3: [Giải thích ĐẦY ĐỦ khoảng 3-4 dòng, đi thẳng vào vấn đề]
 + TUYỆT ĐỐI KHÔNG được viết dài dòng, lan man
 + TUYỆT ĐỐI KHÔNG được ghi "Nhận định này là ĐÚNG/SAI"
 + TUYỆT ĐỐI KHÔNG được đề cập đến các ký tự (a, b, c, d) trong phần giải thích
@@ -62,9 +62,9 @@ BẮT BUỘC Đảm bảo mỗi phần nội dung đều có câu hỏi ở các
 + KHÔNG được ghi Hình [X], nếu lấy dẫn chứng thì dùng cụm từ "hình trên"
 
 ## ĐỊNH DẠNG ĐẦU RA
-I. CÂU HỎI THÔNG HIỂU (24 câu)
+I. CÂU HỎI THÔNG HIỂU (20 câu)
 Câu 1:
-[Đoạn thông tin/tài liệu dài (80-100 từ) hoặc có kèm hình ảnh từ nội dung PDF]
+[Đoạn thông tin/tài liệu dài (50-100 từ) hoặc có kèm hình ảnh từ nội dung PDF]
 [Hình ảnh: Mô tả chi tiết hình ảnh nếu có]
 a) [Phát biểu thứ nhất]
 b) [Phát biểu thứ hai] 
@@ -74,16 +74,16 @@ Lời giải
 1010
 ####
 - [Nhắc lại TOÀN BỘ phát biểu a)] - ĐÚNG/SAI.
-[Giải thích ĐẦY ĐỦ 70 - 90 từ]
+[Giải thích ĐẦY ĐỦ 3-4 dòng]
 - [Nhắc lại TOÀN BỘ phát biểu b)] - ĐÚNG/SAI.
-[Giải thích ĐẦY ĐỦ 70 - 90 từ]
+[Giải thích ĐẦY ĐỦ 3-4 dòng]
 - [Nhắc lại TOÀN BỘ phát biểu c)] - ĐÚNG/SAI.
-[Giải thích ĐẦY ĐỦ 70 - 90 từ]
+[Giải thích ĐẦY ĐỦ 3-4 dòng]
 - [Nhắc lại TOÀN BỘ phát biểu d)] - ĐÚNG/SAI.
-[Giải thích ĐẦY ĐỦ 70 - 90 từ]
+[Giải thích ĐẦY ĐỦ 3-4 dòng]
 
 ## LƯU Ý QUAN TRỌNG
-- TUYỆT ĐỐI phải giải thích phải ĐẦY ĐỦ chỉ 70 - 90 từ.
+- TUYỆT ĐỐI phải giải thích phải ĐẦY ĐỦ chỉ 3-4 dòng.
 - TUYỆT ĐỐI KHÔNG viết dài dòng, lan man như ví dụ cũ.
 - Đảm bảo độ chính xác 100% về mặt khoa học/kỹ thuật.
 - Câu hỏi phải có tính phân loại cao (có cả đúng và sai).

@@ -6,18 +6,15 @@ from PyQt5.QtWidgets import (
     QCheckBox, QGroupBox, QTreeWidget, QTreeWidgetItem, QHeaderView,
     QTabWidget, QTextEdit, QTreeWidgetItemIterator, QSpinBox, QDialog
 )
-from PyQt5.QtCore import Qt, QThread, pyqtSignal, QObject, pyqtSlot
+from PyQt5.QtCore import Qt, QThread, pyqtSignal
 from PyQt5.QtWebEngineWidgets import QWebEngineView
-from PyQt5.QtGui import QFont, QIcon
+from PyQt5.QtGui import QFont
 import mammoth
 from dotenv import load_dotenv
 from google.oauth2 import service_account
 import glob
 import difflib
 import threading
-import time
-import concurrent.futures
-from process.response2docx import response2docx_json, response2docx_dung_sai_json
 
 load_dotenv()
 
@@ -69,7 +66,7 @@ class ProcessingThread(QThread):
         # 1. Đọc Prompt một lần duy nhất để tối ưu I/O
         prompt_content_tn = ""
         prompt_content_ds = ""
-
+        prompt_content_tln = ""
         if "trac_nghiem" in self.prompt_paths and self.prompt_paths["trac_nghiem"]:
             try:
                 with open(self.prompt_paths["trac_nghiem"], "r", encoding="utf-8") as f:
@@ -85,7 +82,13 @@ class ProcessingThread(QThread):
             except Exception as e:
                 self.error_signal.emit(f"Lỗi đọc prompt DS: {e}")
                 return
-
+        if "tra_loi_ngan" in self.prompt_paths and self.prompt_paths["tra_loi_ngan"]:
+            try:
+                with open(self.prompt_paths["tra_loi_ngan"], "r", encoding="utf-8") as f:
+                    prompt_content_tln = f.read()
+            except Exception as e:
+                self.error_signal.emit(f"Lỗi đọc prompt TLN: {e}")
+                return
         # 2. Tạo danh sách công việc (Flattened List)
         # Tách riêng TN và DS thành các task độc lập
         all_tasks = []
@@ -98,6 +101,9 @@ class ProcessingThread(QThread):
             # Nếu user chọn DS, tạo task DS (độc lập hoàn toàn với TN)
             if prompt_content_ds:
                 all_tasks.append(TaskInfo(output_name, pdf_files, "DS", prompt_content_ds))
+            # Nếu user chọn TLN, tạo task TLN (độc lập hoàn toàn với TN và DS)
+            if prompt_content_tln:
+                all_tasks.append(TaskInfo(output_name, pdf_files, "TLN", prompt_content_tln))
 
         total_tasks = len(all_tasks)
         if total_tasks == 0:
@@ -173,7 +179,7 @@ class ProcessingThread(QThread):
         Hàm xử lý chạy trong từng luồng con.
         """
         import os
-        from process.response2docx import response2docx_json, response2docx_dung_sai_json
+        from process.response2docx import response2docx_json, response2docx_dung_sai_json, response2docx_tra_loi_ngan_json
 
         # Tên model chuẩn đã test thành công
         MODEL_NAME = "gemini-2.5-pro" 
@@ -190,7 +196,7 @@ class ProcessingThread(QThread):
                     MODEL_NAME, 
                     batch_name=task.output_name
                 )
-            else: # task_type == "DS"
+            elif task.task_type == "DS":
                 output_filename = f"{task.output_name}_DS"
                 docx_path = response2docx_dung_sai_json(
                     task.pdf_files,
@@ -201,7 +207,17 @@ class ProcessingThread(QThread):
                     MODEL_NAME, 
                     batch_name=task.output_name
                 )
-
+            else:# task.task_type == "TLN":
+                output_filename = f"{task.output_name}_TLN"
+                docx_path = response2docx_tra_loi_ngan_json(
+                    task.pdf_files,
+                    task.prompt_content,
+                    output_filename,
+                    project_id,
+                    creds,
+                    MODEL_NAME,
+                    batch_name=task.output_name
+                )
             if docx_path and os.path.exists(docx_path):
                 return docx_path, None
             else:
@@ -225,12 +241,15 @@ class MainWindow(QWidget):
         # Prompt files mặc định
         self.default_prompt_tn = os.path.join(external_path, "testTN.txt")
         self.default_prompt_ds = os.path.join(external_path, "testDS.txt")
+        self.default_prompt_tln = os.path.join(external_path, "testTLN.txt")
         
         if not os.path.exists(self.default_prompt_tn):
              self.default_prompt_tn = os.path.join(internal_path, "testTN.txt")
         if not os.path.exists(self.default_prompt_ds):
              self.default_prompt_ds = os.path.join(internal_path, "testDS.txt")
-        
+        if not os.path.exists(self.default_prompt_tln):
+            self.default_prompt_tln = os.path.join(internal_path, "testTLN.txt")
+            
         self.load_default_prompts()
         self.setup_modern_theme()
         self.init_ui()
@@ -462,8 +481,30 @@ class MainWindow(QWidget):
         ds_layout.addWidget(self.btn_select_prompt_ds)
         ds_layout.addWidget(self.btn_edit_prompt_ds)
         
+        tln_container = QWidget()
+        tln_layout = QHBoxLayout(tln_container)
+        
+        self.checkbox_tln = QCheckBox("Trả lời ngắn (30 câu)")
+        self.checkbox_tln.setChecked(True)
+        self.checkbox_tln.stateChanged.connect(self.update_process_button_state)
+        
+        self.prompt_tln_label = QLabel(os.path.basename(self.default_prompt_tln))
+        
+        self.btn_select_prompt_tln = QPushButton("📂 Chọn Prompt")
+        self.btn_select_prompt_tln.clicked.connect(lambda: self.select_prompt_file("tra_loi_ngan"))
+        
+        self.btn_edit_prompt_tln = QPushButton("✏️ Sửa")
+        self.btn_edit_prompt_tln.clicked.connect(lambda: self.edit_prompt("tra_loi_ngan"))
+        
+        tln_layout.addWidget(self.checkbox_tln, 2)
+        tln_layout.addWidget(QLabel("Prompt:"), 0)
+        tln_layout.addWidget(self.prompt_tln_label, 3)
+        tln_layout.addWidget(self.btn_select_prompt_tln)
+        tln_layout.addWidget(self.btn_edit_prompt_tln)
+        
         config_layout.addWidget(tn_container)
         config_layout.addWidget(ds_container)
+        config_layout.addWidget(tln_container)
         config_group.setLayout(config_layout)
 
         # --- SECTION 3: ACTION & THREADING ---
@@ -600,6 +641,7 @@ class MainWindow(QWidget):
     def load_default_prompts(self):
         self.prompt_tn_content = ""
         self.prompt_ds_content = ""
+        self.prompt_tln_content = ""
         if os.path.isfile(self.default_prompt_tn):
             try:
                 with open(self.default_prompt_tn, "r", encoding="utf-8") as f:
@@ -609,6 +651,12 @@ class MainWindow(QWidget):
             try:
                 with open(self.default_prompt_ds, "r", encoding="utf-8") as f:
                     self.prompt_ds_content = f.read()
+            except: pass
+            
+        if os.path.isfile(self.default_prompt_tln):
+            try:
+                with open(self.default_prompt_tln, "r", encoding="utf-8") as f:
+                    self.prompt_tln_content = f.read()
             except: pass
 
     def add_pdf_files(self):
@@ -790,16 +838,23 @@ class MainWindow(QWidget):
                 if prompt_type == "trac_nghiem":
                     self.prompt_tn_content = content
                     self.prompt_tn_label.setText(os.path.basename(file_path))
-                else:
+                elif prompt_type == "dung_sai":
                     self.prompt_ds_content = content
                     self.prompt_ds_label.setText(os.path.basename(file_path))
+                elif prompt_type == "tra_loi_ngan":
+                    self.prompt_tln_content = content
+                    self.prompt_tln_label.setText(os.path.basename(file_path))
             except Exception as e:
                 QMessageBox.warning(self, "Lỗi", f"Không thể đọc file: {str(e)}")
 
     def edit_prompt(self, prompt_type):
         """Sửa prompt và LƯU VÀO FILE (ĐÃ FIX LỖI HIỂN THỊ)"""
         edit_dialog = QDialog(self)
-        title_type = 'Trắc nghiệm' if prompt_type == 'trac_nghiem' else 'Đúng/Sai'
+        title_type = {
+            'trac_nghiem': 'Trắc nghiệm',
+            'dung_sai': 'Đúng/Sai',
+            'tra_loi_ngan': 'Trả lời ngắn'
+        }.get(prompt_type, prompt_type)
         edit_dialog.setWindowTitle(f"Sửa Prompt - {title_type}")
         edit_dialog.setModal(True)
         edit_dialog.resize(750, 600)
@@ -819,8 +874,11 @@ class MainWindow(QWidget):
         # Load nội dung hiện tại
         if prompt_type == "trac_nghiem": 
             text_edit.setPlainText(self.prompt_tn_content)
-        else: 
+        elif prompt_type == "dung_sai":
             text_edit.setPlainText(self.prompt_ds_content)
+        else:
+            text_edit.setPlainText(self.prompt_tln_content)
+
         dialog_layout.addWidget(text_edit)
         
         # Layout nút bấm
@@ -859,11 +917,15 @@ class MainWindow(QWidget):
                 self.prompt_tn_content = new_content
                 self.prompt_tn_label.setText("✏️ Prompt đã chỉnh sửa")
                 file_path = self.default_prompt_tn
-            else:
+            elif prompt_type == "dung_sai":
                 self.prompt_ds_content = new_content
                 self.prompt_ds_label.setText("✏️ Prompt đã chỉnh sửa")
                 file_path = self.default_prompt_ds
-            
+            elif prompt_type == "tra_loi_ngan":
+                self.prompt_tln_content = new_content
+                self.prompt_tln_label.setText("✏️ Prompt đã chỉnh sửa")
+                file_path = self.default_prompt_tln
+
             # Ghi file
             try:
                 if file_path:
@@ -880,7 +942,12 @@ class MainWindow(QWidget):
         
         # Hàm xử lý reset
         def reset_prompt():
-            default_file = self.default_prompt_tn if prompt_type == "trac_nghiem" else self.default_prompt_ds
+            default_file = {
+                'trac_nghiem': self.default_prompt_tn,
+                'dung_sai': self.default_prompt_ds,
+                'tra_loi_ngan': self.default_prompt_tln
+            }.get(prompt_type, self.default_prompt_tn)
+            
             if os.path.isfile(default_file):
                 try:
                     with open(default_file, "r", encoding="utf-8") as f:
@@ -899,7 +966,7 @@ class MainWindow(QWidget):
 
     def update_process_button_state(self):
         """Cập nhật trạng thái button"""
-        has_selection = self.checkbox_tn.isChecked() or self.checkbox_ds.isChecked()
+        has_selection = (self.checkbox_tn.isChecked() or self.checkbox_ds.isChecked() or self.checkbox_tln.isChecked())
         self.process_button.setEnabled(has_selection)
         if not has_selection: 
             self.process_button.setText("⚠️ Vui lòng chọn ít nhất 1 dạng đề")
@@ -1050,7 +1117,9 @@ class MainWindow(QWidget):
         if not selected_items:
             QMessageBox.warning(self, "Lỗi", "Vui lòng chọn ít nhất một file hoặc folder để xử lý!")
             return
-        if not self.checkbox_tn.isChecked() and not self.checkbox_ds.isChecked():
+        
+        # FIX: Thêm checkbox_tln vào điều kiện kiểm tra
+        if not self.checkbox_tn.isChecked() and not self.checkbox_ds.isChecked() and not self.checkbox_tln.isChecked():
             QMessageBox.warning(self, "Lỗi", "Vui lòng chọn ít nhất một dạng đề!")
             return
         
@@ -1061,12 +1130,20 @@ class MainWindow(QWidget):
                 QMessageBox.warning(self, "Lỗi", "Không tìm thấy file prompt trắc nghiệm!")
                 return
             prompt_paths["trac_nghiem"] = prompt_file
+        
         if self.checkbox_ds.isChecked():
             prompt_file = self.default_prompt_ds if os.path.isfile(self.default_prompt_ds) else None
             if not prompt_file or not os.path.isfile(prompt_file):
                 QMessageBox.warning(self, "Lỗi", "Không tìm thấy file prompt đúng/sai!")
                 return
             prompt_paths["dung_sai"] = prompt_file
+        
+        if self.checkbox_tln.isChecked():
+            prompt_file = self.default_prompt_tln if os.path.isfile(self.default_prompt_tln) else None
+            if not prompt_file or not os.path.isfile(prompt_file):
+                QMessageBox.warning(self, "Lỗi", "Không tìm thấy file prompt trả lời ngắn!")
+                return
+            prompt_paths["tra_loi_ngan"] = prompt_file
         
         self.set_ui_enabled(False)
         self.progress_bar.setVisible(True)
@@ -1104,10 +1181,13 @@ class MainWindow(QWidget):
         self.deselect_all_button.setEnabled(enabled)
         self.checkbox_tn.setEnabled(enabled)
         self.checkbox_ds.setEnabled(enabled)
+        self.checkbox_tln.setEnabled(enabled)
         self.btn_select_prompt_tn.setEnabled(enabled)
         self.btn_select_prompt_ds.setEnabled(enabled)
+        self.btn_select_prompt_tln.setEnabled(enabled)
         self.btn_edit_prompt_tn.setEnabled(enabled)
         self.btn_edit_prompt_ds.setEnabled(enabled)
+        self.btn_edit_prompt_tln.setEnabled(enabled)
         self.thread_spinbox.setEnabled(enabled)
 
     def update_status(self, message):

@@ -222,6 +222,28 @@ class PromptBuilder:
   ]
 }
 """
+        elif question_type == "tra_loi_ngan":
+            return """
+{
+  "loai_de": "tra_loi_ngan",
+  "tong_so_cau": 30,
+  "cau_hoi": [
+    {
+      "stt": 1,
+      "muc_do": "nhan_biet",
+      "phan": "Phần I",
+      "noi_dung": "Nội dung câu hỏi 50-70 từ...",
+      "hinh_anh": {
+        "co_hinh": false,
+        "loai": "tu_mo_ta",
+        "mo_ta": ""
+      },
+      "dap_an": "đáp án ngắn gọn",
+      "giai_thich": "Giải thích chi tiết 80-120 từ về cách tính toán/suy luận để có đáp án..."
+    }
+  ]
+}
+"""
         
         return "{}"
     
@@ -377,6 +399,75 @@ class DynamicDocxRenderer:
             if gt.get('giai_thich'):
                 self.doc.add_paragraph(gt.get('giai_thich', ''))
     
+    def render_question_tra_loi_ngan(self, cau: Dict):
+        """Render câu hỏi trả lời ngắn (Đã fix lỗi thừa #### và in đậm kết luận)"""
+        # Câu hỏi
+        p = self.doc.add_paragraph()
+        p.add_run(f"Câu {cau['stt']}: ").bold = True
+        p.add_run(cau['noi_dung'])
+        
+        # Hình ảnh (nếu có)
+        hinh_anh = cau.get("hinh_anh", {})
+        if hinh_anh.get("co_hinh"):
+            insert_image_or_placeholder(self.doc, hinh_anh)
+        
+        # Đáp án - IN ĐẬM
+        p_da = self.doc.add_paragraph()
+        run_label = p_da.add_run("Đáp án: ")
+        run_label.bold = True
+        
+        # Xử lý format [[đáp án]]
+        raw_ans = str(cau.get('dap_an', '')).strip()
+        if raw_ans.startswith("[[") and raw_ans.endswith("]]"):
+            final_ans = raw_ans
+        else:
+            final_ans = f"[[{raw_ans}]]"
+            
+        run_ans = p_da.add_run(final_ans)
+        run_ans.bold = True
+        
+        # Lời giải header
+        p_lg = self.doc.add_paragraph()
+        p_lg.add_run("Lời giải").bold = True
+        self.doc.add_paragraph("####")  # Code đã tự thêm dòng này
+        
+        # Giải thích chi tiết
+        giai_thich = cau.get("giai_thich", "")
+        
+        # Chuẩn hóa xuống dòng: thay thế \\n (text literal) thành \n (newline char)
+        lines = giai_thich.replace('\\n', '\n').split('\n')
+        
+        for line in lines:
+            text = line.strip()
+            if not text:
+                continue
+                
+            # [FIX 1] Loại bỏ dòng #### nếu AI tự sinh ra (để tránh bị 2 dòng ####)
+            if text == "####":
+                continue
+            
+            # [FIX 2] Xử lý in đậm kết luận
+            is_bold = False
+            
+            # Logic 1: Nếu dòng bắt đầu bằng "**" và kết thúc bằng "**" (Markdown bold)
+            if text.startswith("**") and text.endswith("**"):
+                text = text[2:-2] # Loại bỏ dấu **
+                is_bold = True
+            
+            # Logic 2: Nếu dòng bắt đầu bằng chữ "Vậy" (bất kể hoa thường)
+            # (Dùng clean text để check phòng trường hợp còn sót ký tự lạ)
+            check_text = text.replace('*', '').strip().lower()
+            if check_text.startswith("vậy"):
+                is_bold = True
+                # Clean luôn dấu ** nếu còn sót trong dòng "Vậy..."
+                text = text.replace('**', '')
+
+            # Ghi vào file Word
+            p_gt = self.doc.add_paragraph(text)
+            if is_bold:
+                for run in p_gt.runs:
+                    run.bold = True
+    
     def render_all(self, data: Dict):
         """
         Main render function - TỰ ĐỘNG DETECT loại đề
@@ -402,6 +493,8 @@ class DynamicDocxRenderer:
             for cau in grouped[muc_do]:
                 if loai_de == "dung_sai":
                     self.render_question_dung_sai(cau)
+                elif loai_de == "tra_loi_ngan":
+                    self.render_question_tra_loi_ngan(cau)
                 else:
                     self.render_question_trac_nghiem(cau)
 
@@ -469,6 +562,14 @@ def response2docx_dung_sai_json(file_path, prompt, file_name, project_id, creds,
         question_type="dung_sai",
         batch_name=batch_name
     )
+    
+def response2docx_tra_loi_ngan_json(file_path, prompt, file_name, project_id, creds, model_name, batch_name=None):
+    """Wrapper cho trả lời ngắn (legacy compatibility)"""
+    return response2docx_flexible(
+        file_path, prompt, file_name, project_id, creds, model_name,
+        question_type="tra_loi_ngan",
+        batch_name=batch_name
+    )
 
 class ConfigManager:
     """
@@ -481,7 +582,7 @@ class ConfigManager:
             "nhan_biet": "I. CÂU HỎI NHẬN BIẾT",
             "thong_hieu": "II. CÂU HỎI THÔNG HIỂU",
             "van_dung": "III. CÂU HỎI VẬN DỤNG",
-            "van_dung_cao": "IV. CÂU HỎI VẬN DỤNG CAO"
+            "van_dung_cao": "IV. CÂU HỎI VẬN DỤNG CAO" 
         },
         "section_order": ["nhan_biet", "thong_hieu", "van_dung", "van_dung_cao"],
         "auto_fix": True,
