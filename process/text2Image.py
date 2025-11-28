@@ -34,7 +34,7 @@ def generate_image_from_text(prompt, aspect_ratio="1:1", number_of_images=1):
         # Model ID theo yêu cầu: gemini-3-pro-image-preview
         model_name = "gemini-3-pro-image-preview" 
 
-        print(f"🎨 Đang sinh ảnh với model {model_name} (Ratio: {aspect_ratio})...")
+        # print(f"🎨 Đang sinh ảnh với model {model_name} (Ratio: {aspect_ratio})...")
         
         # 4. Gọi API sinh ảnh (Dùng generate_content với image_config)
         response = client.models.generate_content(
@@ -54,7 +54,7 @@ def generate_image_from_text(prompt, aspect_ratio="1:1", number_of_images=1):
         if response.parts:
             for part in response.parts:
                 if part.inline_data and part.inline_data.data:
-                    print("✅ Sinh ảnh thành công!")
+                    # print("✅ Sinh ảnh thành công!")
                     return part.inline_data.data # Trả về bytes của ảnh đầu tiên tìm thấy
         
         print("❌ API không trả về dữ liệu ảnh (Có thể do Safety Filter).")

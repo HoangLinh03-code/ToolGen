@@ -69,6 +69,7 @@ jobs:
           # Copy file Prompt (Bắt buộc có để chạy)
           Copy-Item -Path "testDS.txt" -Destination "GenQues/"
           Copy-Item -Path "testTN.txt" -Destination "GenQues/"
+          Copy-Item -Path "testTLN.txt" -Destination "GenQues/"
 
       # --- BƯỚC 5: NÉN FILE (QUAN TRỌNG CHO NGƯỜI DÙNG CUỐI) ---
       - name: Zip Release

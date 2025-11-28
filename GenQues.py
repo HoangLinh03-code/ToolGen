@@ -233,7 +233,7 @@ class ProcessingThread(QThread):
 class MainWindow(QWidget):
     def __init__(self):
         super().__init__()
-        self.setWindowTitle("Gen Ques v2.3 - Đa Luồng Tối Ưu")
+        self.setWindowTitle("Gen Ques v2.5 - Tạo câu hỏi tự động")
         self.resize(1400, 850)
         self.generated_files = []
         self.processing_thread = None
@@ -382,7 +382,7 @@ class MainWindow(QWidget):
         processing_layout.setContentsMargins(15, 15, 15, 15)
         
         # --- SECTION 1: NGUỒN TÀI LIỆU ---
-        pdf_group = QGroupBox("1. Nguồn Tài Liệu PDF")
+        pdf_group = QGroupBox("1. Nguồn Tài Liệu")
         pdf_layout = QVBoxLayout()
         
         file_toolbar = QHBoxLayout()

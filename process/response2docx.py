@@ -544,7 +544,7 @@ def response2docx_flexible(
     
     # 6. Lưu file
     output_path = save_document_securely(doc, batch_name, file_name)
-    print(f"✅ Đã lưu file: {output_path}")
+    # print(f"✅ Đã lưu file: {output_path}")
     return output_path
 
 def response2docx_json(file_path, prompt, file_name, project_id, creds, model_name, batch_name=None):
