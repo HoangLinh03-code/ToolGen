@@ -19,6 +19,17 @@ import traceback
 _FILE_LOCK = threading.RLock()
 _OUTPUT_DIR_LOCK = threading.RLock()
 
+def remove_xml_incompatible_characters(text):
+    """
+    Lọc bỏ ký tự NULL (\x00) và các ký tự điều khiển gây crash file Word.
+    """
+    if not text:
+        return ""
+    # Giữ lại: Tab (\x09), Line Feed (\x0A), Carriage Return (\x0D)
+    # Loại bỏ: Các ký tự điều khiển khác và Unicode không hợp lệ
+    illegal_xml_re = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1F\uD800-\uDFFF\uFFFE\uFFFF]")
+    return illegal_xml_re.sub('', str(text))
+
 def get_app_path():
     """Lấy đường dẫn chứa file .exe hoặc script"""
     if getattr(sys, 'frozen', False):
@@ -29,7 +40,7 @@ def latex_to_omml_via_pandoc(latex_math_dollar):
     """Chuyển đổi LaTeX sang OMML qua Pandoc"""
     try:
         with NamedTemporaryFile(suffix=".docx", delete=False) as temp_docx:
-            temp_docx.close()
+            # temp_docx.close()
             # Cờ ẩn cửa sổ console đen khi gọi subprocess
             result = subprocess.run(
                 ['pandoc', '--from=latex', '--to=docx', '-o', temp_docx.name],
@@ -48,8 +59,8 @@ def latex_to_omml_via_pandoc(latex_math_dollar):
             with zipfile.ZipFile(temp_docx.name, 'r') as z:
                 xml_content = z.read('word/document.xml').decode('utf-8')
             
-            if os.path.exists(temp_docx.name):
-                os.unlink(temp_docx.name)
+            # if os.path.exists(temp_docx.name):
+            #     os.unlink(temp_docx.name)
        
         match = re.search(r'(<m:oMath[^>]*>.*?</m:oMath>)', xml_content, re.DOTALL)
         return match.group(1) if match else None
@@ -711,26 +722,36 @@ def repair_broken_latex(text: str) -> str:
     Ví dụ: "... là $(-5; 4)." -> "... là $(-5; 4)$."
     """
     # 1. Đếm số lượng dấu $
-    count = text.count('$')
+    if not text:
+        return ""
     
-    # Nếu số lượng là chẵn (0, 2, 4...) -> Khả năng cao là đã đủ cặp -> Return
-    if count % 2 == 0:
-        return text
+    # Bước 1: Vệ sinh XML trước tiên
+    text = remove_xml_incompatible_characters(text)
 
-    # 2. Nếu số lượng là LẺ -> Chắc chắn thiếu 1 dấu đóng
-    # Tìm vị trí dấu $ cuối cùng
-    last_idx = text.rfind('$')
-    
-    # Lấy đoạn text từ dấu $ đó đến hết
-    segment = text[last_idx:]
-    
-    # Logic vá:
-    # Nếu kết thúc bằng dấu câu (.,;:) -> Chèn $ vào trước dấu câu
-    if text.endswith('.') or text.endswith(',') or text.endswith(';') or text.endswith(':'):
-        return text[:-1] + '$' + text[-1]
-    
-    # Nếu không có dấu câu -> Chèn $ vào cuối cùng
-    return text + '$'
+    # Bước 2: Sửa các lỗi cú pháp đặc thù
+    # Sửa lỗi 'eq' toán học: "5 eq 0" -> "5 = 0" (hoặc \neq nếu muốn)
+    # Regex bắt: Số/khoảng trắng + eq + Số/khoảng trắng
+    text = re.sub(r'(?<=\d|\w)\s+eq\s+(?=\d|\w)', r' = ', text)
+
+    # Sửa lỗi ngoặc vuông bao quanh $: [$...$] hoặc [$...$ -> $...$
+    text = text.replace('[$', '$').replace('$]', '$')
+    text = text.replace('[ $', '$').replace('$ ]', '$')
+
+    # Sửa lỗi ngoặc vuông bị dính vào $: ...$] -> ...$
+    text = re.sub(r'\$\]', '$', text)
+    text = re.sub(r'\[\$', '$', text)
+
+    # Bước 3: Tự động đóng dấu $ nếu thiếu
+    # Đếm số lượng $
+    count = text.count('$')
+    if count % 2 != 0:
+        # Nếu thiếu, thêm $ vào cuối câu (trước dấu chấm câu nếu có)
+        if text.endswith('.') or text.endswith(',') or text.endswith(';'):
+            text = text[:-1] + '$' + text[-1]
+        else:
+            text = text + '$'
+            
+    return text
 
 def response2docx_flexible(
     file_path: str,
