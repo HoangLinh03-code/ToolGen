@@ -31,16 +31,12 @@ def latex_to_omml_via_pandoc(latex_math_dollar):
         with NamedTemporaryFile(suffix=".docx", delete=False) as temp_docx:
             temp_docx.close()
             # Cờ ẩn cửa sổ console đen khi gọi subprocess
-            creation_flags = 0
-            if sys.platform == "win32":
-                creation_flags = subprocess.CREATE_NO_WINDOW
             result = subprocess.run(
                 ['pandoc', '--from=latex', '--to=docx', '-o', temp_docx.name],
                 input=latex_math_dollar,
                 text=True,
                 capture_output=True,
-                encoding='utf-8',
-                creationflags=creation_flags
+                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
             )
  
             if result.returncode != 0:
@@ -125,8 +121,8 @@ def process_text_with_latex(text, paragraph, bold=False):
         return
     
     # 🔍 DEBUG: In ra text trước khi xử lý
-    # print(f"🔍 Processing text: {text[:100]}...")
-    text = repair_broken_latex(text)
+    print(f"🔍 Processing text: {text[:100]}...")
+    # text = repair_broken_latex(text)
     text = text.replace("<br>", "\n").replace("<br/>", "\n") \
                .replace("<Br>", "\n").replace("<Br/>", "\n")
     text = re.sub(r'</?(div|p|u|span|font|i|b)\b[^>]*>', '', text)
@@ -136,12 +132,12 @@ def process_text_with_latex(text, paragraph, bold=False):
     parts = re.split(pattern, text)
     
     # 🔍 DEBUG: In ra các parts
-    # print(f"🔍 Split into {len(parts)} parts")
-    # for i, part in enumerate(parts):
-    #     if part and (part.startswith('$') or part.startswith('\\[')):
-    #         print(f"   Part {i}: LATEX -> {part[:50]}")
-    #     elif part:
-    #         print(f"   Part {i}: TEXT -> {part[:50]}")
+    print(f"🔍 Split into {len(parts)} parts")
+    for i, part in enumerate(parts):
+        if part and (part.startswith('$') or part.startswith('\\[')):
+            print(f"   Part {i}: LATEX -> {part[:50]}")
+        elif part:
+            print(f"   Part {i}: TEXT -> {part[:50]}")
    
     for part in parts:
         if not part:
@@ -150,7 +146,7 @@ def process_text_with_latex(text, paragraph, bold=False):
         if part.startswith('$') or part.startswith('\\['):
             try:
                 latex_expr = clean_latex_math(part)
-                # print(f"✅ Inserting equation: {latex_expr}")
+                print(f"✅ Inserting equation: {latex_expr}")
                 insert_equation_into_paragraph(latex_expr, paragraph)
             except Exception as e:
                 print(f"Lỗi xử lý LaTeX: {e}")
