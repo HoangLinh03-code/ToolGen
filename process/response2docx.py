@@ -26,39 +26,82 @@ def get_app_path():
     return os.path.dirname(os.path.abspath(__file__))
 
 def latex_to_omml_via_pandoc(latex_math_dollar):
+    """
+    Convert LaTeX sang OMML qua Pandoc
+    Tương thích với môi trường PyInstaller
+    """
     try:
-        with NamedTemporaryFile(suffix=".docx", delete=False) as temp_docx:
-            # Gọi Pandoc
-            result = subprocess.run(
-                ['pandoc', '--from=latex', '--to=docx', '-o', temp_docx.name],
-                input=latex_math_dollar,
-                text=True,
-                capture_output=True,
-                creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
-            )
- 
-            if result.returncode != 0:
-                return None
-            
-            with zipfile.ZipFile(temp_docx.name, 'r') as z:
-                xml_content = z.read('word/document.xml').decode('utf-8')
+        # Lấy đường dẫn thư mục chứa file .exe hoặc script
+        app_path = get_app_path()
+        
+        # Đường dẫn tuyệt đối đến pandoc.exe (cùng thư mục với ToolGen.exe)
+        pandoc_path = os.path.join(app_path, "pandoc.exe")
+        
+        # Kiểm tra pandoc có tồn tại không
+        if not os.path.exists(pandoc_path):
+            print(f"❌ KHÔNG TÌM THẤY PANDOC tại: {pandoc_path}")
+            print(f"   App path: {app_path}")
+            print(f"   Files trong thư mục: {os.listdir(app_path)}")
+            return None
+        
+        print(f"✅ Đã tìm thấy Pandoc tại: {pandoc_path}")
+        
+        # Tạo thư mục temp trong thư mục ứng dụng
+        temp_dir = os.path.join(app_path, "temp")
+        os.makedirs(temp_dir, exist_ok=True)
+        
+        # Tạo file DOCX tạm
+        with NamedTemporaryFile(suffix=".docx", delete=False, dir=temp_dir) as temp_docx:
+            temp_path = temp_docx.name
+        
+        # Gọi Pandoc với ĐƯỜNG DẪN TUYỆT ĐỐI
+        result = subprocess.run(
+            [pandoc_path, '--from=latex', '--to=docx', '-o', temp_path],
+            input=latex_math_dollar,
+            text=True,
+            capture_output=True,
+            creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
+        )
+        
+        # Kiểm tra lỗi
+        if result.returncode != 0:
+            print(f"❌ Pandoc error (return code {result.returncode}):")
+            print(f"   STDERR: {result.stderr}")
+            print(f"   STDOUT: {result.stdout}")
+            return None
+        
+        # Đọc OMML từ file DOCX vừa tạo
+        if not os.path.exists(temp_path):
+            print(f"❌ File DOCX tạm không được tạo: {temp_path}")
+            return None
+        
+        with zipfile.ZipFile(temp_path, 'r') as z:
+            xml_content = z.read('word/document.xml').decode('utf-8')
         
         # Trích xuất OMML
         match = re.search(r'(<m:oMath[^>]*>.*?</m:oMath>)', xml_content, re.DOTALL)
         
+        # Xóa file tạm
         try:
-            if os.path.exists(temp_docx.name):
-                os.unlink(temp_docx.name)
-        except:
-            pass  # Bỏ qua lỗi xóa file
+            if os.path.exists(temp_path):
+                os.unlink(temp_path)
+        except Exception as cleanup_error:
+            print(f"⚠️ Không thể xóa file tạm {temp_path}: {cleanup_error}")
         
-        return match.group(1) if match else None
-   
-    except FileNotFoundError:
-        print("❌ LỖI: Không tìm thấy 'pandoc.exe'. Hãy đảm bảo file này nằm cùng thư mục với phần mềm.")
+        if match:
+            print(f"✅ Convert LaTeX thành công: {latex_math_dollar[:50]}...")
+            return match.group(1)
+        else:
+            print(f"⚠️ Không tìm thấy OMML trong output của Pandoc")
+            return None
+    
+    except FileNotFoundError as e:
+        print(f"❌ LỖI FileNotFoundError: {e}")
+        print(f"   Đảm bảo pandoc.exe nằm cùng thư mục với ToolGen.exe")
         return None
     except Exception as e:
-        print(f"Lỗi latex_to_omml: {e}")
+        print(f"❌ Lỗi không mong đợi trong latex_to_omml_via_pandoc: {e}")
+        traceback.print_exc()
         return None
 
 
