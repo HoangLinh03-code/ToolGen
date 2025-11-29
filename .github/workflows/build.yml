@@ -18,18 +18,11 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      # CÀI ĐẶT PANDOC ĐẦY ĐỦ (bao gồm dependencies)
-      - name: Install Pandoc with Dependencies
+      # CÀI ĐẶT PANDOC
+      - name: Install Pandoc
         shell: pwsh
         run: |
-          # Cài Pandoc qua Chocolatey (bản stable có đầy đủ DLL)
           choco install pandoc --version=3.1.11 --no-progress -y
-
-          # Verify installation
-          $pandocPath = (Get-Command pandoc).Source
-          Write-Host "Pandoc installed at: $pandocPath"
-
-          # Test pandoc hoạt động
           pandoc --version
 
       - name: Set up Python
@@ -51,7 +44,7 @@ jobs:
         env:
           ENV_KEY_CONTENT: ${{ secrets.ENV_KEY }}
 
-      # BUILD VỚI CẤU HÌNH TỐI ƯU
+      # BUILD APPLICATION
       - name: Build with PyInstaller
         shell: pwsh
         run: |
@@ -65,67 +58,70 @@ jobs:
             --add-data "process;process" `
             GenQues.py
 
-      # ĐÓNG GÓI PANDOC ĐẦY ĐỦ
-      - name: Prepare Package with Pandoc
+      # ĐÓNG GÓI PANDOC + DEPENDENCIES
+      - name: Package Pandoc with Full Dependencies
         shell: pwsh
         run: |
-          New-Item -ItemType Directory -Path "GenQues" -Force
+          Write-Host "=== PACKAGING PANDOC ==="
 
-          # Copy file EXE chính
+          # 1. Tìm Pandoc
+          $pandocExe = (Get-Command pandoc).Source
+          $pandocDir = Split-Path -Parent $pandocExe
+          Write-Host "Pandoc location: $pandocDir"
+
+          # 2. Tạo thư mục package
+          New-Item -ItemType Directory -Path "GenQues" -Force
+          New-Item -ItemType Directory -Path "GenQues/pandoc" -Force
+
+          # 3. Copy file EXE chính
           Copy-Item -Path "dist/ToolGen.exe" -Destination "GenQues/"
 
-          # Copy các file Prompt
+          # 4. Copy Prompt files
           Copy-Item -Path "testDS.txt" -Destination "GenQues/" -ErrorAction SilentlyContinue
           Copy-Item -Path "testTN.txt" -Destination "GenQues/" -ErrorAction SilentlyContinue
           Copy-Item -Path "testTLN.txt" -Destination "GenQues/" -ErrorAction SilentlyContinue
 
-          # [QUAN TRỌNG] Tìm và copy Pandoc
-          Write-Host "Searching for Pandoc installation..."
+          # 5. Copy TOÀN BỘ Pandoc folder
+          Write-Host "Copying Pandoc files..."
+          Copy-Item -Path "$pandocDir\*" -Destination "GenQues/pandoc/" -Recurse -Force
 
-          # Tìm Pandoc exe
-          $pandocExe = (Get-Command pandoc -ErrorAction SilentlyContinue).Source
+          # 6. Copy Visual C++ Runtime DLLs (QUAN TRỌNG!)
+          Write-Host "Copying VC++ Runtime DLLs..."
+          $vcDlls = @(
+              "vcruntime140.dll",
+              "msvcp140.dll", 
+              "vcruntime140_1.dll"
+          )
 
-          if (-not $pandocExe) {
-              # Fallback: Tìm trong các đường dẫn phổ biến
-              $possiblePaths = @(
-                  "C:\ProgramData\chocolatey\lib\pandoc\tools\pandoc.exe",
-                  "$env:LOCALAPPDATA\Pandoc\pandoc.exe",
-                  "$env:APPDATA\local\Pandoc\pandoc.exe"
-              )
-              
-              foreach ($path in $possiblePaths) {
-                  if (Test-Path $path) {
-                      $pandocExe = $path
-                      break
-                  }
+          foreach ($dll in $vcDlls) {
+              $systemDll = "C:\Windows\System32\$dll"
+              if (Test-Path $systemDll) {
+                  Copy-Item -Path $systemDll -Destination "GenQues/pandoc/" -Force
+                  Write-Host "  ✓ $dll"
               }
           }
 
-          if (-not $pandocExe) {
-              Write-Error "Cannot find Pandoc installation!"
-              exit 1
-          }
-
-          $pandocDir = Split-Path -Parent $pandocExe
-          Write-Host "Found Pandoc at: $pandocDir"
-
-          # Tạo thư mục pandoc trong GenQues
-          New-Item -ItemType Directory -Path "GenQues/pandoc" -Force
-
-          # Copy TẤT CẢ files từ thư mục Pandoc
-          Copy-Item -Path "$pandocDir\*" -Destination "GenQues/pandoc/" -Recurse -Force
-
-          # Verify copy thành công
-          Write-Host "Pandoc files copied:"
-          Get-ChildItem "GenQues/pandoc" -Recurse | Format-Table Name, Length -AutoSize
-
-          # Kiểm tra pandoc.exe có tồn tại không
+          # 7. Verify
+          Write-Host "`n=== VERIFICATION ==="
           if (Test-Path "GenQues/pandoc/pandoc.exe") {
-              Write-Host "pandoc.exe verified in package"
+              Write-Host "✅ pandoc.exe found"
+              
+              # Test chạy pandoc
+              try {
+                  $version = & "GenQues/pandoc/pandoc.exe" --version 2>&1
+                  Write-Host "✅ Pandoc works!"
+                  Write-Host $version[0]
+              } catch {
+                  Write-Warning "⚠️ Pandoc test failed: $_"
+              }
           } else {
-              Write-Error "pandoc.exe NOT found in package!"
+              Write-Error "❌ pandoc.exe NOT found!"
               exit 1
           }
+
+          Write-Host "`nPackage contents:"
+          Get-ChildItem "GenQues" -Recurse | Where-Object {!$_.PSIsContainer} | 
+              Select-Object FullName, Length | Format-Table -AutoSize
 
       - name: Zip Release
         shell: pwsh

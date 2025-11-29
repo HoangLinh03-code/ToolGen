@@ -18,28 +18,12 @@ import threading
 
 load_dotenv()
 
-def init_environment_paths():
-    """
-    Cấu hình biến môi trường để App tìm thấy pandoc.exe nằm cạnh file chạy
-    """
-    if getattr(sys, 'frozen', False):
-        # Khi chạy file .exe
-        # internal_path: Dùng để lấy các file đóng gói bên trong (icon, .env mẫu)
-        internal_path = sys._MEIPASS 
-        # external_path: Thư mục chứa file .exe (nơi chứa pandoc.exe, file output)
-        external_path = os.path.dirname(sys.executable)
-    else:
-        # Khi chạy code python .py
-        internal_path = os.path.dirname(os.path.abspath(__file__))
-        external_path = os.path.dirname(os.path.abspath(__file__))
+if getattr(sys, 'frozen', False):
+    external_path = os.path.dirname(sys.executable)
+else:
+    external_path = os.path.dirname(os.path.abspath(__file__))
 
-    # QUAN TRỌNG: Thêm external_path vào PATH hệ thống tạm thời
-    # Để subprocess.run(['pandoc']) có thể tìm thấy file pandoc.exe nằm cạnh ToolGen.exe
-    os.environ["PATH"] += os.pathsep + external_path
-    
-    return internal_path, external_path
-
-internal_path, external_path = init_environment_paths()
+internal_path = external_path
 
 dotenv_path = os.path.join(internal_path, '.env')
 load_dotenv(dotenv_path)

@@ -24,102 +24,103 @@ def get_app_path():
     if getattr(sys, 'frozen', False):
         return os.path.dirname(sys.executable)
     return os.path.dirname(os.path.abspath(__file__))
+def find_pandoc_executable():
+    """
+    Tìm pandoc.exe theo thứ tự ưu tiên:
+    1. Thư mục 'pandoc' cạnh tool (cho bản build)
+    2. PATH hệ thống (cho môi trường dev)
+    """
+    app_path = get_app_path()
+    
+    # 1. Tìm trong thư mục cục bộ 'pandoc' (ưu tiên cao nhất)
+    local_pandoc = os.path.join(app_path, 'pandoc', 'pandoc.exe')
+    if os.path.isfile(local_pandoc):
+        print(f"✅ Sử dụng Pandoc cục bộ: {local_pandoc}")
+        return local_pandoc
+    
+    # 2. Fallback: Tìm trong PATH hệ thống (cho dev)
+    import shutil
+    system_pandoc = shutil.which('pandoc')
+    if system_pandoc:
+        print(f"⚠️ Sử dụng Pandoc hệ thống: {system_pandoc}")
+        return system_pandoc
+    
+    # 3. Không tìm thấy
+    print("❌ KHÔNG TÌM THẤY PANDOC!")
+    return None
 
 def latex_to_omml_via_pandoc(latex_math_dollar):
-    """
-    Convert LaTeX sang OMML qua Pandoc
-    VERSION TỰ ĐỘNG TÌM PANDOC (Bundle hoặc System)
-    """
+    """Chuyển đổi LaTeX sang OMML qua Pandoc"""
+    pandoc_exe = find_pandoc_executable()
+    
+    if not pandoc_exe:
+        print("❌ Pandoc không khả dụng, bỏ qua equation")
+        return None
+    
     try:
-        app_path = get_app_path()
+        # Chuẩn hóa input (loại bỏ ký tự lạ)
+        latex_clean = latex_math_dollar.strip()
         
-        # Đường dẫn ưu tiên 1: Pandoc trong thư mục app (bundled)
-        pandoc_dir_bundled = os.path.join(app_path, "pandoc")
-        pandoc_exe_bundled = os.path.join(pandoc_dir_bundled, "pandoc.exe")
-        
-        # Đường dẫn ưu tiên 2: Pandoc system-wide
-        import shutil
-        pandoc_exe_system = shutil.which("pandoc")
-        
-        # Chọn đường dẫn nào có sẵn
-        if os.path.exists(pandoc_exe_bundled):
-            pandoc_exe = pandoc_exe_bundled
-            pandoc_dir = pandoc_dir_bundled
-            print(f"[INFO] Using bundled Pandoc: {pandoc_exe}")
-        elif pandoc_exe_system:
-            pandoc_exe = pandoc_exe_system
-            pandoc_dir = os.path.dirname(pandoc_exe_system)
-            print(f"[INFO] Using system Pandoc: {pandoc_exe}")
-        else:
-            print(f"[ERROR] CANNOT FIND PANDOC!")
-            print(f"  Bundled path: {pandoc_exe_bundled} (does not exist)")
-            print(f"  System path: Not found in PATH")
-            print(f"  App path: {app_path}")
-            return None
-        
-        # Tạo thư mục temp
-        temp_dir = os.path.join(app_path, "temp")
-        os.makedirs(temp_dir, exist_ok=True)
-        
-        # Tạo file DOCX tạm
-        with NamedTemporaryFile(suffix=".docx", delete=False, dir=temp_dir) as temp_docx:
+        # Tạo file tạm với encoding UTF-8 BOM để tránh lỗi
+        with NamedTemporaryFile(mode='w', suffix=".docx", delete=False, encoding='utf-8') as temp_docx:
             temp_path = temp_docx.name
         
-        # Set biến môi trường PATH
-        env = os.environ.copy()
-        env['PATH'] = pandoc_dir + os.pathsep + env.get('PATH', '')
-        
-        # Gọi Pandoc
+        # Chạy Pandoc với error handling tốt hơn
         result = subprocess.run(
             [pandoc_exe, '--from=latex', '--to=docx', '-o', temp_path],
-            input=latex_math_dollar,
+            input=latex_clean,
             text=True,
+            encoding='utf-8',
             capture_output=True,
-            env=env,
-            cwd=pandoc_dir,  # Set working directory
+            timeout=10,  # Timeout 10s để tránh treo
             creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
         )
-        
-        # Kiểm tra lỗi
+ 
         if result.returncode != 0:
-            print(f"[ERROR] Pandoc error (return code {result.returncode}):")
-            print(f"  STDERR: {result.stderr}")
-            print(f"  STDOUT: {result.stdout}")
-            print(f"  Input LaTeX: {latex_math_dollar[:100]}...")
+            error_msg = result.stderr.strip() if result.stderr else "Unknown error"
+            print(f"⚠️ Pandoc error (code {result.returncode}): {error_msg}")
+            
+            # Kiểm tra lỗi phổ biến
+            if "not found" in error_msg.lower() or "cannot find" in error_msg.lower():
+                print("   → Thiếu DLL dependencies. Kiểm tra lại folder pandoc/")
+            elif "syntax" in error_msg.lower():
+                print(f"   → LaTeX syntax error: {latex_clean[:50]}...")
+            
             return None
         
-        # Đọc OMML
-        if not os.path.exists(temp_path):
-            print(f"[ERROR] Temp DOCX file not created: {temp_path}")
+        # Kiểm tra file output có tồn tại không
+        if not os.path.exists(temp_path) or os.path.getsize(temp_path) == 0:
+            print(f"⚠️ Pandoc không tạo file output hợp lệ")
             return None
-        
+           
+        # Đọc XML từ DOCX
         with zipfile.ZipFile(temp_path, 'r') as z:
             xml_content = z.read('word/document.xml').decode('utf-8')
         
-        # Trích xuất OMML
-        match = re.search(r'(<m:oMath[^>]*>.*?</m:oMath>)', xml_content, re.DOTALL)
-        
-        # Cleanup
+        # Dọn dẹp file tạm
         try:
-            if os.path.exists(temp_path):
-                os.unlink(temp_path)
+            os.remove(temp_path)
         except:
             pass
+       
+        # Tìm equation XML
+        match = re.search(r'(<m:oMath[^>]*>.*?</m:oMath>)', xml_content, re.DOTALL)
         
-        if match:
-            return match.group(1)
-        else:
-            print(f"[WARNING] OMML not found in Pandoc output")
+        if not match:
+            print(f"⚠️ Không tìm thấy equation trong output: {latex_clean[:30]}...")
             return None
-    
-    except FileNotFoundError as e:
-        print(f"[ERROR] FileNotFoundError: {e}")
-        print(f"  Make sure 'pandoc' folder is in the same directory as ToolGen.exe")
+            
+        return match.group(1)
+   
+    except subprocess.TimeoutExpired:
+        print(f"⚠️ Pandoc timeout (>10s)")
         return None
     except Exception as e:
-        print(f"[ERROR] Unexpected error in latex_to_omml_via_pandoc: {e}")
+        print(f"❌ Lỗi latex_to_omml: {type(e).__name__}: {e}")
+        import traceback
         traceback.print_exc()
         return None
+
 
 
 def process_text_with_latex(text, paragraph, bold=False):
