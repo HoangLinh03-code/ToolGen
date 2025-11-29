@@ -1,25 +1,32 @@
 # @format
+
 name: Build & Release Windows App
 
 on:
-  # 1. Trigger khi push TAG bắt đầu bằng 'v' (ví dụ: v1.0.0, v2.1-beta)
-  # Đây là cách chuyên nghiệp nhất để ra mắt phần mềm.
   push:
     tags:
       - "v*"
-  # 2. Vẫn giữ trigger manual để test
   workflow_dispatch:
 
 jobs:
   build-and-release:
     runs-on: windows-latest
     permissions:
-      contents: write # Cấp quyền ghi để Action có thể tạo Release
+      contents: write
 
     steps:
       # --- BƯỚC 1: CHUẨN BỊ MÔI TRƯỜNG ---
       - name: Check out repository
         uses: actions/checkout@v4
+
+      # [MỚI] Cài đặt Pandoc bằng Chocolatey (có sẵn trên Windows Runner)
+      - name: Install Pandoc
+        shell: pwsh
+        run: |
+          choco install pandoc --no-progress
+          # Kiểm tra xem pandoc đã cài chưa và in ra đường dẫn
+          $pandocPath = (Get-Command pandoc).Source
+          Write-Host "Pandoc installed at: $pandocPath"
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -45,8 +52,6 @@ jobs:
       - name: Build with PyInstaller
         shell: pwsh
         run: |
-          # --windowed: Ẩn cửa sổ cmd đen (nếu muốn hiện để debug thì bỏ cờ này đi)
-          # --icon: Nếu có icon thì thêm --icon=icon.ico
           python -m PyInstaller `
             --onefile `
             --clean `
@@ -63,36 +68,37 @@ jobs:
         run: |
           New-Item -ItemType Directory -Path "GenQues" -Force
 
-          # Copy file EXE
+          # Copy file EXE chính
           Copy-Item -Path "dist/ToolGen.exe" -Destination "GenQues/"
 
-          # Copy file Prompt (Bắt buộc có để chạy)
+          # Copy các file Prompt
           Copy-Item -Path "testDS.txt" -Destination "GenQues/"
           Copy-Item -Path "testTN.txt" -Destination "GenQues/"
           Copy-Item -Path "testTLN.txt" -Destination "GenQues/"
 
-      # --- BƯỚC 5: NÉN FILE (QUAN TRỌNG CHO NGƯỜI DÙNG CUỐI) ---
+          # [MỚI] Copy Pandoc.exe vào cùng thư mục với ToolGen.exe
+          # Lấy đường dẫn thực tế của pandoc vừa cài đặt
+          $pandocPath = (Get-Command pandoc).Source
+          Write-Host "Copying Pandoc from $pandocPath"
+          Copy-Item -Path $pandocPath -Destination "GenQues/"
+
+      # --- BƯỚC 5: NÉN FILE ---
       - name: Zip Release
         shell: pwsh
         run: |
-          # Lấy tên Tag (ví dụ v1.0.0)
           $tagName = "${{ github.ref_name }}"
           $zipName = "GenQues-$tagName.zip"
-
-          # Nén thư mục lại thành 1 file zip duy nhất
           Compress-Archive -Path "GenQues" -DestinationPath $zipName
-
-          # Lưu tên file vào biến môi trường để bước sau dùng
           echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
 
-      # --- BƯỚC 6: TẠO RELEASE VÀ UPLOAD ---
+      # --- BƯỚC 6: TẠO RELEASE ---
       - name: Create Release and Upload Asset
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
         with:
           files: ${{ env.ZIP_NAME }}
-          draft: false # false = Xuất bản ngay lập tức
-          prerelease: false # false = Bản chính thức
-          generate_release_notes: true # Tự động tạo ghi chú dựa trên commit
+          draft: false
+          prerelease: false
+          generate_release_notes: true
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}

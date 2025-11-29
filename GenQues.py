@@ -18,15 +18,43 @@ import threading
 
 load_dotenv()
 
-if getattr(sys, 'frozen', False):
-    internal_path = sys._MEIPASS
-    external_path = os.path.dirname(sys.executable)
-else:
-    internal_path = os.path.dirname(__file__)
-    external_path = os.path.dirname(__file__)
+def init_environment_paths():
+    """
+    Cấu hình biến môi trường để App tìm thấy pandoc.exe nằm cạnh file chạy
+    """
+    if getattr(sys, 'frozen', False):
+        # Khi chạy file .exe
+        # internal_path: Dùng để lấy các file đóng gói bên trong (icon, .env mẫu)
+        internal_path = sys._MEIPASS 
+        # external_path: Thư mục chứa file .exe (nơi chứa pandoc.exe, file output)
+        external_path = os.path.dirname(sys.executable)
+    else:
+        # Khi chạy code python .py
+        internal_path = os.path.dirname(os.path.abspath(__file__))
+        external_path = os.path.dirname(os.path.abspath(__file__))
+
+    # QUAN TRỌNG: Thêm external_path vào PATH hệ thống tạm thời
+    # Để subprocess.run(['pandoc']) có thể tìm thấy file pandoc.exe nằm cạnh ToolGen.exe
+    os.environ["PATH"] += os.pathsep + external_path
+    
+    return internal_path, external_path
+
+internal_path, external_path = init_environment_paths()
 
 dotenv_path = os.path.join(internal_path, '.env')
 load_dotenv(dotenv_path)
+
+# Kiểm tra Pandoc (Optional - Để debug)
+def check_pandoc_availability():
+    import shutil
+    pandoc_path = shutil.which("pandoc")
+    if pandoc_path:
+        print(f"✅ Đã tìm thấy Pandoc tại: {pandoc_path}")
+    else:
+        print("⚠️ Không tìm thấy Pandoc! Chức năng tạo công thức toán sẽ lỗi.")
+
+# Gọi kiểm tra (có thể bỏ qua khi release)
+check_pandoc_availability()
 
 # ============================================================
 # PHẦN ĐA LUỒNG (MULTITHREADING) - TỐI ƯU
@@ -1043,7 +1071,7 @@ class MainWindow(QWidget):
                     min_len = min(len(seed_base), len(cand_base))
                     prefix_ratio = len(common_prefix_raw) / min_len if min_len > 0 else 0
                     # Giống nội dung > 80% HOẶC Tiền tố giống > 70% (để bắt KNTT SGK và KNTT_SBT)
-                    if matcher.ratio() > 0.8 or prefix_ratio > 0.6: 
+                    if matcher.ratio() > 0.95 or prefix_ratio > 0.8: 
                         should_merge = True
                             
                 # Check 2: Khác Folder (Logic chặt hơn)

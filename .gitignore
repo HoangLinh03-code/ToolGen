@@ -11,8 +11,6 @@ venv/
 output/
 processing_progress.json
 *.html
-test_connect.py
-test_imgae.py
 *.png
 *.jpg
-pdf_scan.py
+test/
