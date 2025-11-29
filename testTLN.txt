@@ -45,6 +45,17 @@ BẮT BUỘC Đảm bảo mỗi phần nội dung đều có câu hỏi ở các
      + Nếu muốn chia theo chủ đề: -> Điền "phan": "CHỦ ĐỀ: KINH TẾ BIỂN" 
 - Tuyệt đối KHÔNG điền chung chung kiểu "Phần I", "Phần II" (sẽ không biết nội dung là gì).
 
+## YÊU CẦU ĐẶC BIỆT VỀ TRÍCH DẪN (CHO MÔN XÃ HỘI):
+- Nếu câu hỏi dựa trên một đoạn tư liệu, bài thơ, hoặc văn bản lịch sử, hãy trích xuất nó vào trường "trich_dan" và ghi nguồn vào "nguon_trich_dan" trong JSON.
+
+- Ví dụ cấu trúc JSON mong muốn:
+{
+  "noi_dung": "Đọc đoạn tư liệu sau và trả lời câu hỏi:",
+  "trich_dan": "Mỗi thị tộc thường tôn sùng một loài động vật...",
+  "nguon_trich_dan": "(SGK Lịch sử và Địa lí 6, bộ Cánh diều, trang 19)",
+  "dap_an": [...]
+}
+
 ## ĐỊNH DẠNG ĐẦU RA
 I. CÂU HỎI VẬN DỤNG
 Câu 1: 

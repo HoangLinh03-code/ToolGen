@@ -35,6 +35,17 @@ Tổng số câu hỏi: 20 câu.
 + Trong phần giải thích không được ghi Hình [X].
 + Lưu ý: [X] trong lời giải là số thứ tự đáp án ví dụ đáp án B đúng. Vậy khi ghi lời giải sẽ là 2 không được ghi là B
 
+## YÊU CẦU ĐẶC BIỆT VỀ TRÍCH DẪN (CHO MÔN XÃ HỘI):
+- Nếu câu hỏi dựa trên một đoạn tư liệu, bài thơ, hoặc văn bản lịch sử, hãy trích xuất nó vào trường "trich_dan" và ghi nguồn vào "nguon_trich_dan" trong JSON.
+
+- Ví dụ cấu trúc JSON mong muốn:
+{
+  "noi_dung": "Đọc đoạn tư liệu sau và trả lời câu hỏi:",
+  "trich_dan": "Mỗi thị tộc thường tôn sùng một loài động vật...",
+  "nguon_trich_dan": "(SGK Lịch sử và Địa lí 6, bộ Cánh diều, trang 19)",
+  "dap_an": [...]
+}
+
 ## Ví dụ về cách viết phần giải thích (Cần tuân thủ nghiêm ngặt):
 Câu hỏi mẫu.
 Trong mạch điện gia đình, cầu chì có vai trò chính là?

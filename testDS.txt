@@ -61,6 +61,17 @@ BẮT BUỘC Đảm bảo mỗi phần nội dung đều có câu hỏi ở các
 + Sử dụng kiến thức thực tế một cách tự nhiên, logic
 + KHÔNG được ghi Hình [X], nếu lấy dẫn chứng thì dùng cụm từ "hình trên"
 
+## YÊU CẦU ĐẶC BIỆT VỀ TRÍCH DẪN (CHO MÔN XÃ HỘI):
+- Nếu câu hỏi dựa trên một đoạn tư liệu, bài thơ, hoặc văn bản lịch sử, hãy trích xuất nó vào trường "trich_dan" và ghi nguồn vào "nguon_trich_dan" trong JSON.
+
+- Ví dụ cấu trúc JSON mong muốn:
+{
+  "noi_dung": "Đọc đoạn tư liệu sau và trả lời câu hỏi:",
+  "trich_dan": "Mỗi thị tộc thường tôn sùng một loài động vật...",
+  "nguon_trich_dan": "(SGK Lịch sử và Địa lí 6, bộ Cánh diều, trang 19)",
+  "dap_an": [...]
+}
+
 ## ĐỊNH DẠNG ĐẦU RA
 I. CÂU HỎI THÔNG HIỂU (20 câu)
 Câu 1:
