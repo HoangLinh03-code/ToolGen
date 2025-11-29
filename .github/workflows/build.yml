@@ -78,9 +78,14 @@ jobs:
 
           # [MỚI] Copy Pandoc.exe vào cùng thư mục với ToolGen.exe
           # Lấy đường dẫn thực tế của pandoc vừa cài đặt
-          $pandocPath = (Get-Command pandoc).Source
-          Write-Host "Copying Pandoc from $pandocPath"
-          Copy-Item -Path $pandocPath -Destination "GenQues/"
+          $pandocDir = Split-Path -Parent (Get-Command pandoc).Source
+          Write-Host "Copying entire Pandoc directory from: $pandocDir"
+
+          # Tạo thư mục pandoc trong GenQues
+          New-Item -ItemType Directory -Path "GenQues/pandoc" -Force
+
+          # Copy tất cả files trong thư mục Pandoc
+          Copy-Item -Path "$pandocDir\*" -Destination "GenQues/pandoc/" -Recurse -Force
 
       # --- BƯỚC 5: NÉN FILE ---
       - name: Zip Release

@@ -28,23 +28,31 @@ def get_app_path():
 def latex_to_omml_via_pandoc(latex_math_dollar):
     """
     Convert LaTeX sang OMML qua Pandoc
-    Tương thích với môi trường PyInstaller
+    Tương thích với môi trường PyInstaller - Sử dụng thư mục Pandoc đầy đủ
     """
     try:
         # Lấy đường dẫn thư mục chứa file .exe hoặc script
         app_path = get_app_path()
         
-        # Đường dẫn tuyệt đối đến pandoc.exe (cùng thư mục với ToolGen.exe)
-        pandoc_path = os.path.join(app_path, "pandoc.exe")
+        # Đường dẫn đến thư mục pandoc (chứa đầy đủ dependencies)
+        pandoc_dir = os.path.join(app_path, "pandoc")
+        pandoc_exe = os.path.join(pandoc_dir, "pandoc.exe")
         
         # Kiểm tra pandoc có tồn tại không
-        if not os.path.exists(pandoc_path):
-            print(f"❌ KHÔNG TÌM THẤY PANDOC tại: {pandoc_path}")
+        if not os.path.exists(pandoc_exe):
+            print(f"❌ KHÔNG TÌM THẤY PANDOC tại: {pandoc_exe}")
             print(f"   App path: {app_path}")
-            print(f"   Files trong thư mục: {os.listdir(app_path)}")
-            return None
+            
+            # Fallback: Thử tìm pandoc.exe trực tiếp trong app_path (backward compatible)
+            fallback_path = os.path.join(app_path, "pandoc.exe")
+            if os.path.exists(fallback_path):
+                print(f"⚠️ Dùng fallback: {fallback_path}")
+                pandoc_exe = fallback_path
+                pandoc_dir = app_path
+            else:
+                return None
         
-        print(f"✅ Đã tìm thấy Pandoc tại: {pandoc_path}")
+        print(f"✅ Đã tìm thấy Pandoc tại: {pandoc_exe}")
         
         # Tạo thư mục temp trong thư mục ứng dụng
         temp_dir = os.path.join(app_path, "temp")
@@ -54,12 +62,17 @@ def latex_to_omml_via_pandoc(latex_math_dollar):
         with NamedTemporaryFile(suffix=".docx", delete=False, dir=temp_dir) as temp_docx:
             temp_path = temp_docx.name
         
-        # Gọi Pandoc với ĐƯỜNG DẪN TUYỆT ĐỐI
+        # ⭐ QUAN TRỌNG: Set biến môi trường PATH để Pandoc tìm được dependencies
+        env = os.environ.copy()
+        env['PATH'] = pandoc_dir + os.pathsep + env.get('PATH', '')
+        
+        # Gọi Pandoc với đường dẫn tuyệt đối VÀ môi trường đúng
         result = subprocess.run(
-            [pandoc_path, '--from=latex', '--to=docx', '-o', temp_path],
+            [pandoc_exe, '--from=latex', '--to=docx', '-o', temp_path],
             input=latex_math_dollar,
             text=True,
             capture_output=True,
+            env=env,  # ← THÊM DÒNG NÀY
             creationflags=subprocess.CREATE_NO_WINDOW if hasattr(subprocess, 'CREATE_NO_WINDOW') else 0
         )
         
@@ -68,6 +81,7 @@ def latex_to_omml_via_pandoc(latex_math_dollar):
             print(f"❌ Pandoc error (return code {result.returncode}):")
             print(f"   STDERR: {result.stderr}")
             print(f"   STDOUT: {result.stdout}")
+            print(f"   Input LaTeX: {latex_math_dollar}")
             return None
         
         # Đọc OMML từ file DOCX vừa tạo
@@ -86,10 +100,9 @@ def latex_to_omml_via_pandoc(latex_math_dollar):
             if os.path.exists(temp_path):
                 os.unlink(temp_path)
         except Exception as cleanup_error:
-            print(f"⚠️ Không thể xóa file tạm {temp_path}: {cleanup_error}")
+            pass  # Im lặng để không spam log
         
         if match:
-            print(f"✅ Convert LaTeX thành công: {latex_math_dollar[:50]}...")
             return match.group(1)
         else:
             print(f"⚠️ Không tìm thấy OMML trong output của Pandoc")
@@ -97,7 +110,7 @@ def latex_to_omml_via_pandoc(latex_math_dollar):
     
     except FileNotFoundError as e:
         print(f"❌ LỖI FileNotFoundError: {e}")
-        print(f"   Đảm bảo pandoc.exe nằm cùng thư mục với ToolGen.exe")
+        print(f"   Đảm bảo thư mục 'pandoc' nằm cùng thư mục với ToolGen.exe")
         return None
     except Exception as e:
         print(f"❌ Lỗi không mong đợi trong latex_to_omml_via_pandoc: {e}")
