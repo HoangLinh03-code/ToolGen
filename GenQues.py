@@ -19,11 +19,11 @@ import threading
 load_dotenv()
 
 if getattr(sys, 'frozen', False):
+    internal_path = sys._MEIPASS
     external_path = os.path.dirname(sys.executable)
 else:
-    external_path = os.path.dirname(os.path.abspath(__file__))
-
-internal_path = external_path
+    internal_path = os.path.dirname(__file__)
+    external_path = os.path.dirname(__file__)
 
 dotenv_path = os.path.join(internal_path, '.env')
 load_dotenv(dotenv_path)
