@@ -15,18 +15,22 @@ jobs:
       contents: write
 
     steps:
-      # --- BƯỚC 1: CHUẨN BỊ MÔI TRƯỜNG ---
       - name: Check out repository
         uses: actions/checkout@v4
 
-      # [MỚI] Cài đặt Pandoc bằng Chocolatey (có sẵn trên Windows Runner)
-      - name: Install Pandoc
+      # ✅ CÀI ĐẶT PANDOC ĐẦY ĐỦ (bao gồm dependencies)
+      - name: Install Pandoc với Dependencies
         shell: pwsh
         run: |
-          choco install pandoc --no-progress
-          # Kiểm tra xem pandoc đã cài chưa và in ra đường dẫn
+          # Cài Pandoc qua Chocolatey (bản stable có đầy đủ DLL)
+          choco install pandoc --version=3.1.11 --no-progress -y
+
+          # Verify installation
           $pandocPath = (Get-Command pandoc).Source
-          Write-Host "Pandoc installed at: $pandocPath"
+          Write-Host "✅ Pandoc installed at: $pandocPath"
+
+          # Test pandoc hoạt động
+          pandoc --version
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -40,7 +44,6 @@ jobs:
           pip install -r requirements.txt
           pip install pyinstaller
 
-      # --- BƯỚC 2: TẠO FILE .ENV TỪ SECRET ---
       - name: Create .env file
         shell: pwsh
         run: |
@@ -48,7 +51,7 @@ jobs:
         env:
           ENV_KEY_CONTENT: ${{ secrets.ENV_KEY }}
 
-      # --- BƯỚC 3: BUILD EXE ---
+      # ✅ BUILD VỚI CẤU HÌNH TỐI ƯU
       - name: Build with PyInstaller
         shell: pwsh
         run: |
@@ -62,8 +65,8 @@ jobs:
             --add-data "process;process" `
             GenQues.py
 
-      # --- BƯỚC 4: ĐÓNG GÓI (PACKAGING) ---
-      - name: Prepare Package
+      # ✅ ĐÓNG GÓI PANDOC ĐẦY ĐỦ
+      - name: Prepare Package with Pandoc
         shell: pwsh
         run: |
           New-Item -ItemType Directory -Path "GenQues" -Force
@@ -76,18 +79,22 @@ jobs:
           Copy-Item -Path "testTN.txt" -Destination "GenQues/"
           Copy-Item -Path "testTLN.txt" -Destination "GenQues/"
 
-          # [MỚI] Copy Pandoc.exe vào cùng thư mục với ToolGen.exe
-          # Lấy đường dẫn thực tế của pandoc vừa cài đặt
-          $pandocDir = Split-Path -Parent (Get-Command pandoc).Source
-          Write-Host "Copying entire Pandoc directory from: $pandocDir"
+          # 🔥 [QUAN TRỌNG] Copy TOÀN BỘ thư mục Pandoc (bao gồm DLLs)
+          $pandocExePath = (Get-Command pandoc).Source
+          $pandocDir = Split-Path -Parent $pandocExePath
+
+          Write-Host "📦 Copying Pandoc directory from: $pandocDir"
 
           # Tạo thư mục pandoc trong GenQues
           New-Item -ItemType Directory -Path "GenQues/pandoc" -Force
 
-          # Copy tất cả files trong thư mục Pandoc
+          # Copy TẤT CẢ files (bao gồm .exe và .dll)
           Copy-Item -Path "$pandocDir\*" -Destination "GenQues/pandoc/" -Recurse -Force
 
-      # --- BƯỚC 5: NÉN FILE ---
+          # Verify copy thành công
+          Write-Host "📋 Files copied:"
+          Get-ChildItem "GenQues/pandoc" | Format-Table Name, Length
+
       - name: Zip Release
         shell: pwsh
         run: |
@@ -96,7 +103,6 @@ jobs:
           Compress-Archive -Path "GenQues" -DestinationPath $zipName
           echo "ZIP_NAME=$zipName" >> $env:GITHUB_ENV
 
-      # --- BƯỚC 6: TẠO RELEASE ---
       - name: Create Release and Upload Asset
         uses: softprops/action-gh-release@v1
         if: startsWith(github.ref, 'refs/tags/')
