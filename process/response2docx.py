@@ -19,17 +19,6 @@ import traceback
 _FILE_LOCK = threading.RLock()
 _OUTPUT_DIR_LOCK = threading.RLock()
 
-def remove_xml_incompatible_characters(text):
-    """
-    Lọc bỏ ký tự NULL (\x00) và các ký tự điều khiển gây crash file Word.
-    """
-    if not text:
-        return ""
-    # Giữ lại: Tab (\x09), Line Feed (\x0A), Carriage Return (\x0D)
-    # Loại bỏ: Các ký tự điều khiển khác và Unicode không hợp lệ
-    illegal_xml_re = re.compile(r"[\x00-\x08\x0b\x0c\x0e-\x1F\uD800-\uDFFF\uFFFE\uFFFF]")
-    return illegal_xml_re.sub('', str(text))
-
 def get_app_path():
     """Lấy đường dẫn chứa file .exe hoặc script"""
     if getattr(sys, 'frozen', False):
@@ -37,11 +26,9 @@ def get_app_path():
     return os.path.dirname(os.path.abspath(__file__))
 
 def latex_to_omml_via_pandoc(latex_math_dollar):
-    """Chuyển đổi LaTeX sang OMML qua Pandoc"""
     try:
         with NamedTemporaryFile(suffix=".docx", delete=False) as temp_docx:
-            # temp_docx.close()
-            # Cờ ẩn cửa sổ console đen khi gọi subprocess
+            # Gọi Pandoc
             result = subprocess.run(
                 ['pandoc', '--from=latex', '--to=docx', '-o', temp_docx.name],
                 input=latex_math_dollar,
@@ -51,18 +38,20 @@ def latex_to_omml_via_pandoc(latex_math_dollar):
             )
  
             if result.returncode != 0:
-                # print(f"⚠️ Pandoc error: {result.stderr}")
-                # return None
-                if os.path.exists(temp_docx.name): os.unlink(temp_docx.name)
                 return None
-            xml_content = ""
+            
             with zipfile.ZipFile(temp_docx.name, 'r') as z:
                 xml_content = z.read('word/document.xml').decode('utf-8')
-            
-            # if os.path.exists(temp_docx.name):
-            #     os.unlink(temp_docx.name)
-       
+        
+        # Trích xuất OMML
         match = re.search(r'(<m:oMath[^>]*>.*?</m:oMath>)', xml_content, re.DOTALL)
+        
+        try:
+            if os.path.exists(temp_docx.name):
+                os.unlink(temp_docx.name)
+        except:
+            pass  # Bỏ qua lỗi xóa file
+        
         return match.group(1) if match else None
    
     except FileNotFoundError:
@@ -72,14 +61,57 @@ def latex_to_omml_via_pandoc(latex_math_dollar):
         print(f"Lỗi latex_to_omml: {e}")
         return None
 
+
+def process_text_with_latex(text, paragraph, bold=False):
+    """
+    Xử lý text có công thức LaTeX
+    VERSION ỔN ĐỊNH - Copy từ test_res.py (KHÔNG có repair_broken_latex)
+    """
+    if not text:
+        return
+    
+    # Làm sạch HTML tags
+    text = text.replace("<br>", "\n").replace("<br/>", "\n") \
+               .replace("<Br>", "\n").replace("<Br/>", "\n")
+    text = re.sub(r'</?(div|p|u|span|font|i|b)\b[^>]*>', '', text)
+    text = text.replace("&nbsp;", "").replace("&lt;", "").replace("&gt;", "")
+    
+    # Tách text và LaTeX
+    pattern = r'(\$[^$]+\$|\\\[.*?\\\])'
+    parts = re.split(pattern, text)
+    
+    for part in parts:
+        if not part:
+            continue
+        
+        # Phần LaTeX
+        if part.startswith('$') or part.startswith('\\['):
+            try:
+                latex_expr = clean_latex_math(part)
+                insert_equation_into_paragraph(latex_expr, paragraph)
+            except Exception as e:
+                # Fallback: thêm text thuần
+                run = paragraph.add_run(part)
+                if bold:
+                    run.bold = True
+        # Phần text thường
+        else:
+            cleaned_part = re.sub(r'^\s*/', '', part)
+            run = paragraph.add_run(cleaned_part)
+            if bold:
+                run.bold = True
+
+
 def insert_equation_into_paragraph(latex_math_dollar, paragraph):
     """Chèn công thức toán học vào paragraph"""
     omml_str = latex_to_omml_via_pandoc(latex_math_dollar)
-   
+    
     if not omml_str:
+        # Fallback: Thêm text thuần nếu không convert được
         paragraph.add_run(f" [{latex_math_dollar}] ")
         return
-   
+    
+    # Thêm namespace nếu thiếu
     if 'xmlns:m=' not in omml_str:
         omml_str = re.sub(
             r'<m:oMath',
@@ -87,7 +119,7 @@ def insert_equation_into_paragraph(latex_math_dollar, paragraph):
             omml_str,
             count=1
         )
-   
+    
     try:
         omml_element = parse_xml(omml_str)
         run = paragraph.add_run()
@@ -96,8 +128,12 @@ def insert_equation_into_paragraph(latex_math_dollar, paragraph):
         print(f"Lỗi chèn equation: {e}")
         paragraph.add_run(f" [{latex_math_dollar}] ")
 
+
 def clean_latex_math(latex_raw):
-    """Làm sạch và chuẩn hóa LaTeX"""
+    """
+    Làm sạch và chuẩn hóa LaTeX
+    GIỐNG HỆT VERSION CŨ
+    """
     latex_raw = re.sub(r'\\/', '', latex_raw)
     latex_raw = re.sub(r'\\operatorname\s*{\s*([^}]*)\s*}',
                        lambda m: m.group(1).replace(' ', ''), latex_raw)
@@ -118,57 +154,15 @@ def clean_latex_math(latex_raw):
                        r'\\\1', latex_raw)
     latex_raw = re.sub(r'(\\Leftrightarrow|\\Rightarrow|\\rightarrow)(?=\w)', r'\1 ', latex_raw)
     latex_raw = latex_raw.replace(r'\\n', r'\n')
-   
+    
     latex_raw = latex_raw.strip()
-    latex_raw = latex_raw.replace('\n', ' ').replace('\r', '')
+    # ✅ KHÁC BIỆT: Version cũ KHÔNG replace \n và \r
+    # latex_raw = latex_raw.replace('\n', ' ').replace('\r', '')  # ← XÓA DÒNG NÀY
+    
     if not (latex_raw.startswith('$') and latex_raw.endswith('$')):
         latex_raw = f"${latex_raw}$"
-   
+    
     return latex_raw
-
-def process_text_with_latex(text, paragraph, bold=False):
-    """Xử lý text có công thức LaTeX với fallback an toàn"""
-    if not text:
-        return
-    
-    # 🔍 DEBUG: In ra text trước khi xử lý
-    print(f"🔍 Processing text: {text[:100]}...")
-    # text = repair_broken_latex(text)
-    text = text.replace("<br>", "\n").replace("<br/>", "\n") \
-               .replace("<Br>", "\n").replace("<Br/>", "\n")
-    text = re.sub(r'</?(div|p|u|span|font|i|b)\b[^>]*>', '', text)
-    text = text.replace("&nbsp;", "").replace("&lt;", "").replace("&gt;", "")
-   
-    pattern = r'(\$[^$]+\$|\\\[.*?\\\])'
-    parts = re.split(pattern, text)
-    
-    # 🔍 DEBUG: In ra các parts
-    print(f"🔍 Split into {len(parts)} parts")
-    for i, part in enumerate(parts):
-        if part and (part.startswith('$') or part.startswith('\\[')):
-            print(f"   Part {i}: LATEX -> {part[:50]}")
-        elif part:
-            print(f"   Part {i}: TEXT -> {part[:50]}")
-   
-    for part in parts:
-        if not part:
-            continue
-       
-        if part.startswith('$') or part.startswith('\\['):
-            try:
-                latex_expr = clean_latex_math(part)
-                print(f"✅ Inserting equation: {latex_expr}")
-                insert_equation_into_paragraph(latex_expr, paragraph)
-            except Exception as e:
-                print(f"Lỗi xử lý LaTeX: {e}")
-                run = paragraph.add_run(part)
-                if bold:
-                    run.bold = True
-        else:
-            cleaned_part = re.sub(r'^\s*/', '', part)
-            run = paragraph.add_run(cleaned_part)
-            if bold:
-                run.bold = True
 
 def ensure_output_folder_for_batch(batch_name):
     """Tạo folder riêng cho batch"""
@@ -208,7 +202,7 @@ def save_document_securely(doc, batch_name, file_name):
         return None
 
 def clean_json_string(text: str) -> str:
-    """Làm sạch chuỗi JSON"""
+    """Làm sạch markdown wrapper"""
     text = text.strip()
     if text.startswith("```json"):
         text = text[7:]
@@ -229,14 +223,87 @@ def repair_json_with_ai(broken_json_str: str, client) -> str:
 NHIỆM VỤ:
 1. Sửa lỗi cú pháp JSON (escape quotes, thêm phẩy, đóng ngoặc)
 2. KHÔNG thay đổi nội dung Tiếng Việt
-3. CHỈ TRẢ VỀ JSON ĐÃ SỬA (không markdown)
+3. KHÔNG thay đổi công thức LaTeX (giữ nguyên \\frac, \\sqrt...)
+4. CHỈ TRẢ VỀ JSON ĐÃ SỬA (không markdown, không giải thích)
     """
     repaired_text = client.send_data_to_check(prompt_fix)
     return clean_json_string(repaired_text)
 def sanitize_latex_json(text: str) -> str:
-    pattern = r'(?<!\\)\\(?![\\"/bfnrtu])'
-
-    return re.sub(pattern, r'\\\\', text)
+    """
+    Sanitize JSON chứa LaTeX một cách AN TOÀN
+    
+    Chiến lược:
+    1. Chỉ xử lý BÊN TRONG chuỗi JSON (giữa dấu ngoặc kép)
+    2. Giữ nguyên phần cấu trúc JSON (keys, colons, brackets)
+    3. Escape backslash KHÔNG phải JSON escape hợp lệ
+    """
+    
+    # Danh sách escape sequences hợp lệ trong JSON spec
+    VALID_JSON_ESCAPES = {
+        '\\\\', '\\"', '\\/', '\\b', '\\f', '\\n', '\\r', '\\t'
+    }
+    
+    def fix_string_content(match):
+        """
+        Xử lý nội dung BÊN TRONG chuỗi JSON (giữa dấu ngoặc kép)
+        match.group(0) = toàn bộ "..." (có dấu ")
+        match.group(1) = nội dung giữa dấu " (không có dấu ")
+        """
+        full_match = match.group(0)
+        content = match.group(1)
+        
+        # Nếu chuỗi rỗng, giữ nguyên
+        if not content:
+            return full_match
+        
+        result = []
+        i = 0
+        
+        while i < len(content):
+            char = content[i]
+            
+            if char == '\\':
+                # Kiểm tra có phải escape hợp lệ không
+                if i + 1 < len(content):
+                    next_char = content[i + 1]
+                    two_chars = char + next_char
+                    
+                    # Trường hợp 1: JSON escape hợp lệ (\\, \", \n, \t...)
+                    if two_chars in VALID_JSON_ESCAPES:
+                        result.append(two_chars)
+                        i += 2
+                        continue
+                    
+                    # Trường hợp 2: Unicode escape (\uXXXX)
+                    if next_char == 'u' and i + 5 < len(content):
+                        hex_part = content[i+2:i+6]
+                        if len(hex_part) == 4 and all(c in '0123456789ABCDEFabcdef' for c in hex_part):
+                            result.append(content[i:i+6])  # \uXXXX
+                            i += 6
+                            continue
+                    
+                    # Trường hợp 3: LaTeX command (VD: \frac, \sqrt, \sin)
+                    # → Escape thành \\
+                    result.append('\\\\')
+                    i += 1
+                else:
+                    # Backslash ở cuối chuỗi → Escape
+                    result.append('\\\\')
+                    i += 1
+            else:
+                result.append(char)
+                i += 1
+        
+        # Trả về chuỗi đã fix (VẪN CÓ dấu ngoặc kép)
+        return '"' + ''.join(result) + '"'
+    
+    # Regex tìm tất cả chuỗi JSON: "..."
+    # (?:[^"\\]|\\.)* nghĩa là: (không phải " hoặc \) HOẶC (\ theo sau bất kỳ ký tự nào)
+    string_pattern = r'"((?:[^"\\]|\\.)*)"'
+    
+    sanitized = re.sub(string_pattern, fix_string_content, text)
+    
+    return sanitized
 
 def parse_json_safely(json_str: str, client) -> Optional[Dict]:
     """Parse JSON an toàn với Sanitization và Retry AI"""
@@ -715,43 +782,6 @@ class DynamicDocxRenderer:
                     self.render_question_tra_loi_ngan(cau)
                 else:
                     self.render_question_trac_nghiem(cau)
-
-def repair_broken_latex(text: str) -> str:
-    """
-    Tự động phát hiện và đóng dấu $ bị thiếu.
-    Ví dụ: "... là $(-5; 4)." -> "... là $(-5; 4)$."
-    """
-    # 1. Đếm số lượng dấu $
-    if not text:
-        return ""
-    
-    # Bước 1: Vệ sinh XML trước tiên
-    text = remove_xml_incompatible_characters(text)
-
-    # Bước 2: Sửa các lỗi cú pháp đặc thù
-    # Sửa lỗi 'eq' toán học: "5 eq 0" -> "5 = 0" (hoặc \neq nếu muốn)
-    # Regex bắt: Số/khoảng trắng + eq + Số/khoảng trắng
-    text = re.sub(r'(?<=\d|\w)\s+eq\s+(?=\d|\w)', r' = ', text)
-
-    # Sửa lỗi ngoặc vuông bao quanh $: [$...$] hoặc [$...$ -> $...$
-    text = text.replace('[$', '$').replace('$]', '$')
-    text = text.replace('[ $', '$').replace('$ ]', '$')
-
-    # Sửa lỗi ngoặc vuông bị dính vào $: ...$] -> ...$
-    text = re.sub(r'\$\]', '$', text)
-    text = re.sub(r'\[\$', '$', text)
-
-    # Bước 3: Tự động đóng dấu $ nếu thiếu
-    # Đếm số lượng $
-    count = text.count('$')
-    if count % 2 != 0:
-        # Nếu thiếu, thêm $ vào cuối câu (trước dấu chấm câu nếu có)
-        if text.endswith('.') or text.endswith(',') or text.endswith(';'):
-            text = text[:-1] + '$' + text[-1]
-        else:
-            text = text + '$'
-            
-    return text
 
 def response2docx_flexible(
     file_path: str,
