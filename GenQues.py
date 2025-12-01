@@ -276,6 +276,29 @@ class MainWindow(QWidget):
                 color: #333;
                 background-color: #f5f7fa;
             }
+            QTreeWidget {
+                border: 1px solid #ddd;
+                border-radius: 6px;
+                background-color: white;
+                alternate-background-color: #f9fbfd;
+            }
+            
+            QTreeWidget::item {
+                height: 40px; /* Dòng cao, dễ bấm */
+                padding: 2px;
+                border-bottom: 1px solid #f0f0f0;
+            }
+            
+            QTreeWidget::item:hover {
+                background-color: #e3f2fd;
+                color: #1565C0;
+            }
+            
+            QTreeWidget::item:selected {
+                background-color: #bbdefb;
+                color: #0d47a1;
+            }
+            
             
             QTabWidget::pane { 
                 border: 1px solid #dcdcdc; 
@@ -427,6 +450,7 @@ class MainWindow(QWidget):
         file_toolbar.addStretch()
         file_toolbar.addWidget(self.clear_all_button)
         
+        self.just_checked = False
         self.file_tree = QTreeWidget()
         self.file_tree.setHeaderLabels(["Tên Tài Liệu", "Đường Dẫn Chi Tiết"])
         self.file_tree.setAlternatingRowColors(True)
@@ -436,8 +460,11 @@ class MainWindow(QWidget):
         header = self.file_tree.header()
         header.setSectionResizeMode(0, QHeaderView.ResizeToContents)
         header.setSectionResizeMode(1, QHeaderView.Stretch)
-        self.file_tree.setColumnWidth(0, 400)
+        self.file_tree.setColumnWidth(0, 450)
 
+        self.file_tree.itemChanged.connect(self.handle_item_check_changed)
+        self.file_tree.itemClicked.connect(self.handle_smart_click)
+        
         self.file_count_label = QLabel("<i>Chưa có tài liệu nào được chọn</i>")
         self.file_count_label.setAlignment(Qt.AlignRight)
         
@@ -716,6 +743,7 @@ class MainWindow(QWidget):
 
     def handle_item_check_changed(self, item, column):
         """Xử lý sự kiện khi user tick vào checkbox"""
+        self.just_checked = True
         if column != 0: return
 
         self.file_tree.blockSignals(True)
@@ -730,6 +758,33 @@ class MainWindow(QWidget):
         finally:
             self.file_tree.blockSignals(False)
 
+    def handle_smart_click(self, item, column):
+        """
+        Logic thông minh: Bấm vào chữ = Tick
+        """
+        # Nếu sự kiện này xảy ra ngay sau khi checkbox vừa đổi trạng thái (do bấm trúng ô vuông)
+        # Thì ta bỏ qua để tránh đảo trạng thái lại lần nữa (Thành Checked -> Unchecked -> Checked)
+        if self.just_checked:
+            self.just_checked = False
+            return
+
+        # Nếu không phải bấm ô vuông (tức là bấm vào chữ), ta tự động đảo tick
+        self.file_tree.blockSignals(True) # Chặn signal để tránh vòng lặp vô tận
+        try:
+            current_state = item.checkState(0)
+            new_state = Qt.Unchecked if current_state == Qt.Checked else Qt.Checked
+            item.setCheckState(0, new_state)
+            
+            # Gọi thủ công hàm logic cha/con vì ta đang chặn signal
+            self.handle_item_check_changed(item, 0)
+            
+            # Reset lại cờ just_checked vì việc gọi hàm trên đã set nó thành True
+            self.just_checked = False 
+        finally:
+            self.file_tree.blockSignals(False)
+        
+        self.update_file_count()
+    
     def update_children_check_state(self, parent_item, check_state):
         """Cập nhật trạng thái con"""
         for i in range(parent_item.childCount()):
@@ -1054,8 +1109,8 @@ class MainWindow(QWidget):
                 if os.path.dirname(seed) == os.path.dirname(candidate):
                     min_len = min(len(seed_base), len(cand_base))
                     prefix_ratio = len(common_prefix_raw) / min_len if min_len > 0 else 0
-                    # Giống nội dung > 80% HOẶC Tiền tố giống > 70% (để bắt KNTT SGK và KNTT_SBT)
-                    if matcher.ratio() > 0.95 or prefix_ratio > 0.8: 
+                    # Giống nội dung > 90% HOẶC Tiền tố giống > 70% (để bắt KNTT SGK và KNTT_SBT)
+                    if matcher.ratio() > 0.9 or prefix_ratio > 0.7: 
                         should_merge = True
                             
                 # Check 2: Khác Folder (Logic chặt hơn)

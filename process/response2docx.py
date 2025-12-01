@@ -35,14 +35,14 @@ def find_pandoc_executable():
     # 1. Tìm trong thư mục cục bộ 'pandoc' (ưu tiên cao nhất)
     local_pandoc = os.path.join(app_path, 'pandoc', 'pandoc.exe')
     if os.path.isfile(local_pandoc):
-        print(f"✅ Sử dụng Pandoc cục bộ: {local_pandoc}")
+        # print(f"✅ Sử dụng Pandoc cục bộ: {local_pandoc}")
         return local_pandoc
     
     # 2. Fallback: Tìm trong PATH hệ thống (cho dev)
     import shutil
     system_pandoc = shutil.which('pandoc')
     if system_pandoc:
-        print(f"⚠️ Sử dụng Pandoc hệ thống: {system_pandoc}")
+        # print(f"⚠️ Sử dụng Pandoc hệ thống: {system_pandoc}")
         return system_pandoc
     
     # 3. Không tìm thấy
@@ -191,10 +191,6 @@ def insert_equation_into_paragraph(latex_math_dollar, paragraph):
 
 
 def clean_latex_math(latex_raw):
-    """
-    Làm sạch và chuẩn hóa LaTeX
-    GIỐNG HỆT VERSION CŨ
-    """
     latex_raw = re.sub(r'\\/', '', latex_raw)
     latex_raw = re.sub(r'\\operatorname\s*{\s*([^}]*)\s*}',
                        lambda m: m.group(1).replace(' ', ''), latex_raw)
