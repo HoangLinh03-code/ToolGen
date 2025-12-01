@@ -191,6 +191,10 @@ def insert_equation_into_paragraph(latex_math_dollar, paragraph):
 
 
 def clean_latex_math(latex_raw):
+    """
+    Làm sạch và chuẩn hóa LaTeX
+    GIỐNG HỆT VERSION CŨ
+    """
     latex_raw = re.sub(r'\\/', '', latex_raw)
     latex_raw = re.sub(r'\\operatorname\s*{\s*([^}]*)\s*}',
                        lambda m: m.group(1).replace(' ', ''), latex_raw)
@@ -658,7 +662,7 @@ class DynamicDocxRenderer:
         """Render câu hỏi trắc nghiệm 4 đáp án"""
         # Câu hỏi
         p = self.doc.add_paragraph()
-        p.add_run(f"Câu {cau['stt']}: ").bold = True
+        p.add_run(f"Câu {cau['stt']}. ").bold = True
         process_text_with_latex(cau['noi_dung'], p)
         
         # Hình ảnh
@@ -674,7 +678,7 @@ class DynamicDocxRenderer:
         
         # Lời giải
         p_lg = self.doc.add_paragraph()
-        p_lg.add_run("Lời giải:").bold = True
+        p_lg.add_run("Lời giải").bold = True
         
         if "dap_an_dung" in cau:
             p_dung = self.doc.add_paragraph()
@@ -701,7 +705,7 @@ class DynamicDocxRenderer:
         """Render câu hỏi đúng/sai"""
         # Số câu
         p = self.doc.add_paragraph()
-        p.add_run(f"Câu {cau['stt']}:").bold = True
+        p.add_run(f"Câu {cau['stt']}.").bold = True
         
         # Đoạn thông tin - THÊM XỬ LÝ LATEX
         if cau.get("doan_thong_tin"):
@@ -721,7 +725,7 @@ class DynamicDocxRenderer:
         
         # Lời giải
         p_lg = self.doc.add_paragraph()
-        p_lg.add_run("Lời giải:").bold = True
+        p_lg.add_run("Lời giải").bold = True
         
         p_da = self.doc.add_paragraph()
         p_da.add_run(cau.get("dap_an_dung_sai", "")).bold = True
@@ -730,20 +734,20 @@ class DynamicDocxRenderer:
         # Giải thích từng ý - THÊM XỬ LÝ LATEX
         for gt in cau.get("giai_thich", []):
             p_gt = self.doc.add_paragraph()
-            p_gt.add_run("- ")
+            p_gt.add_run("+ ")
             process_text_with_latex(gt.get('noi_dung_y', ''), p_gt)  
-            run_kl = p_gt.add_run(f" - {gt.get('ket_luan', 'SAI')}.")
+            run_kl = p_gt.add_run(f" {gt.get('ket_luan', 'SAI')} - ")
             run_kl.bold = True
             
             if gt.get('giai_thich'):
-                p_gt_detail = self.doc.add_paragraph()
-                process_text_with_latex(gt.get('giai_thich', ''), p_gt_detail)  
+                p_gt.add_run("")
+                process_text_with_latex(gt.get('giai_thich', ''), p_gt)  
     
     def render_question_tra_loi_ngan(self, cau: Dict):
         """Render câu hỏi trả lời ngắn"""
         # Câu hỏi
         p = self.doc.add_paragraph()
-        p.add_run(f"Câu {cau['stt']}: ").bold = True
+        p.add_run(f"Câu {cau['stt']}. ").bold = True
         process_text_with_latex(cau['noi_dung'], p)  
         
         # Hình ảnh (nếu có)
