@@ -658,7 +658,7 @@ class DynamicDocxRenderer:
         """Render câu hỏi trắc nghiệm 4 đáp án"""
         # Câu hỏi
         p = self.doc.add_paragraph()
-        p.add_run(f"Câu {cau['stt']}: ").bold = True
+        p.add_run(f"Câu {cau['stt']}. ").bold = True
         process_text_with_latex(cau['noi_dung'], p)
         
         # Hình ảnh
@@ -674,7 +674,7 @@ class DynamicDocxRenderer:
         
         # Lời giải
         p_lg = self.doc.add_paragraph()
-        p_lg.add_run("Lời giải:").bold = True
+        p_lg.add_run("Lời giải").bold = True
         
         if "dap_an_dung" in cau:
             p_dung = self.doc.add_paragraph()
@@ -701,7 +701,7 @@ class DynamicDocxRenderer:
         """Render câu hỏi đúng/sai"""
         # Số câu
         p = self.doc.add_paragraph()
-        p.add_run(f"Câu {cau['stt']}:").bold = True
+        p.add_run(f"Câu {cau['stt']}.").bold = True
         
         # Đoạn thông tin - THÊM XỬ LÝ LATEX
         if cau.get("doan_thong_tin"):
@@ -721,7 +721,7 @@ class DynamicDocxRenderer:
         
         # Lời giải
         p_lg = self.doc.add_paragraph()
-        p_lg.add_run("Lời giải:").bold = True
+        p_lg.add_run("Lời giải").bold = True
         
         p_da = self.doc.add_paragraph()
         p_da.add_run(cau.get("dap_an_dung_sai", "")).bold = True
@@ -743,8 +743,9 @@ class DynamicDocxRenderer:
         """Render câu hỏi trả lời ngắn"""
         # Câu hỏi
         p = self.doc.add_paragraph()
-        p.add_run(f"Câu {cau['stt']}: ").bold = True
-        process_text_with_latex(cau['noi_dung'], p)  
+        p.add_run(f"Câu {cau['stt']}. ").bold = True
+        p_noi_dung = self.doc.add_paragraph()
+        process_text_with_latex(cau['noi_dung'], p_noi_dung)  
         
         # Hình ảnh (nếu có)
         hinh_anh = cau.get("hinh_anh", {})
