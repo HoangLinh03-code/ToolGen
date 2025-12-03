@@ -1078,18 +1078,41 @@ class MainWindow(QWidget):
 
     def _smart_group_files(self, file_paths):
         """
-        Gom nhóm thông minh v5 (Final Fix):
-        - Xử lý triệt để trường hợp file trong cùng folder có tên na ná nhau (ví dụ KNTT SGK và KNTT_SBT).
-        - Khi prefix chung quá ngắn -> Tự động lấy tên FOLDER cha làm tên file output.
+        Gom nhóm thông minh v8 (Final Ultimate):
+        1. Check ID (Bài 1, Chủ đề 2) -> Ưu tiên cao nhất.
+        2. Check Suffix (Đuôi file) -> Xử lý trường hợp "Ứng phó với thiên tai".
+        3. Clean nhiễu (Date, Bracket) trước khi so sánh.
         """
+        import re
+        import difflib
+
         groups = {}
         pending_files = sorted(file_paths)
-        
+
+        # Regex bắt định danh: Chủ đề 8, Bài 10...
+        distinct_pattern = r"(?i)(?:chủ đề|bài|chương|phần|unit|chapter|topic|tuần|tiết|vol|tập)\s*[\d]+"
+
+        def clean_name_for_compare(name):
+            """Làm sạch tên file để so sánh nội dung cốt lõi"""
+            name = os.path.splitext(name)[0].lower()
+            # Xóa ngày tháng, VD: (13.3.2025), (TB2025)
+            name = re.sub(r'\(\d+.*?\)', '', name)
+            # Xóa các ký tự ngăn cách
+            name = re.sub(r'[_\-\(\)\[\]]', ' ', name)
+            # Xóa các từ khóa sách phổ biến làm nhiễu
+            name = re.sub(r'\b(kntt|sgv|cd|sbt|sgk|hdtn|hoat dong trai nghiem)\b', '', name)
+            # Chuẩn hóa khoảng trắng
+            return " ".join(name.split())
+
         while pending_files:
             seed = pending_files.pop(0)
             seed_name = os.path.basename(seed)
             seed_base = os.path.splitext(seed_name)[0]
             
+            # 1. Tìm ID trong file gốc (VD: Chủ đề 8)
+            seed_numbers = re.findall(distinct_pattern, seed_base)
+            seed_clean = clean_name_for_compare(seed_name)
+
             current_group = [seed]
             
             i = 0
@@ -1098,64 +1121,78 @@ class MainWindow(QWidget):
                 cand_name = os.path.basename(candidate)
                 cand_base = os.path.splitext(cand_name)[0]
                 
+                cand_numbers = re.findall(distinct_pattern, cand_base)
+                cand_clean = clean_name_for_compare(cand_name)
+
                 should_merge = False
                 
-                # --- LOGIC GOM NHÓM (GIỮ NGUYÊN) ---
-                matcher = difflib.SequenceMatcher(None, seed_base, cand_base)
-                match = matcher.find_longest_match(0, len(seed_base), 0, len(cand_base))
-                common_prefix_raw = seed_base[match.a : match.a + match.size]
-                
-                # Check 1: Cùng Folder
-                if os.path.dirname(seed) == os.path.dirname(candidate):
-                    min_len = min(len(seed_base), len(cand_base))
-                    prefix_ratio = len(common_prefix_raw) / min_len if min_len > 0 else 0
-                    # Giống nội dung > 90% HOẶC Tiền tố giống > 70% (để bắt KNTT SGK và KNTT_SBT)
-                    if matcher.ratio() > 0.9 or prefix_ratio > 0.7: 
+                # === LOGIC 1: SO SÁNH ID (MẠNH NHẤT) ===
+                # Nếu cùng là "Chủ đề 8" -> GỘP
+                if seed_numbers and cand_numbers:
+                    last_seed_id = seed_numbers[-1].lower().replace(" ", "")
+                    last_cand_id = cand_numbers[-1].lower().replace(" ", "")
+                    if last_seed_id == last_cand_id:
                         should_merge = True
-                            
-                # Check 2: Khác Folder (Logic chặt hơn)
-                else:
-                    if matcher.ratio() > 0.85: 
+
+                # === LOGIC 2: SO SÁNH ĐUÔI (SUFFIX) ===
+                # Xử lý: "..._Ứng phó với thiên tai" vs "... - Ứng phó với thiên tai"
+                if not should_merge:
+                    # Lấy 15 ký tự cuối đã làm sạch để so sánh
+                    # (Độ dài tùy chỉnh, 15 là đủ cho cụm từ có nghĩa)
+                    suffix_len = min(len(seed_clean), len(cand_clean), 20)
+                    if suffix_len > 5:
+                        if seed_clean[-suffix_len:] == cand_clean[-suffix_len:]:
+                            should_merge = True
+
+                # === LOGIC 3: SO SÁNH TỔNG THỂ (FALLBACK) ===
+                if not should_merge:
+                    matcher = difflib.SequenceMatcher(None, seed_clean, cand_clean)
+                    # Vì đã clean hết tên sách, tỷ lệ trùng sẽ rất cao nếu cùng nội dung
+                    if matcher.ratio() > 0.8: 
                         should_merge = True
-                
+                    
+                    # Check folder: Nếu cùng folder thì hạ tiêu chuẩn xuống
+                    if os.path.dirname(seed) == os.path.dirname(candidate):
+                        if matcher.ratio() > 0.6: # Hạ xuống 60% nếu cùng folder
+                            should_merge = True
+
                 if should_merge:
                     current_group.append(candidate)
                     pending_files.pop(i)
                 else:
                     i += 1
             
-            # --- LOGIC ĐẶT TÊN (ĐÃ SỬA ĐỂ FIX LỖI CỦA BẠN) ---
+            # --- ĐẶT TÊN GROUP THÔNG MINH ---
             if len(current_group) > 1:
-                # Lấy tên của 2 file đầu tiên để so sánh
-                name1 = os.path.splitext(os.path.basename(current_group[0]))[0]
-                name2 = os.path.splitext(os.path.basename(current_group[1]))[0]
+                # Ưu tiên 1: Tên Folder chứa nó (Thường folder tên rất chuẩn: "Bài 30...")
+                folder_path = os.path.dirname(current_group[0])
+                folder_name = os.path.basename(folder_path)
                 
-                # Tìm prefix chung
-                common_prefix = os.path.commonprefix([name1, name2]).strip(" .-_")
+                # Kiểm tra xem các file có nằm cùng folder không
+                is_same_folder = all(os.path.dirname(f) == folder_path for f in current_group)
                 
-                # [FIX QUAN TRỌNG TẠI ĐÂY]
-                # Nếu tên chung quá ngắn (ví dụ chỉ ra "KNTT" hay "SGV")
-                if len(common_prefix) < 6:
-                    # Kiểm tra xem có cùng nằm trong 1 folder không
-                    folder_path = os.path.dirname(current_group[0])
-                    is_same_folder = all(os.path.dirname(f) == folder_path for f in current_group)
-                    
-                    if is_same_folder:
-                        # NẾU CÙNG FOLDER: Lấy luôn tên Folder làm tên file output
-                        # Ví dụ: Folder "Bài 9 - Chủ đề 9" -> File ra "Bài 9 - Chủ đề 9_TN.docx"
-                        folder_name = os.path.basename(folder_path)
-                        group_name = folder_name
-                    else:
-                        # Nếu khác folder mà tên lại ngắn -> Gộp tên file đầu + hậu tố
-                        group_name = f"{name1}_Combined"
+                if is_same_folder:
+                    group_name = folder_name
+                elif seed_numbers:
+                    # Ưu tiên 2: Dùng ID (Chủ đề 8)
+                    group_name = seed_numbers[-1].title()
+                    # Ghép thêm folder cha để tránh trùng nếu tên quá ngắn
+                    if len(group_name) < 10:
+                         parent_name = os.path.basename(folder_path)
+                         if group_name.lower() not in parent_name.lower():
+                             group_name = f"{parent_name}_{group_name}"
+                         else:
+                             group_name = parent_name
                 else:
-                    # Nếu tên chung đủ dài và có nghĩa -> Giữ nguyên
-                    group_name = common_prefix
+                    # Ưu tiên 3: Prefix chung (đã clean)
+                    name1 = os.path.splitext(os.path.basename(current_group[0]))[0]
+                    name2 = os.path.splitext(os.path.basename(current_group[1]))[0]
+                    common = os.path.commonprefix([name1, name2]).strip(" .-_")
+                    group_name = common if len(common) > 5 else folder_name
             else:
-                # Nếu nhóm chỉ có 1 file
                 group_name = seed_base
 
-            # Xử lý trùng tên (thêm số _1, _2 nếu cần)
+            # Handle duplicate names
             base_key = group_name
             counter = 1
             while group_name in groups:
