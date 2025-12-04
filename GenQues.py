@@ -251,9 +251,9 @@ class MainWindow(QWidget):
         self.processing_thread = None
         
         # Prompt files mặc định
-        self.default_prompt_tn = os.path.join(external_path, "testTN.txt")
-        self.default_prompt_ds = os.path.join(external_path, "testDS.txt")
-        self.default_prompt_tln = os.path.join(external_path, "testTLN.txt")
+        self.default_prompt_tn = self._get_priority_path("testTN.txt")
+        self.default_prompt_ds = self._get_priority_path("testDS.txt")
+        self.default_prompt_tln = self._get_priority_path("testTLN.txt")
         
         if not os.path.exists(self.default_prompt_tn):
              self.default_prompt_tn = os.path.join(internal_path, "testTN.txt")
@@ -263,10 +263,28 @@ class MainWindow(QWidget):
             self.default_prompt_tln = os.path.join(internal_path, "testTLN.txt")
             
         self.load_default_prompts()
+        self.current_prompt_tn = self.default_prompt_tn
+        self.current_prompt_ds = self.default_prompt_ds
+        self.current_prompt_tln = self.default_prompt_tln
         self.setup_modern_theme()
         self.init_ui()
         self.setup_credentials()
-
+    def _get_priority_path(self, filename):
+        """
+        Hàm helper tìm đường dẫn file theo thứ tự ưu tiên:
+        1. File bên ngoài (cạnh file exe) -> Để user có thể custom/sửa đổi.
+        2. File nội bộ (trong _MEIPASS) -> File gốc đóng gói kèm app.
+        """
+        # 1. Kiểm tra file bên ngoài (External)
+        external_file = os.path.join(external_path, filename)
+        if os.path.exists(external_file):
+            print(f"💡 [Config] Đã tìm thấy file custom bên ngoài: {filename}")
+            return external_file
+        
+        # 2. Fallback về file nội bộ (Internal)
+        internal_file = os.path.join(internal_path, filename)
+        print(f"ℹ️ [Config] Sử dụng file mặc định gốc: {filename}")
+        return internal_file
     def setup_modern_theme(self):
         """Thiết lập CSS toàn cục"""
         self.setStyleSheet("""
@@ -481,7 +499,7 @@ class MainWindow(QWidget):
         tn_container = QWidget()
         tn_layout = QHBoxLayout(tn_container)
         
-        self.checkbox_tn = QCheckBox("Trắc nghiệm 4 đáp án (80 câu)")
+        self.checkbox_tn = QCheckBox("Trắc nghiệm 4 đáp án")
         self.checkbox_tn.setChecked(True)
         self.checkbox_tn.stateChanged.connect(self.update_process_button_state)
         
@@ -502,7 +520,7 @@ class MainWindow(QWidget):
         ds_container = QWidget()
         ds_layout = QHBoxLayout(ds_container)
         
-        self.checkbox_ds = QCheckBox("Đúng/Sai (40 câu)")
+        self.checkbox_ds = QCheckBox("Đúng/Sai")
         self.checkbox_ds.setChecked(True)
         self.checkbox_ds.stateChanged.connect(self.update_process_button_state)
         
@@ -523,7 +541,7 @@ class MainWindow(QWidget):
         tln_container = QWidget()
         tln_layout = QHBoxLayout(tln_container)
         
-        self.checkbox_tln = QCheckBox("Trả lời ngắn (30 câu)")
+        self.checkbox_tln = QCheckBox("Trả lời ngắn")
         self.checkbox_tln.setChecked(True)
         self.checkbox_tln.stateChanged.connect(self.update_process_button_state)
         
@@ -900,17 +918,23 @@ class MainWindow(QWidget):
         )
         if file_path:
             try:
+                # Đọc nội dung để lưu vào bộ nhớ (cho việc hiển thị edit)
                 with open(file_path, "r", encoding="utf-8") as f:
                     content = f.read()
+                
                 if prompt_type == "trac_nghiem":
                     self.prompt_tn_content = content
+                    self.current_prompt_tn = file_path 
                     self.prompt_tn_label.setText(os.path.basename(file_path))
                 elif prompt_type == "dung_sai":
                     self.prompt_ds_content = content
+                    self.current_prompt_ds = file_path 
                     self.prompt_ds_label.setText(os.path.basename(file_path))
                 elif prompt_type == "tra_loi_ngan":
                     self.prompt_tln_content = content
+                    self.current_prompt_tln = file_path
                     self.prompt_tln_label.setText(os.path.basename(file_path))
+                # ---------------------------------------------
             except Exception as e:
                 QMessageBox.warning(self, "Lỗi", f"Không thể đọc file: {str(e)}")
 
@@ -980,18 +1004,20 @@ class MainWindow(QWidget):
             new_content = text_edit.toPlainText()
             file_path = ""
             
+            # --- [SỬA ĐỔI] LẤY ĐƯỜNG DẪN TỪ CURRENT ---
             if prompt_type == "trac_nghiem":
                 self.prompt_tn_content = new_content
                 self.prompt_tn_label.setText("✏️ Prompt đã chỉnh sửa")
-                file_path = self.default_prompt_tn
+                file_path = self.current_prompt_tn # Sửa default -> current
             elif prompt_type == "dung_sai":
                 self.prompt_ds_content = new_content
                 self.prompt_ds_label.setText("✏️ Prompt đã chỉnh sửa")
-                file_path = self.default_prompt_ds
+                file_path = self.current_prompt_ds # Sửa default -> current
             elif prompt_type == "tra_loi_ngan":
                 self.prompt_tln_content = new_content
                 self.prompt_tln_label.setText("✏️ Prompt đã chỉnh sửa")
-                file_path = self.default_prompt_tln
+                file_path = self.current_prompt_tln # Sửa default -> current
+            # ------------------------------------------
 
             # Ghi file
             try:
@@ -1000,7 +1026,7 @@ class MainWindow(QWidget):
                         f.write(new_content)
                     QMessageBox.information(edit_dialog, "Thành công", f"Đã lưu thay đổi vào file:\n{os.path.basename(file_path)}")
                 else:
-                    QMessageBox.warning(edit_dialog, "Cảnh báo", "Không xác định được đường dẫn file gốc để lưu!")
+                    QMessageBox.warning(edit_dialog, "Cảnh báo", "Không xác định được đường dẫn file để lưu!")
             except Exception as e:
                 QMessageBox.critical(edit_dialog, "Lỗi Ghi File", f"Không thể ghi file txt:\n{str(e)}")
                 return
@@ -1218,6 +1244,9 @@ class MainWindow(QWidget):
     def process_files(self):
         """Bắt đầu xử lý với đa luồng"""
         selected_items = self.get_selected_items()
+        # print(f"🔍 Prompt TN hiện tại: {self.current_prompt_tn}")
+        # print(f"🔍 Prompt DS hiện tại: {self.current_prompt_ds}")
+        # print(f"🔍 Prompt TLN hiện tại: {self.current_prompt_tln}")
         if not selected_items:
             QMessageBox.warning(self, "Lỗi", "Vui lòng chọn ít nhất một file hoặc folder để xử lý!")
             return
@@ -1229,23 +1258,23 @@ class MainWindow(QWidget):
         
         prompt_paths = {}
         if self.checkbox_tn.isChecked():
-            prompt_file = self.default_prompt_tn if os.path.isfile(self.default_prompt_tn) else None
+            prompt_file = self.current_prompt_tn 
             if not prompt_file or not os.path.isfile(prompt_file):
-                QMessageBox.warning(self, "Lỗi", "Không tìm thấy file prompt trắc nghiệm!")
+                QMessageBox.warning(self, "Lỗi", f"Không tìm thấy file prompt trắc nghiệm tại:\n{prompt_file}")
                 return
             prompt_paths["trac_nghiem"] = prompt_file
         
         if self.checkbox_ds.isChecked():
-            prompt_file = self.default_prompt_ds if os.path.isfile(self.default_prompt_ds) else None
+            prompt_file = self.current_prompt_ds
             if not prompt_file or not os.path.isfile(prompt_file):
-                QMessageBox.warning(self, "Lỗi", "Không tìm thấy file prompt đúng/sai!")
+                QMessageBox.warning(self, "Lỗi", f"Không tìm thấy file prompt đúng/sai tại:\n{prompt_file}")
                 return
             prompt_paths["dung_sai"] = prompt_file
         
         if self.checkbox_tln.isChecked():
-            prompt_file = self.default_prompt_tln if os.path.isfile(self.default_prompt_tln) else None
+            prompt_file = self.current_prompt_tln
             if not prompt_file or not os.path.isfile(prompt_file):
-                QMessageBox.warning(self, "Lỗi", "Không tìm thấy file prompt trả lời ngắn!")
+                QMessageBox.warning(self, "Lỗi", f"Không tìm thấy file prompt trả lời ngắn tại:\n{prompt_file}")
                 return
             prompt_paths["tra_loi_ngan"] = prompt_file
         
