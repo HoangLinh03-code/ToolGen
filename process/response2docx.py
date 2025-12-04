@@ -259,15 +259,32 @@ def save_document_securely(doc, batch_name, file_name):
         return None
 
 def clean_json_string(text: str) -> str:
-    """Làm sạch markdown wrapper"""
+    if not text:
+        return ""
+
     text = text.strip()
-    if text.startswith("```json"):
-        text = text[7:]
-    elif text.startswith("```"):
-        text = text[3:]
-    if text.endswith("```"):
-        text = text[:-3]
-    return text.strip()
+
+    # BƯỚC 1: Dùng Regex để bắt nội dung trong ```json ... ``` (nếu có)
+    # re.DOTALL giúp dấu chấm (.) khớp với cả dòng mới (\n)
+    # re.IGNORECASE để bắt cả ```JSON và ```json
+    pattern = r"```(?:json)?(.*?)```"
+    match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+    
+    if match:
+        # Nếu tìm thấy markdown, lấy nội dung bên trong
+        text = match.group(1).strip()
+    
+    # BƯỚC 2: "Săn" JSON bằng cách tìm dấu { đầu tiên và } cuối cùng
+    # Bước này cực quan trọng cho môn Tự nhiên khi AI hay nói nhảm trước/sau JSON
+    start_idx = text.find('{')
+    end_idx = text.rfind('}')
+
+    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
+        # Cắt lấy đúng phần từ { đến }
+        return text[start_idx : end_idx + 1]
+
+    # Trường hợp tệ nhất: Trả về nguyên gốc để các hàm repair (AI sửa lỗi) xử lý tiếp
+    return text
 
 def repair_json_with_ai(broken_json_str: str, client) -> str:
     """Gửi JSON lỗi cho AI sửa"""
@@ -553,8 +570,9 @@ class PromptBuilder:
 - Nếu đáp án là hình ảnh hoặc ký hiệu, hãy mô tả nó bằng lời (Ví dụ: "Hình vẽ tam giác", "Ký hiệu Rỗng").
 
 1. **FORMAT JSON**: 
-   - Trả về DUY NHẤT một chuỗi JSON hợp lệ.
-   - Không thêm markdown (```json), không thêm lời dẫn.
+   - CHỈ TRẢ VỀ DUY NHẤT MỘT CHUỖI JSON hợp lệ.
+   - TUYỆT ĐỐI KHÔNG có lời mở đầu (Ví dụ: "Đây là kết quả...", "Here is the JSON...").
+   - TUYỆT ĐỐI KHÔNG có lời kết thúc hay giải thích thêm bên ngoài JSON.
    - Không được để trường dữ liệu bị `null` hoặc bỏ trống.
 
 2. **QUY TẮC SỬ DỤNG LaTeX ($) - HÃY LINH HOẠT:**
