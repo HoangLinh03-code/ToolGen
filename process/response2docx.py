@@ -263,10 +263,6 @@ def clean_json_string(text: str) -> str:
         return ""
 
     text = text.strip()
-
-    # BƯỚC 1: Dùng Regex để bắt nội dung trong ```json ... ``` (nếu có)
-    # re.DOTALL giúp dấu chấm (.) khớp với cả dòng mới (\n)
-    # re.IGNORECASE để bắt cả ```JSON và ```json
     pattern = r"```(?:json)?(.*?)```"
     match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
     
@@ -569,13 +565,21 @@ class PromptBuilder:
 - Mọi trường trong câu hỏi và đáp án PHẢI có dữ liệu.
 - Nếu đáp án là hình ảnh hoặc ký hiệu, hãy mô tả nó bằng lời (Ví dụ: "Hình vẽ tam giác", "Ký hiệu Rỗng").
 
-1. **FORMAT JSON**: 
-   - CHỈ TRẢ VỀ DUY NHẤT MỘT CHUỖI JSON hợp lệ.
-   - TUYỆT ĐỐI KHÔNG có lời mở đầu (Ví dụ: "Đây là kết quả...", "Here is the JSON...").
-   - TUYỆT ĐỐI KHÔNG có lời kết thúc hay giải thích thêm bên ngoài JSON.
-   - Không được để trường dữ liệu bị `null` hoặc bỏ trống.
+1. **FORMAT ĐẦU RA (QUAN TRỌNG NHẤT)**: 
+   - CHỈ TRẢ VỀ DUY NHẤT MỘT CHUỖI JSON thuần túy.
+   - TUYỆT ĐỐI KHÔNG có lời mở đầu (Ví dụ: "Đây là kết quả...", "Here is the JSON...", "Let me help you...").
+   - TUYỆT ĐỐI KHÔNG có lời kết thúc hay giải thích thêm bên ngoài block JSON.
+   - JSON phải hợp lệ (valid JSON), không được thiếu dấu phẩy hay ngoặc.
 
-2. **QUY TẮC SỬ DỤNG LaTeX ($) - HÃY LINH HOẠT:**
+2. **CHẶN SUY LUẬN NHÁP (ANTI-CHAIN-OF-THOUGHT) - ĐẶC BIỆT VỚI MÔN TỰ NHIÊN (TOÁN/LÝ/HÓA)**:
+   - **VẤN ĐỀ CẤM:** Cấm tuyệt đối việc in ra quá trình suy nghĩ của AI vào trong các trường dữ liệu.
+     + SAI: "giai_thich": "Đầu tiên ta tính delta. Delta = b^2 - 4ac. Vì delta > 0 nên... Vậy đáp án là..." (Văn phong lôi thôi, giống nháp).
+     + SAI: "giai_thich": "Let me calculate step by step..."
+   - **YÊU CẦU ĐÚNG:** Hãy tính toán ngầm (internal processing). Chỉ viết **LỜI GIẢI CHÍNH THỨC** (Final Polish Solution) vào trường `"giai_thich"`.
+   - Văn phong lời giải: Trang trọng, học thuật, gãy gọn, giống hệt sách giải bài tập (SBT) hoặc đáp án chính thức của Bộ Giáo dục.
+   - Đi thẳng vào công thức và kết quả. Ví dụ: "Ta có phương trình... <=> x = ... Vậy nghiệm là...".
+
+3. **QUY TẮC SỬ DỤNG LaTeX ($) - HÃY LINH HOẠT:**
    - **KHOA HỌC TỰ NHIÊN:** + BẮT BUỘC dùng dấu `$` bao quanh các công thức, phương trình, ký hiệu biến số, phản ứng hóa học.
      + Ví dụ: "Hàm số $y = x^2 + 2x + 1$", "Chất $H_2SO_4$ đặc", "Gia tốc $a = 2 m/s^2$".
      + Phân số dùng: $\\frac{{tu}}{{mau}}$.
@@ -586,7 +590,7 @@ class PromptBuilder:
      + Ví dụ ĐÚNG: "Ngày 2/9/1945", "Dân số là 90 triệu người".
      + Ví dụ SAI (Cấm): "$Ngày 2/9/1945$", "$90 triệu$".
 
-3. **HÌNH ẢNH MINH HỌA (QUAN TRỌNG - BẮT BUỘC CHECK)**:
+4. **HÌNH ẢNH MINH HỌA (QUAN TRỌNG - BẮT BUỘC CHECK)**:
    - Tư duy: "Nội dung này có cần hình minh họa để học sinh hiểu rõ hơn không?"
    - Áp dụng cho **MỌI LĨNH VỰC** (Khoa học Tự nhiên & Xã hội):
      + **Toán/Lý/Hóa**: Nếu có hình học, đồ thị, mạch điện, thí nghiệm, cấu trúc phân tử... -> BẮT BUỘC điền mô tả vào `"mo_ta"`.
