@@ -253,7 +253,7 @@ def save_document_securely(doc, batch_name, file_name):
             except Exception as e:
                 print(f"⚠️ Lỗi lưu file lần {retry_count + 1}: {e}")
                 if retry_count < max_retries - 1:
-                    time.sleep(0.5)
+                    time.sleep(1)
         
         print(f"❌ Không thể lưu file sau {max_retries} lần thử")
         return None

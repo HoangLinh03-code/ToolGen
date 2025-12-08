@@ -72,6 +72,7 @@ class ProcessingThread(QThread):
         """Logic chạy chính: Tách nhỏ tác vụ để chạy song song thực sự"""
         import time
         import concurrent.futures
+        import random
 
         self.progress.emit("⚙️ Đang chuẩn bị dữ liệu và đọc Prompt...")
 
@@ -141,7 +142,8 @@ class ProcessingThread(QThread):
                 future_to_task[future] = task
                 
                 # Nghỉ cực ngắn để tránh spam API cùng 1 mili-giây gây lỗi 429
-                time.sleep(0.1)
+                rand = random.randint(10,20)
+                time.sleep(rand)
 
             # Thu thập kết quả khi từng task hoàn thành
             for future in concurrent.futures.as_completed(future_to_task):
