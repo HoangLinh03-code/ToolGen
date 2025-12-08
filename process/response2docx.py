@@ -257,33 +257,8 @@ def save_document_securely(doc, batch_name, file_name):
         
         print(f"❌ Không thể lưu file sau {max_retries} lần thử")
         return None
-
-def clean_json_string(text: str) -> str:
-    if not text:
-        return ""
-
-    text = text.strip()
-    pattern = r"```(?:json)?(.*?)```"
-    match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
-    
-    if match:
-        # Nếu tìm thấy markdown, lấy nội dung bên trong
-        text = match.group(1).strip()
-    
-    # BƯỚC 2: "Săn" JSON bằng cách tìm dấu { đầu tiên và } cuối cùng
-    # Bước này cực quan trọng cho môn Tự nhiên khi AI hay nói nhảm trước/sau JSON
-    start_idx = text.find('{')
-    end_idx = text.rfind('}')
-
-    if start_idx != -1 and end_idx != -1 and end_idx > start_idx:
-        # Cắt lấy đúng phần từ { đến }
-        return text[start_idx : end_idx + 1]
-
-    # Trường hợp tệ nhất: Trả về nguyên gốc để các hàm repair (AI sửa lỗi) xử lý tiếp
-    return text
-
 def repair_json_with_ai(broken_json_str: str, client) -> str:
-    """Gửi JSON lỗi cho AI sửa"""
+    """Gửi JSON lỗi cho AI sửa (KHÔNG THAY ĐỔI)"""
     print("⚠️ JSON lỗi. Đang yêu cầu AI sửa...")
     prompt_fix = f"""
 Đoạn JSON sau bị lỗi cú pháp:
@@ -299,32 +274,25 @@ NHIỆM VỤ:
     repaired_text = client.send_data_to_check(prompt_fix)
     return clean_json_string(repaired_text)
 def sanitize_latex_json(text: str) -> str:
-    """
-    Sanitize JSON chứa LaTeX một cách AN TOÀN
-    
-    Chiến lược:
-    1. Chỉ xử lý BÊN TRONG chuỗi JSON (giữa dấu ngoặc kép)
-    2. Giữ nguyên phần cấu trúc JSON (keys, colons, brackets)
-    3. Escape backslash KHÔNG phải JSON escape hợp lệ
-    """
-    
-    # Danh sách escape sequences hợp lệ trong JSON spec
-    VALID_JSON_ESCAPES = {
+    VALID_ESCAPES = {
         '\\\\', '\\"', '\\/', '\\b', '\\f', '\\n', '\\r', '\\t'
     }
     
+    def is_already_escaped(s: str, pos: int) -> bool:
+        """Kiểm tra backslash tại vị trí pos đã được escape chưa"""
+        count = 0
+        i = pos - 1
+        while i >= 0 and s[i] == '\\':
+            count += 1
+            i -= 1
+        return count % 2 == 1
+    
     def fix_string_content(match):
-        """
-        Xử lý nội dung BÊN TRONG chuỗi JSON (giữa dấu ngoặc kép)
-        match.group(0) = toàn bộ "..." (có dấu ")
-        match.group(1) = nội dung giữa dấu " (không có dấu ")
-        """
-        full_match = match.group(0)
+        full = match.group(0)
         content = match.group(1)
         
-        # Nếu chuỗi rỗng, giữ nguyên
         if not content:
-            return full_match
+            return full
         
         result = []
         i = 0
@@ -332,80 +300,96 @@ def sanitize_latex_json(text: str) -> str:
         while i < len(content):
             char = content[i]
             
-            if char == '\\':
-                # Kiểm tra có phải escape hợp lệ không
-                if i + 1 < len(content):
-                    next_char = content[i + 1]
-                    two_chars = char + next_char
-                    
-                    # Trường hợp 1: JSON escape hợp lệ (\\, \", \n, \t...)
-                    if two_chars in VALID_JSON_ESCAPES:
-                        result.append(two_chars)
-                        i += 2
+            if char == '\\' and i + 1 < len(content):
+                next_char = content[i + 1]
+                two_chars = char + next_char
+                
+                # ✅ Case 1: JSON escape hợp lệ → Giữ nguyên
+                if two_chars in VALID_ESCAPES:
+                    result.append(two_chars)
+                    i += 2
+                    continue
+                
+                # ✅ Case 2: Unicode escape (\uXXXX) → Giữ nguyên
+                if next_char == 'u' and i + 5 < len(content):
+                    hex_part = content[i+2:i+6]
+                    if len(hex_part) == 4 and all(c in '0123456789ABCDEFabcdef' for c in hex_part):
+                        result.append(content[i:i+6])
+                        i += 6
                         continue
-                    
-                    # Trường hợp 2: Unicode escape (\uXXXX)
-                    if next_char == 'u' and i + 5 < len(content):
-                        hex_part = content[i+2:i+6]
-                        if len(hex_part) == 4 and all(c in '0123456789ABCDEFabcdef' for c in hex_part):
-                            result.append(content[i:i+6])  # \uXXXX
-                            i += 6
-                            continue
-                    
-                    # Trường hợp 3: LaTeX command (VD: \frac, \sqrt, \sin)
-                    # → Escape thành \\
+                
+                # ✅ Case 3: Backslash ĐÃ escape (\\) → Giữ nguyên
+                if next_char == '\\':
                     result.append('\\\\')
-                    i += 1
-                else:
-                    # Backslash ở cuối chuỗi → Escape
-                    result.append('\\\\')
-                    i += 1
+                    i += 2
+                    continue
+                
+                # ❌ Case 4: LaTeX command → CẦN escape
+                result.append('\\\\')
+                i += 1
             else:
                 result.append(char)
                 i += 1
         
-        # Trả về chuỗi đã fix (VẪN CÓ dấu ngoặc kép)
         return '"' + ''.join(result) + '"'
     
-    # Regex tìm tất cả chuỗi JSON: "..."
-    # (?:[^"\\]|\\.)* nghĩa là: (không phải " hoặc \) HOẶC (\ theo sau bất kỳ ký tự nào)
     string_pattern = r'"((?:[^"\\]|\\.)*)"'
-    
     sanitized = re.sub(string_pattern, fix_string_content, text)
-    
     return sanitized
 
 def parse_json_safely(json_str: str, client) -> Optional[Dict]:
-    """Parse JSON an toàn với Sanitization và Retry AI"""
-    # 1. Clean markdown
-    cleaned_str = clean_json_string(json_str)
+    """Parse JSON với 3 lớp bảo vệ"""
     
-    # 2. Bước quan trọng: Sanitize LaTeX backslashes bằng thuật toán (nhanh và chính xác hơn AI)
-    sanitized_str = sanitize_latex_json(cleaned_str)
-    
-    # Thử parse lần 1 (với chuỗi đã sanitize)
+    # === LỚP 1: Thử parse ngay lập tức ===
     try:
-        return json.loads(sanitized_str, strict=False)
-    except json.JSONDecodeError as e:
-        print(f"❌ Lỗi JSON lần 1 (Logic): {e}")
-        # Debug: In ra đoạn lỗi để kiểm tra nếu cần
-        start = max(0, e.pos - 20)
-        end = min(len(sanitized_str), e.pos + 20)
-        print(f"Context: ...{sanitized_str[start:end]}...")
+        return json.loads(json_str, strict=False)
+    except json.JSONDecodeError:
+        pass
     
-    # Thử sửa bằng AI (Fallback cuối cùng)
+    # === LỚP 2: Clean + Sanitize ===
+    cleaned = clean_json_string(json_str)
+    sanitized = sanitize_latex_json(cleaned)
+    
     try:
-        # Lưu ý: Gửi chuỗi gốc (cleaned_str) hoặc chuỗi đã sanitize tùy chiến lược. 
-        # Thường gửi chuỗi gốc để AI tự định dạng lại từ đầu sẽ an toàn hơn về ngữ nghĩa.
-        repaired_str = repair_json_with_ai(cleaned_str, client)
-        
-        # Sau khi AI sửa, vẫn nên sanitize lại một lần nữa để chắc chắn
-        repaired_str = sanitize_latex_json(repaired_str)
-        
-        return json.loads(repaired_str, strict=False)
+        return json.loads(sanitized, strict=False)
     except json.JSONDecodeError as e:
-        print(f"❌ Lỗi JSON lần 2 (AI Give up): {e}")
+        print(f"⚠️ Lỗi JSON sau sanitize (vị trí {e.pos}): {e.msg}")
+        start = max(0, e.pos - 30)
+        end = min(len(sanitized), e.pos + 30)
+        print(f"Context: ...{sanitized[start:end]}...")
+    
+    # === LỚP 3: Gọi AI sửa ===
+    print("🤖 Gọi AI sửa JSON...")
+    try:
+        repaired = repair_json_with_ai(cleaned, client)
+        repaired_sanitized = sanitize_latex_json(repaired)
+        return json.loads(repaired_sanitized, strict=False)
+    except Exception as e:
+        print(f"❌ AI cũng không sửa được: {e}")
         return None
+
+
+def clean_json_string(text: str) -> str:
+    """Xóa markdown wrapper và lấy phần JSON thuần túy"""
+    if not text:
+        return ""
+    
+    text = text.strip()
+    
+    # Xóa markdown code block
+    pattern = r"```(?:json)?(.*?)```"
+    match = re.search(pattern, text, re.DOTALL | re.IGNORECASE)
+    if match:
+        text = match.group(1).strip()
+    
+    # "Săn" JSON bằng cách tìm { đầu và } cuối
+    start = text.find('{')
+    end = text.rfind('}')
+    
+    if start != -1 and end != -1 and end > start:
+        return text[start:end + 1]
+    
+    return text
 def generate_or_get_image(hinh_anh_data: Dict) -> tuple:
     """
     Xử lý gọi hàm sinh ảnh.
@@ -571,14 +555,6 @@ class PromptBuilder:
    - TUYỆT ĐỐI KHÔNG có lời kết thúc hay giải thích thêm bên ngoài block JSON.
    - JSON phải hợp lệ (valid JSON), không được thiếu dấu phẩy hay ngoặc.
 
-2. **CHẶN SUY LUẬN NHÁP (ANTI-CHAIN-OF-THOUGHT) - ĐẶC BIỆT VỚI MÔN TỰ NHIÊN (TOÁN/LÝ/HÓA)**:
-   - **VẤN ĐỀ CẤM:** Cấm tuyệt đối việc in ra quá trình suy nghĩ của AI vào trong các trường dữ liệu.
-     + SAI: "giai_thich": "Đầu tiên ta tính delta. Delta = b^2 - 4ac. Vì delta > 0 nên... Vậy đáp án là..." (Văn phong lôi thôi, giống nháp).
-     + SAI: "giai_thich": "Let me calculate step by step..."
-   - **YÊU CẦU ĐÚNG:** Hãy tính toán ngầm (internal processing). Chỉ viết **LỜI GIẢI CHÍNH THỨC** (Final Polish Solution) vào trường `"giai_thich"`.
-   - Văn phong lời giải: Trang trọng, học thuật, gãy gọn, giống hệt sách giải bài tập (SBT) hoặc đáp án chính thức của Bộ Giáo dục.
-   - Đi thẳng vào công thức và kết quả. Ví dụ: "Ta có phương trình... <=> x = ... Vậy nghiệm là...".
-
 3. **QUY TẮC SỬ DỤNG LaTeX ($) - HÃY LINH HOẠT:**
    - **KHOA HỌC TỰ NHIÊN:** + BẮT BUỘC dùng dấu `$` bao quanh các công thức, phương trình, ký hiệu biến số, phản ứng hóa học.
      + Ví dụ: "Hàm số $y = x^2 + 2x + 1$", "Chất $H_2SO_4$ đặc", "Gia tốc $a = 2 m/s^2$".
@@ -604,17 +580,9 @@ class PromptBuilder:
 ### MẪU JSON:
 {json_hint}
 """
-
-
-
-# ============================================================================
-# PHẦN 5: DYNAMIC DOCX RENDERER (MỚI - AUTO-ADAPT)
-# ============================================================================
-
 class DynamicDocxRenderer:
     """
     Renderer tự động thích ứng với cấu trúc JSON
-    KHÔNG hard-code logic render
     """
     
     def __init__(self, doc: Document):
@@ -983,3 +951,55 @@ class ConfigManager:
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
 
+
+if __name__ == "__main__":
+    # Test case 1: LaTeX chưa escape
+    test1 = r'{"formula": "Công thức \\frac{a}{b} = 0.5"}'
+    print("Test 1 (LaTeX chưa escape):")
+    print(f"Input:  {test1}")
+    result1 = sanitize_latex_json(test1)
+    print(f"Output: {result1}")
+    try:
+        parsed = json.loads(result1)
+        print(f"✅ Parse thành công: {parsed}")
+    except Exception as e:
+        print(f"❌ Lỗi: {e}")
+    print("-" * 60)
+    
+    # Test case 2: LaTeX ĐÃ escape (không được double escape)
+    test2 = r'{"formula": "Công thức \\frac{a}{b} = 0.5"}'
+    print("Test 2 (LaTeX đã escape):")
+    print(f"Input:  {test2}")
+    result2 = sanitize_latex_json(test2)
+    print(f"Output: {result2}")
+    try:
+        parsed = json.loads(result2)
+        print(f"✅ Parse thành công: {parsed}")
+    except Exception as e:
+        print(f"❌ Lỗi: {e}")
+    print("-" * 60)
+    
+    # Test case 3: Mix escape và chưa escape
+    test3 = r'{"text": "Đã escape: \\sin(x), chưa escape: \cos(x)"}'
+    print("Test 3 (Mix):")
+    print(f"Input:  {test3}")
+    result3 = sanitize_latex_json(test3)
+    print(f"Output: {result3}")
+    try:
+        parsed = json.loads(result3)
+        print(f"✅ Parse thành công: {parsed}")
+    except Exception as e:
+        print(f"❌ Lỗi: {e}")
+    print("-" * 60)
+    
+    # Test case 4: JSON escape hợp lệ (phải giữ nguyên)
+    test4 = r'{"text": "Line 1\nLine 2\tTabbed"}'
+    print("Test 4 (JSON escape hợp lệ):")
+    print(f"Input:  {test4}")
+    result4 = sanitize_latex_json(test4)
+    print(f"Output: {result4}")
+    try:
+        parsed = json.loads(result4)
+        print(f"✅ Parse thành công: {parsed}")
+    except Exception as e:
+        print(f"❌ Lỗi: {e}")
