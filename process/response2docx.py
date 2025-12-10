@@ -646,14 +646,7 @@ class PromptBuilder:
    - CHỈ TRẢ VỀ DUY NHẤT MỘT CHUỖI JSON thuần túy.
    - TUYỆT ĐỐI KHÔNG có lời mở đầu hay kết thúc (như "Here is result...").
    - **QUAN TRỌNG:** Phải sử dụng dấu ngoặc kép (") cho key và value. KHÔNG dùng dấu ngoặc đơn (').
-
-2. **QUY TẮC LATEX (Toán/Lý/Hóa):**
-   - BẮT BUỘC dùng dấu $ bao quanh công thức.
-   - Khi viết trong JSON string, dấu gạch chéo phải được escape (nhân đôi).
-   - Ví dụ đúng: "Hàm số $y = x^2$" hoặc "Phân số $\\\\frac{{1}}{{2}}$" (lưu ý dấu gạch chéo kép).
-   - Ví dụ sai: "\\frac{{1}}{{2}}" (thiếu escape) hoặc "$y$" (cho biến đơn lẻ không cần thiết).
-
-3. **HÌNH ẢNH:**
+2. **HÌNH ẢNH:**
    - Nếu câu hỏi có hình, BẮT BUỘC điền mô tả chi tiết vào trường "hinh_anh".
    - Ví dụ: "Tam giác ABC vuông tại A..." hoặc "Sơ đồ mạch điện gồm..."
 
@@ -729,7 +722,7 @@ class DynamicDocxRenderer:
         # Câu hỏi
         p = self.doc.add_paragraph()
         p.add_run(f"Câu {cau['stt']}. ").bold = True
-        process_text_with_latex(cau['noi_dung'], p)
+        process_text_with_latex(cau['noi_dung'], p) 
         
         # Hình ảnh
         hinh_anh = cau.get("hinh_anh", {})
@@ -800,14 +793,15 @@ class DynamicDocxRenderer:
         # Giải thích từng ý - THÊM XỬ LÝ LATEX
         for gt in cau.get("giai_thich", []):
             p_gt = self.doc.add_paragraph()
-            p_gt.add_run("- ")
-            process_text_with_latex(gt.get('noi_dung_y', ''), p_gt)  
-            run_kl = p_gt.add_run(f" - {gt.get('ket_luan', 'SAI')}.")
+            p_gt.add_run('+) "') 
+            process_text_with_latex(gt.get('noi_dung_y', ''), p_gt)
+            ket_luan = gt.get('ket_luan', 'SAI')
+            run_kl = p_gt.add_run(f'" - {ket_luan}. ')
             run_kl.bold = True
             
             if gt.get('giai_thich'):
-                p_gt_detail = self.doc.add_paragraph()
-                process_text_with_latex(gt.get('giai_thich', ''), p_gt_detail)  
+                # p_gt_detail = self.doc.add_paragraph()
+                process_text_with_latex(gt.get('giai_thich', ''), p_gt)  
     
     def render_question_tra_loi_ngan(self, cau: Dict):
         """Render câu hỏi trả lời ngắn"""
