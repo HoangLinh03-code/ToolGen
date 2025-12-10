@@ -1,4 +1,3 @@
-
 import json
 import os
 import sys
@@ -258,21 +257,109 @@ def save_document_securely(doc, batch_name, file_name):
         print(f"❌ Không thể lưu file sau {max_retries} lần thử")
         return None
 def repair_json_with_ai(broken_json_str: str, client) -> str:
-    """Gửi JSON lỗi cho AI sửa (KHÔNG THAY ĐỔI)"""
-    print("⚠️ JSON lỗi. Đang yêu cầu AI sửa...")
-    prompt_fix = f"""
-Đoạn JSON sau bị lỗi cú pháp:
+    """
+    Gửi JSON lỗi cho AI sửa (ĐÃ CẢI TIẾN)
+    Thay vì yêu cầu AI trả về toàn bộ JSON, ta sẽ cố gắng tìm phần hợp lệ
+    hoặc yêu cầu AI sửa phần bị lỗi cụ thể.
+    """
+    print("⚠️ JSON lỗi. Đang cố gắng sửa...")
+    
+    # --- Cải tiến 1: Cố gắng "xén" JSON hợp lệ ---
+    # Đôi khi AI trả về JSON bị thừa văn bản phía sau
+    repaired_by_cutting = extract_valid_json(broken_json_str)
+    if repaired_by_cutting:
+        print("✅ JSON đã được sửa bằng cách xén phần hợp lệ.")
+        return repaired_by_cutting
 
+    # --- Cải tiến 2: Gửi yêu cầu sửa lỗi cụ thể hơn cho AI ---
+    # Thay vì gửi nguyên đoạn lỗi, mô tả rõ hơn lỗi gì
+    error_description = "Đoạn JSON sau bị lỗi cú pháp hoặc bị cắt xén."
+    error_description += " Có thể thiếu dấu phẩy, ngoặc đóng/mở không khớp, hoặc bị ngắt giữa chừng."
+    error_description += " Vui lòng sửa lỗi cú pháp, GIỮ NGUYÊN TOÀN BỘ NỘI DUNG TIẾNG VIỆT VÀ CÔNG THỨC LATEX,"
+    error_description += " và TRẢ VỀ CHỈ CÓ JSON ĐÃ SỬA (không thêm lời dẫn, không thêm markdown)."
+
+    prompt_fix = f"""
+{error_description}
+
+JSON lỗi:
 {broken_json_str}
 
-NHIỆM VỤ:
-1. Sửa lỗi cú pháp JSON (escape quotes, thêm phẩy, đóng ngoặc)
-2. KHÔNG thay đổi nội dung Tiếng Việt
-3. KHÔNG thay đổi công thức LaTeX (giữ nguyên \\frac, \\sqrt...)
-4. CHỈ TRẢ VỀ JSON ĐÃ SỬA (không markdown, không giải thích)
+JSON đã sửa (chỉ JSON, không thêm gì khác):
+"""
+    try:
+        repaired_text = client.send_data_to_check(prompt_fix)
+        # Sau khi AI trả về, thử xén lại lần nữa nếu cần
+        final_repaired = extract_valid_json(repaired_text)
+        if final_repaired:
+            print("✅ JSON đã được sửa bởi AI và xác nhận hợp lệ.")
+            return final_repaired
+        else:
+            print("❌ AI trả về văn bản nhưng vẫn không phải JSON hợp lệ.")
+            return repaired_text # Trả về nguyên văn để thử parse sau
+    except Exception as e:
+        print(f"❌ Gặp lỗi khi yêu cầu AI sửa JSON: {e}")
+        return broken_json_str
+    
+def extract_valid_json(text: str) -> str:
     """
-    repaired_text = client.send_data_to_check(prompt_fix)
-    return clean_json_string(repaired_text)
+    Cố gắng trích xuất phần JSON hợp lệ từ một chuỗi có thể có văn bản thừa.
+    Hỗ trợ cả JSON lồng nhau phức tạp.
+    """
+    text = text.strip()
+    
+    # 1. Tìm tất cả các cặp ngoặc nhọn {} hoặc ngoặc vuông []
+    stack = []
+    start = -1
+    max_depth = 0
+    max_start = -1
+    max_end = -1
+
+    for i, char in enumerate(text):
+        if char == '{':
+            if not stack:
+                start = i
+            stack.append(char)
+        elif char == '[':
+            if not stack:
+                start = i
+            stack.append(char)
+        elif char == '}' and stack and stack[-1] == '{':
+            stack.pop()
+            if not stack and (i - start) > (max_end - max_start):
+                max_start = start
+                max_end = i
+        elif char == ']' and stack and stack[-1] == '[':
+            stack.pop()
+            if not stack and (i - start) > (max_end - max_start):
+                max_start = start
+                max_end = i
+
+    if max_start != -1 and max_end != -1:
+        potential_json = text[max_start : max_end + 1]
+        # 2. Thử parse phần JSON này
+        try:
+            # Dùng strict=False để thư giãn một chút với ký tự đặc biệt
+            json.loads(potential_json, strict=False)
+            print(f"🔍 Đã tìm thấy JSON hợp lệ trong văn bản.")
+            return potential_json
+        except (json.JSONDecodeError, TypeError):
+            pass # Không parse được, thử phương pháp khác
+
+    # Nếu không tìm được JSON hoàn chỉnh, thử phương pháp cũ
+    # "Săn" JSON bằng cách tìm { đầu và } cuối
+    start_brace = text.find('{')
+    end_brace = text.rfind('}')
+    if start_brace != -1 and end_brace != -1 and end_brace > start_brace:
+        potential_json_old_way = text[start_brace : end_brace + 1]
+        try:
+            json.loads(potential_json_old_way, strict=False)
+            print(f"🔍 Đã tìm thấy JSON hợp lệ theo cách cũ.")
+            return potential_json_old_way
+        except (json.JSONDecodeError, TypeError):
+            pass
+
+    # Nếu tất cả đều không thành công
+    return ""
 def sanitize_latex_json(text: str) -> str:
     VALID_ESCAPES = {
         '\\\\', '\\"', '\\/', '\\b', '\\f', '\\n', '\\r', '\\t'
@@ -338,34 +425,55 @@ def sanitize_latex_json(text: str) -> str:
     return sanitized
 
 def parse_json_safely(json_str: str, client) -> Optional[Dict]:
-    """Parse JSON với 3 lớp bảo vệ"""
+    """Parse JSON với 3 lớp bảo vệ - ĐÃ CẢI TIẾN"""
     
     # === LỚP 1: Thử parse ngay lập tức ===
     try:
         return json.loads(json_str, strict=False)
-    except json.JSONDecodeError:
+    except (json.JSONDecodeError, TypeError):
         pass
-    
+
     # === LỚP 2: Clean + Sanitize ===
     cleaned = clean_json_string(json_str)
     sanitized = sanitize_latex_json(cleaned)
     
     try:
         return json.loads(sanitized, strict=False)
-    except json.JSONDecodeError as e:
-        print(f"⚠️ Lỗi JSON sau sanitize (vị trí {e.pos}): {e.msg}")
-        start = max(0, e.pos - 30)
-        end = min(len(sanitized), e.pos + 30)
-        print(f"Context: ...{sanitized[start:end]}...")
-    
+    except (json.JSONDecodeError, TypeError) as e:
+        print(f"⚠️ Lỗi JSON sau sanitize (vị trí {getattr(e, 'pos', 'unknown')}): {e.msg}")
+        # Chỉ in context nếu có vị trí lỗi
+        if hasattr(e, 'pos'):
+            start = max(0, e.pos - 30)
+            end = min(len(sanitized), e.pos + 30)
+            print(f"Context: ...{sanitized[start:end]}...")
+
     # === LỚP 3: Gọi AI sửa ===
     print("🤖 Gọi AI sửa JSON...")
     try:
-        repaired = repair_json_with_ai(cleaned, client)
-        repaired_sanitized = sanitize_latex_json(repaired)
-        return json.loads(repaired_sanitized, strict=False)
+        # Thay vì gửi 'cleaned', ta gửi 'sanitized' để AI có thể sửa dễ hơn
+        repaired = repair_json_with_ai(sanitized, client)
+        
+        # AI có thể trả về nhiều thứ, cố gắng extract JSON hợp lệ
+        extracted_json = extract_valid_json(repaired)
+        if extracted_json:
+            # Nếu extract được, lại phải sanitize lại vì có thể AI chưa escape đúng
+            final_sanitized = sanitize_latex_json(extracted_json)
+            try:
+                return json.loads(final_sanitized, strict=False)
+            except (json.JSONDecodeError, TypeError) as e:
+                 print(f"❌ AI trả về JSON nhưng vẫn lỗi sau khi sanitize: {e}")
+                 return None
+        else:
+            # Nếu không extract được, thử parse nguyên văn
+            try:
+                return json.loads(repaired, strict=False)
+            except (json.JSONDecodeError, TypeError) as e:
+                 print(f"❌ Không thể parse cả JSON được AI sửa: {e}")
+                 return None
+
     except Exception as e:
-        print(f"❌ AI cũng không sửa được: {e}")
+        print(f"❌ LỖI nghiêm trọng khi gọi AI sửa JSON: {e}")
+        traceback.print_exc()
         return None
 
 
@@ -444,16 +552,12 @@ def insert_image_or_placeholder(doc: Document, hinh_anh_data: Dict):
 
 class PromptBuilder:
     """
-    Builder tạo prompt động dựa trên cấu hình
-    Cho phép thay đổi prompt mà không sửa code
+    Builder tạo prompt động - Đã sửa lỗi xung đột f-string và LaTeX
     """
     
     @staticmethod
     def build_json_structure_hint(question_type: str) -> str:
-        """
-        Tạo hint cấu trúc JSON dựa trên loại đề
-        Đây là phần duy nhất cần thay đổi khi muốn format mới
-        """
+        # Hàm này trả về string thường (không phải f-string) nên giữ nguyên 1 dấu {}
         if question_type == "trac_nghiem_4_dap_an":
             return """
 {
@@ -465,11 +569,7 @@ class PromptBuilder:
       "muc_do": "nhan_biet",
       "phan": "Phần I",
       "noi_dung": "Nội dung câu hỏi...",
-      "hinh_anh": {
-        "co_hinh": true,
-        "loai": "tu_mo_ta",
-        "mo_ta": "Mô tả để sinh ảnh..."
-      },
+      "hinh_anh": { "co_hinh": true, "loai": "tu_mo_ta", "mo_ta": "Mô tả..." },
       "dap_an": [
         {"ky_hieu": "A", "noi_dung": "Đáp án A"},
         {"ky_hieu": "B", "noi_dung": "Đáp án B"},
@@ -477,12 +577,11 @@ class PromptBuilder:
         {"ky_hieu": "D", "noi_dung": "Đáp án D"}
       ],
       "dap_an_dung": 2,
-      "giai_thich": "Giải thích chi tiết..."
+      "giai_thich": "Giải thích..."
     }
   ]
 }
 """
-        
         elif question_type == "dung_sai":
             return """
 {
@@ -493,20 +592,18 @@ class PromptBuilder:
       "stt": 1,
       "muc_do": "thong_hieu",
       "phan": "Phần I",
-      "doan_thong_tin": "Nội dung...",
-      "hinh_anh": { "co_hinh": true, "loai": "tu_mo_ta", "mo_ta": "Mô tả để sinh ảnh..." },
+      "doan_thong_tin": "...",
+      "hinh_anh": { "co_hinh": true, "loai": "tu_mo_ta", "mo_ta": "Mô tả..." },
       "cac_y": [
-        {"ky_hieu": "a", "noi_dung": "Phát biểu a", "dung": false},
-        {"ky_hieu": "b", "noi_dung": "Phát biểu b", "dung": true},
-        {"ky_hieu": "c", "noi_dung": "Phát biểu c", "dung": false},
-        {"ky_hieu": "d", "noi_dung": "Phát biểu d", "dung": true}
+        {"ky_hieu": "a", "noi_dung": "...", "dung": false},
+        {"ky_hieu": "b", "noi_dung": "...", "dung": true},
+        {"ky_hieu": "c", "noi_dung": "...", "dung": false},
+        {"ky_hieu": "d", "noi_dung": "...", "dung": true}
       ],
       "dap_an_dung_sai": "0101",
       "giai_thich": [
-        {"y": "a", "noi_dung_y": "...", "ket_luan": "SAI", "giai_thich": "BẮT BUỘC GIẢI THÍCH CHI TIẾT TẠI ĐÂY"},
-        {"y": "b", "noi_dung_y": "...", "ket_luan": "ĐÚNG", "giai_thich": "BẮT BUỘC GIẢI THÍCH CHI TIẾT TẠI ĐÂY"},
-        {"y": "c", "noi_dung_y": "...", "ket_luan": "SAI", "giai_thich": "BẮT BUỘC GIẢI THÍCH CHI TIẾT TẠI ĐÂY"},
-        {"y": "d", "noi_dung_y": "...", "ket_luan": "ĐÚNG", "giai_thich": "BẮT BUỘC GIẢI THÍCH CHI TIẾT TẠI ĐÂY"}
+        {"y": "a", "noi_dung_y": "...", "ket_luan": "SAI", "giai_thich": "..."},
+        {"y": "b", "noi_dung_y": "...", "ket_luan": "ĐÚNG", "giai_thich": "..."}
       ]
     }
   ]
@@ -520,64 +617,47 @@ class PromptBuilder:
   "cau_hoi": [
     {
       "stt": 1,
-      "muc_do": "nhan_biet",
+      "muc_do": "van_dung",
       "phan": "Phần I",
-      "noi_dung": "Nội dung câu hỏi...",
-      "hinh_anh": {
-        "co_hinh": true,
-        "loai": "tu_mo_ta",
-        "mo_ta": "Mô tả để sinh ảnh..."
-      },
-      "dap_an": "đáp án ngắn gọn",
-      "giai_thich": "Giải thích chi tiết 80-120 từ về cách tính toán/suy luận để có đáp án..."
+      "noi_dung": "...",
+      "hinh_anh": { "co_hinh": true, "loai": "tu_mo_ta", "mo_ta": "..." },
+      "dap_an": "[[kết quả]]",
+      "giai_thich": "..."
     }
   ]
 }
 """
-        
         return "{}"
-    
+
     @staticmethod
     def wrap_user_prompt(user_prompt: str, question_type: str) -> str:
         json_hint = PromptBuilder.build_json_structure_hint(question_type)
         
-        # PROMPT MỚI: Ngắn gọn, súc tích, tập trung vào JSON và $
+        # SỬA LỖI TẠI ĐÂY:
+        # Trong f-string (f"""), dấu ngoặc nhọn của LaTeX phải nhân đôi thành {{ }}
+        # Ví dụ: \frac{1}{2} phải viết là \\frac{{1}}{{2}} để Python không hiểu nhầm là biến
+        
         return f"""{user_prompt}
 
 ----------------
 ### YÊU CẦU NGHIÊM NGẶT VỀ DỮ LIỆU (BẮT BUỘC TUÂN THỦ 100%):
-- Mọi trường trong câu hỏi và đáp án PHẢI có dữ liệu.
-- Nếu đáp án là hình ảnh hoặc ký hiệu, hãy mô tả nó bằng lời (Ví dụ: "Hình vẽ tam giác", "Ký hiệu Rỗng").
 
 1. **FORMAT ĐẦU RA (QUAN TRỌNG NHẤT)**: 
    - CHỈ TRẢ VỀ DUY NHẤT MỘT CHUỖI JSON thuần túy.
-   - TUYỆT ĐỐI KHÔNG có lời mở đầu (Ví dụ: "Đây là kết quả...", "Here is the JSON...", "Let me help you...").
-   - TUYỆT ĐỐI KHÔNG có lời kết thúc hay giải thích thêm bên ngoài block JSON.
-   - JSON phải hợp lệ (valid JSON), không được thiếu dấu phẩy hay ngoặc.
+   - TUYỆT ĐỐI KHÔNG có lời mở đầu hay kết thúc (như "Here is result...").
+   - **QUAN TRỌNG:** Phải sử dụng dấu ngoặc kép (") cho key và value. KHÔNG dùng dấu ngoặc đơn (').
 
-3. **QUY TẮC SỬ DỤNG LaTeX ($) - HÃY LINH HOẠT:**
-   - **KHOA HỌC TỰ NHIÊN:** + BẮT BUỘC dùng dấu `$` bao quanh các công thức, phương trình, ký hiệu biến số, phản ứng hóa học.
-     + Ví dụ: "Hàm số $y = x^2 + 2x + 1$", "Chất $H_2SO_4$ đặc", "Gia tốc $a = 2 m/s^2$".
-     + Phân số dùng: $\\frac{{tu}}{{mau}}$.
-   
-   - **KHOA HỌC XÃ HỘI:**
-     + VIẾT VĂN BẢN BÌNH THƯỜNG.
-     + KHÔNG dùng `$` cho các con số thông thường, ngày tháng năm, hoặc danh từ riêng.
-     + Ví dụ ĐÚNG: "Ngày 2/9/1945", "Dân số là 90 triệu người".
-     + Ví dụ SAI (Cấm): "$Ngày 2/9/1945$", "$90 triệu$".
+2. **QUY TẮC LATEX (Toán/Lý/Hóa):**
+   - BẮT BUỘC dùng dấu $ bao quanh công thức.
+   - Khi viết trong JSON string, dấu gạch chéo phải được escape (nhân đôi).
+   - Ví dụ đúng: "Hàm số $y = x^2$" hoặc "Phân số $\\\\frac{{1}}{{2}}$" (lưu ý dấu gạch chéo kép).
+   - Ví dụ sai: "\\frac{{1}}{{2}}" (thiếu escape) hoặc "$y$" (cho biến đơn lẻ không cần thiết).
 
-4. **HÌNH ẢNH MINH HỌA (QUAN TRỌNG - BẮT BUỘC CHECK)**:
-   - Tư duy: "Nội dung này có cần hình minh họa để học sinh hiểu rõ hơn không?"
-   - Áp dụng cho **MỌI LĨNH VỰC** (Khoa học Tự nhiên & Xã hội):
-     + **Toán/Lý/Hóa**: Nếu có hình học, đồ thị, mạch điện, thí nghiệm, cấu trúc phân tử... -> BẮT BUỘC điền mô tả vào `"mo_ta"`.
-     + **Sử/Địa/Văn**: Nếu có lược đồ trận đánh, bản đồ địa lý, biểu đồ dân số, di tích lịch sử, chân dung nhân vật... -> BẮT BUỘC điền mô tả vào `"mo_ta"`.
-   - **Cách viết mô tả ("mo_ta")**:
-     + Viết chi tiết để công cụ vẽ tranh (AI) có thể tái tạo lại được.
-     + Ví dụ Toán: "Tam giác ABC vuông tại A, đường cao AH..."
-     + Ví dụ Sử: "Lược đồ trận Điện Biên Phủ, các mũi tên tấn công từ vây quanh lòng chảo..."
-     + Ví dụ Địa: "Bản đồ hình chữ S của Việt Nam, đánh dấu vị trí thủ đô Hà Nội..."
+3. **HÌNH ẢNH:**
+   - Nếu câu hỏi có hình, BẮT BUỘC điền mô tả chi tiết vào trường "hinh_anh".
+   - Ví dụ: "Tam giác ABC vuông tại A..." hoặc "Sơ đồ mạch điện gồm..."
 
-### MẪU JSON:
+### MẪU JSON MONG MUỐN:
 {json_hint}
 """
 class DynamicDocxRenderer:
@@ -841,8 +921,13 @@ def response2docx_flexible(
     question_type: str = "trac_nghiem_4_dap_an",
     batch_name: Optional[str] = None
 ) -> Optional[str]:
+    """
+    Phiên bản cải tiến với cơ chế fail-safe triệt để.
+    Luôn luôn trả về 1 file .docx, dù AI có lỗi hay không.
+    """
     try:
         from api.callAPI import VertexClient
+        from docx import Document # Import ở đây để đảm bảo nếu lỗi ở mức import thì vẫn bắt được
         
         client = VertexClient(project_id, creds, model_name)
         
@@ -856,16 +941,36 @@ def response2docx_flexible(
         print("📤 Đang gửi request tới AI...")
         ai_response = client.send_data_to_AI(final_prompt, file_path)
         
-        # 3. Parse JSON
+        # 3. Parse JSON với cơ chế an toàn
         print("🔄 Đang parse JSON...")
         data = parse_json_safely(ai_response, client)
-        if not data:
-            print("❌ Không thể parse JSON từ AI")
-            return None
         
+        if not data:
+            print("❌ Không thể parse JSON từ AI. Sử dụng chế độ FAIL-SAFE.")
+            # --- BƯỚC FAIL-SAFE TRIỆT ĐỂ ---
+            # Tạo một file .docx tối thiểu với nội dung phản hồi thô từ AI
+            doc = Document()
+            doc.add_heading(f'ĐỀ {question_type.upper()}', level=1).alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+            doc.add_heading('PHẢN HỒI TỪ AI (RAW)', level=2)
+            # Thêm phản hồi thô để người dùng biết AI đã trả về gì
+            doc.add_paragraph(ai_response)
+            
+            doc.add_heading('LỖI', level=3)
+            doc.add_paragraph('Dữ liệu từ AI không ở định dạng JSON hợp lệ và không thể xử lý.')
+            doc.add_paragraph('Vui lòng kiểm tra lại prompt hoặc nội dung file đầu vào.')
+            
+            print("📝 Đang lưu file FAIL-SAFE...")
+            output_path = save_document_securely(doc, batch_name, f"{file_name}_loi_parse")
+            if output_path:
+                print(f"✅ Đã lưu file FAIL-SAFE: {output_path}")
+            else:
+                print("❌ Không thể lưu file FAIL-SAFE.")
+            return output_path # Trả về đường dẫn file fail-safe
+
         print(f"✅ Parse thành công: {data.get('tong_so_cau', 0)} câu hỏi")
         
-        # 4. Render DOCX động
+        # 4. Render DOCX động (cũng có thể gây lỗi)
         print("📝 Đang tạo DOCX...")
         doc = Document()
         renderer = DynamicDocxRenderer(doc)
@@ -873,26 +978,77 @@ def response2docx_flexible(
         try:
             renderer.render_all(data)
             print("✅ Render DOCX thành công")
-        except Exception as e:
-            print(f"❌ Lỗi khi render DOCX: {e}")
-            traceback.print_exc()
-            return None
-        
-        # 5. Lưu file
+        except Exception as e_render:
+            print(f"❌ Lỗi khi render DOCX: {e_render}")
+            print("📝 Đang chuyển sang chế độ FAIL-SAFE (dữ liệu thô)...")
+            traceback.print_exc() # Ghi log lỗi chi tiết
+            
+            # --- BƯỚC FAIL-SAFE CHO RENDER ---
+            # Tạo lại document mới từ đầu, chỉ ghi dữ liệu thô
+            doc = Document()
+            doc.add_heading(f'ĐỀ {question_type.upper()}', level=1).alignment = WD_ALIGN_PARAGRAPH.CENTER
+            
+            doc.add_heading('DỮ LIỆU TỪ AI (RAW - JSON)', level=2)
+            # Chuyển dữ liệu sang string và thêm vào doc
+            raw_data_str = json.dumps(data, ensure_ascii=False, indent=2)
+            doc.add_paragraph(raw_data_str)
+            
+            doc.add_heading('LỖI KHI XỬ LÝ', level=3)
+            doc.add_paragraph(f'Lỗi render: {e_render}')
+            doc.add_paragraph('Dữ liệu thô đã được lưu. Vui lòng kiểm tra lại cấu trúc JSON.')
+            
+            print("📝 Đang lưu file FAIL-SAFE (render lỗi)...")
+            output_path = save_document_securely(doc, batch_name, f"{file_name}_loi_render")
+            if output_path:
+                print(f"✅ Đã lưu file FAIL-SAFE (render lỗi): {output_path}")
+            else:
+                print("❌ Không thể lưu file FAIL-SAFE (render lỗi).")
+            return output_path # Trả về đường dẫn file fail-safe
+
+        # 5. Lưu file (có thể lỗi do quyền truy cập, ổ đĩa đầy, v.v.)
         print("💾 Đang lưu file...")
         output_path = save_document_securely(doc, batch_name, file_name)
         
         if output_path:
             print(f"✅ Hoàn thành: {output_path}")
         else:
-            print("❌ Không thể lưu file")
+            print("❌ Không thể lưu file (lỗi từ hàm save_document_securely).")
+            # --- BƯỚC FAIL-SAFE CHO LƯU FILE ---
+            # Không thể lưu theo tên gốc, thử lưu với tên lỗi
+            print("📝 Đang chuyển sang chế độ FAIL-SAFE (lỗi lưu file)...")
+            fallback_doc_path = os.path.join(ensure_output_folder_for_batch(batch_name), f"{file_name}_loi_luu.docx")
+            try:
+                doc.save(fallback_doc_path)
+                print(f"✅ Đã lưu file FAIL-SAFE (lỗi lưu file): {fallback_doc_path}")
+                return fallback_doc_path
+            except Exception as e_save:
+                print(f"❌ FAIL-SAFE cũng thất bại khi lưu: {e_save}")
+                return None # Cuối cùng vẫn thất bại
             
         return output_path
-    
-    except Exception as e:
-        print(f"❌ LỖI NGHIÊM TRỌNG: {e}")
+
+    except Exception as e_main:
+        # BƯỚC FAIL-SAFE CUỐI CÙNG CHO TOÀN BỘ HÀM
+        print(f"❌ LỖI NGHIÊM TRỌNG TRONG TOÀN BỘ HÀM: {e_main}")
         traceback.print_exc()
-        return None
+        
+        # Tạo một file .docx trống tối thiểu với thông báo lỗi
+        try:
+            doc = Document()
+            doc.add_heading('LỖI HỆ THỐNG', level=1).alignment = WD_ALIGN_PARAGRAPH.CENTER
+            doc.add_paragraph(f'Lỗi nghiêm trọng: {e_main}')
+            doc.add_paragraph('Hệ thống không thể xử lý yêu cầu.')
+            
+            if not batch_name:
+                batch_name = file_name.replace("_TN", "").replace("_DS", "").replace("_TLN", "")
+            fallback_path = os.path.join(ensure_output_folder_for_batch(batch_name), f"{file_name}_loi_he_thong.docx")
+            
+            doc.save(fallback_path)
+            print(f"✅ Đã tạo file FAIL-SAFE cuối cùng: {fallback_path}")
+            return fallback_path
+        except Exception as e_final:
+            print(f"❌ Không thể tạo file FAIL-SAFE cuối cùng: {e_final}")
+            return None
 
 def response2docx_json(file_path, prompt, file_name, project_id, creds, model_name, batch_name=None):
     """Wrapper cho trắc nghiệm 4 đáp án (legacy)"""
@@ -950,56 +1106,3 @@ class ConfigManager:
         """Lưu config để tái sử dụng"""
         with open(config_path, "w", encoding="utf-8") as f:
             json.dump(config, f, ensure_ascii=False, indent=2)
-
-
-if __name__ == "__main__":
-    # Test case 1: LaTeX chưa escape
-    test1 = r'{"formula": "Công thức \\frac{a}{b} = 0.5"}'
-    print("Test 1 (LaTeX chưa escape):")
-    print(f"Input:  {test1}")
-    result1 = sanitize_latex_json(test1)
-    print(f"Output: {result1}")
-    try:
-        parsed = json.loads(result1)
-        print(f"✅ Parse thành công: {parsed}")
-    except Exception as e:
-        print(f"❌ Lỗi: {e}")
-    print("-" * 60)
-    
-    # Test case 2: LaTeX ĐÃ escape (không được double escape)
-    test2 = r'{"formula": "Công thức \\frac{a}{b} = 0.5"}'
-    print("Test 2 (LaTeX đã escape):")
-    print(f"Input:  {test2}")
-    result2 = sanitize_latex_json(test2)
-    print(f"Output: {result2}")
-    try:
-        parsed = json.loads(result2)
-        print(f"✅ Parse thành công: {parsed}")
-    except Exception as e:
-        print(f"❌ Lỗi: {e}")
-    print("-" * 60)
-    
-    # Test case 3: Mix escape và chưa escape
-    test3 = r'{"text": "Đã escape: \\sin(x), chưa escape: \cos(x)"}'
-    print("Test 3 (Mix):")
-    print(f"Input:  {test3}")
-    result3 = sanitize_latex_json(test3)
-    print(f"Output: {result3}")
-    try:
-        parsed = json.loads(result3)
-        print(f"✅ Parse thành công: {parsed}")
-    except Exception as e:
-        print(f"❌ Lỗi: {e}")
-    print("-" * 60)
-    
-    # Test case 4: JSON escape hợp lệ (phải giữ nguyên)
-    test4 = r'{"text": "Line 1\nLine 2\tTabbed"}'
-    print("Test 4 (JSON escape hợp lệ):")
-    print(f"Input:  {test4}")
-    result4 = sanitize_latex_json(test4)
-    print(f"Output: {result4}")
-    try:
-        parsed = json.loads(result4)
-        print(f"✅ Parse thành công: {parsed}")
-    except Exception as e:
-        print(f"❌ Lỗi: {e}")
