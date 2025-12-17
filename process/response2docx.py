@@ -592,7 +592,7 @@ class PromptBuilder:
       "stt": 1,
       "muc_do": "thong_hieu",
       "phan": "Phần I",
-      "doan_thong_tin": "...",
+      "doan_thong_tin": "Nội dung...",
       "hinh_anh": { "co_hinh": true, "loai": "tu_mo_ta", "mo_ta": "Mô tả..." },
       "cac_y": [
         {"ky_hieu": "a", "noi_dung": "...", "dung": false},
@@ -619,7 +619,7 @@ class PromptBuilder:
       "stt": 1,
       "muc_do": "van_dung",
       "phan": "Phần I",
-      "noi_dung": "...",
+      "noi_dung": "Nội dung...",
       "hinh_anh": { "co_hinh": true, "loai": "tu_mo_ta", "mo_ta": "..." },
       "dap_an": "[[kết quả]]",
       "giai_thich": "..."
@@ -647,15 +647,29 @@ class PromptBuilder:
    - TUYỆT ĐỐI KHÔNG có lời mở đầu hay kết thúc (như "Here is result...").
    - **QUAN TRỌNG:** Phải sử dụng dấu ngoặc kép (") cho key và value. KHÔNG dùng dấu ngoặc đơn (').
 
-2. **QUY TẮC LATEX (Toán/Lý/Hóa):**
-   - BẮT BUỘC dùng dấu $ bao quanh công thức.
-   - Khi viết trong JSON string, dấu gạch chéo phải được escape (nhân đôi).
-   - Ví dụ đúng: "Hàm số $y = x^2$" hoặc "Phân số $\\\\frac{{1}}{{2}}$" (lưu ý dấu gạch chéo kép).
-   - Ví dụ sai: "\\frac{{1}}{{2}}" (thiếu escape) hoặc "$y$" (cho biến đơn lẻ không cần thiết).
+2. **QUY TẮC LATEX (Toán/Lý/Hóa/Sinh):**
+ - **KHOA HỌC TỰ NHIÊN:**
+    + BẮT BUỘC dùng dấu $ bao quanh công thức.
+    + Khi viết trong JSON string, dấu gạch chéo phải được escape (nhân đôi).
+    + Ví dụ đúng: "Hàm số $y = x^2$" hoặc "Phân số $\\\\frac{{1}}{{2}}$" (lưu ý dấu gạch chéo kép).
+    + Ví dụ sai: "\\frac{{1}}{{2}}" (thiếu escape) hoặc "$y$" (cho biến đơn lẻ không cần thiết).
 
-3. **HÌNH ẢNH:**
-   - Nếu câu hỏi có hình, BẮT BUỘC điền mô tả chi tiết vào trường "hinh_anh".
-   - Ví dụ: "Tam giác ABC vuông tại A..." hoặc "Sơ đồ mạch điện gồm..."
+- **KHOA HỌC XÃ HỘI:**
+    + VIẾT VĂN BẢN BÌNH THƯỜNG.
+    + KHÔNG dùng `$` cho các con số thông thường, ngày tháng năm, hoặc danh từ riêng.
+    + Ví dụ ĐÚNG: "Ngày 2/9/1945", "Dân số là 90 triệu người".
+    + Ví dụ SAI (Cấm): "$Ngày 2/9/1945$", "$90 triệu$".
+
+3. **HÌNH ẢNH MINH HỌA (QUAN TRỌNG - BẮT BUỘC CHECK)**:
+   - Tư duy: "Nội dung này có cần hình minh họa để học sinh hiểu rõ hơn không?"
+   - Áp dụng cho **MỌI LĨNH VỰC** (Khoa học Tự nhiên & Xã hội):
+     + **Toán/Lý/Hóa**: Nếu có hình học, đồ thị, mạch điện, thí nghiệm, cấu trúc phân tử... -> BẮT BUỘC điền mô tả vào `"mo_ta"`.
+     + **Sử/Địa/Văn**: Nếu có lược đồ trận đánh, bản đồ địa lý, biểu đồ dân số, di tích lịch sử, chân dung nhân vật... -> BẮT BUỘC điền mô tả vào `"mo_ta"`.
+   - **Cách viết mô tả ("mo_ta")**:
+     + Viết chi tiết để công cụ vẽ tranh (AI) có thể tái tạo lại được.
+     + Ví dụ Toán: "Tam giác ABC vuông tại A, đường cao AH..."
+     + Ví dụ Sử: "Lược đồ trận Điện Biên Phủ, các mũi tên tấn công từ vây quanh lòng chảo..."
+     + Ví dụ Địa: "Bản đồ hình chữ S của Việt Nam, đánh dấu vị trí thủ đô Hà Nội..."
 
 ### MẪU JSON MONG MUỐN:
 {json_hint}
